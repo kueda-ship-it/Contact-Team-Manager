@@ -20,21 +20,12 @@
     ];
 
     // --- Auth Logic ---
-    function initAuth() {
-        if (!localStorage.getItem(USERS_KEY)) {
-            const defaultUsers = [
-                { id: "admin", pw: "admin123", name: "管理者", role: "master" },
-                { id: "manager", pw: "manager123", name: "マネージャー", role: "Manager" },
-                { id: "user", pw: "user123", name: "作業員", role: "user" },
-                { id: "viewer", pw: "viewer123", name: "閲覧者", role: "viewer" }
-            ];
-            localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers));
-        }
-
+    async function initAuth() {
         currentUser = JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
         if (!currentUser) {
             showLoginOverlay();
         } else {
+            // セッション有効チェック（オプションでサーバーに問い合わせても良い）
             renderUIByRole();
         }
     }
@@ -63,21 +54,27 @@
         overlay.style.display = "flex";
     }
 
-    function login() {
+    async function login() {
         const id = $("#loginId").value;
         const pw = $("#loginPw").value;
         if (!id || !pw) {
             alert("IDとパスワードを入力してください。");
             return;
         }
-        const users = JSON.parse(localStorage.getItem(USERS_KEY));
-        const user = users.find(u => u.id === id && u.pw === pw);
 
-        if (user) {
-            localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-            location.reload();
-        } else {
-            $("#loginError").style.display = "block";
+        try {
+            const response = await fetch('/api/users');
+            const users = await response.json();
+            const user = users.find(u => u.id === id && u.pw === pw);
+
+            if (user) {
+                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+                location.reload();
+            } else {
+                $("#loginError").style.display = "block";
+            }
+        } catch (err) {
+            alert("認証サーバーに接続できません。");
         }
     }
 

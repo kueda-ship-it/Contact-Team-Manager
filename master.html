@@ -71,32 +71,37 @@
             if (display) display.textContent = `${user.name} (${user.role})`;
         });
 
-        function renderUserList() {
-            const users = JSON.parse(localStorage.getItem("face_users") || "[]");
-            const body = document.getElementById("userListBody");
-            body.innerHTML = "";
-            users.forEach(u => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${u.id}</td>
-                    <td>${u.name}</td>
-                    <td>
-                        <select onchange="updateUserRole('${u.id}', this.value)">
-                            <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>viewer</option>
-                            <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
-                            <option value="Manager" ${u.role === 'Manager' ? 'selected' : ''}>Manager</option>
-                            <option value="master" ${u.role === 'master' ? 'selected' : ''}>master</option>
-                        </select>
-                    </td>
-                    <td>
-                        <button type="button" class="danger" onclick="deleteUser('${u.id}')">削除</button>
-                    </td>
-                `;
-                body.appendChild(tr);
-            });
+        async function renderUserList() {
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+                const body = document.getElementById("userListBody");
+                body.innerHTML = "";
+                users.forEach(u => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${u.id}</td>
+                        <td>${u.name}</td>
+                        <td>
+                            <select onchange="updateUserRole('${u.id}', this.value)">
+                                <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>viewer</option>
+                                <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
+                                <option value="Manager" ${u.role === 'Manager' ? 'selected' : ''}>Manager</option>
+                                <option value="master" ${u.role === 'master' ? 'selected' : ''}>master</option>
+                            </select>
+                        </td>
+                        <td>
+                            <button type="button" class="danger" onclick="deleteUser('${u.id}')">削除</button>
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
+            } catch (err) {
+                alert("ユーザーリストの取得に失敗しました。");
+            }
         }
 
-        window.addUser = () => {
+        window.addUser = async () => {
             const id = document.getElementById("newUserId").value;
             const pw = document.getElementById("newUserPw").value;
             const name = document.getElementById("newUserName").value;
@@ -107,37 +112,48 @@
                 return;
             }
 
-            const users = JSON.parse(localStorage.getItem("face_users") || "[]");
-            if (users.some(u => u.id === id)) {
-                alert("そのIDは既に使用されています。");
-                return;
-            }
-
-            users.push({ id, pw, name, role });
-            localStorage.setItem("face_users", JSON.stringify(users));
-            renderUserList();
-
-            // クリア
-            document.getElementById("newUserId").value = "";
-            document.getElementById("newUserPw").value = "";
-            document.getElementById("newUserName").value = "";
-        };
-
-        window.updateUserRole = (id, newRole) => {
-            const users = JSON.parse(localStorage.getItem("face_users") || "[]");
-            const user = users.find(u => u.id === id);
-            if (user) {
-                user.role = newRole;
-                localStorage.setItem("face_users", JSON.stringify(users));
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, pw, name, role })
+                });
+                if (response.ok) {
+                    renderUserList();
+                    document.getElementById("newUserId").value = "";
+                    document.getElementById("newUserPw").value = "";
+                    document.getElementById("newUserName").value = "";
+                }
+            } catch (err) {
+                alert("追加に失敗しました。");
             }
         };
 
-        window.deleteUser = (id) => {
-            if (confirm("このユーザーを削除しますか？")) {
-                let users = JSON.parse(localStorage.getItem("face_users") || "[]");
-                users = users.filter(u => u.id !== id);
-                localStorage.setItem("face_users", JSON.stringify(users));
-                renderUserList();
+        window.updateUserRole = async (id, newRole) => {
+            try {
+                const res = await fetch('/api/users');
+                const users = await res.json();
+                const user = users.find(u => u.id === id);
+                if (user) {
+                    user.role = newRole;
+                    await fetch('/api/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(user)
+                    });
+                }
+            } catch (err) {
+                alert("更新に失敗しました。");
+            }
+        };
+
+        window.deleteUser = async (id) => {
+            if (!confirm("このユーザーを削除しますか？")) return;
+            try {
+                const response = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+                if (response.ok) renderUserList();
+            } catch (err) {
+                alert("削除に失敗しました。");
             }
         };
 

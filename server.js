@@ -15,12 +15,22 @@ app.use(express.static(__dirname));
 // Ensure directories exist
 const uploadDir = path.join(__dirname, 'uploads');
 const dataFile = path.join(__dirname, 'reports.json');
+const usersFile = path.join(__dirname, 'users.json');
 
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 if (!fs.existsSync(dataFile)) {
     fs.writeFileSync(dataFile, JSON.stringify([]));
+}
+if (!fs.existsSync(usersFile)) {
+    const defaultUsers = [
+        { id: "admin", pw: "admin123", name: "管理者", role: "master" },
+        { id: "manager", pw: "manager123", name: "マネージャー", role: "Manager" },
+        { id: "user", pw: "user123", name: "作業員", role: "user" },
+        { id: "viewer", pw: "viewer123", name: "閲覧者", role: "viewer" }
+    ];
+    fs.writeFileSync(usersFile, JSON.stringify(defaultUsers, null, 2));
 }
 
 // Multer storage config
@@ -79,7 +89,44 @@ app.delete('/api/reports/:id', (req, res) => {
     }
 });
 
-// 4. Upload image
+// 4. Get all users (Master)
+app.get('/api/users', (req, res) => {
+    try {
+        const data = fs.readFileSync(usersFile, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to read users' });
+    }
+});
+
+// 5. Save/Update user
+app.post('/api/users', (req, res) => {
+    try {
+        let users = JSON.parse(fs.readFileSync(usersFile, 'utf8'));
+        const newUser = req.body;
+        const index = users.findIndex(u => u.id === newUser.id);
+        if (index >= 0) users[index] = newUser;
+        else users.push(newUser);
+        fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save user' });
+    }
+});
+
+// 6. Delete user
+app.delete('/api/users/:id', (req, res) => {
+    try {
+        let users = JSON.parse(fs.readFileSync(usersFile, 'utf8'));
+        users = users.filter(u => u.id !== req.params.id);
+        fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to delete user' });
+    }
+});
+
+// 7. Upload image
 app.post('/api/upload', upload.single('file'), (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
