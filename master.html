@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ユーザーマスタ管理 - F-ace</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="nav">
+        <a href="index.html">← フォームへ戻る</a>
+        <span class="user-info" id="currentUserDisplay"></span>
+        <button type="button" onclick="logout()">ログアウト</button>
+    </div>
+
+    <h1>ユーザーマスタ管理</h1>
+
+    <div class="section">
+        <h2>ユーザー一覧</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ユーザーID</th>
+                        <th>表示名</th>
+                        <th>権限</th>
+                        <th style="width: 120px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="userListBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" id="addUserSection">
+        <h2>新規ユーザー追加</h2>
+        <div class="meta-grid">
+            <div class="field"><label>ユーザーID</label><input type="text" id="newUserId"></div>
+            <div class="field"><label>パスワード</label><input type="password" id="newUserPw"></div>
+            <div class="field"><label>表示名</label><input type="text" id="newUserName"></div>
+            <div class="field">
+                <label>権限</label>
+                <select id="newUserRole">
+                    <option value="viewer">viewer</option>
+                    <option value="user">user</option>
+                    <option value="Manager">Manager</option>
+                    <option value="master">master</option>
+                </select>
+            </div>
+            <div class="field" style="justify-content: flex-end; padding-top: 10px;">
+                <button type="button" class="primary" onclick="addUser()">ユーザーを追加</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // master画面専用の初期化
+        document.addEventListener("DOMContentLoaded", () => {
+            const user = JSON.parse(localStorage.getItem("face_current_user"));
+            if (!user || (user.role !== 'master' && user.role !== 'Manager')) {
+                alert("アクセス権限がありません。");
+                location.href = "index.html";
+                return;
+            }
+            renderUserList();
+
+            const display = document.getElementById("currentUserDisplay");
+            if (display) display.textContent = `${user.name} (${user.role})`;
+        });
+
+        function renderUserList() {
+            const users = JSON.parse(localStorage.getItem("face_users") || "[]");
+            const body = document.getElementById("userListBody");
+            body.innerHTML = "";
+            users.forEach(u => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${u.id}</td>
+                    <td>${u.name}</td>
+                    <td>
+                        <select onchange="updateUserRole('${u.id}', this.value)">
+                            <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>viewer</option>
+                            <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
+                            <option value="Manager" ${u.role === 'Manager' ? 'selected' : ''}>Manager</option>
+                            <option value="master" ${u.role === 'master' ? 'selected' : ''}>master</option>
+                        </select>
+                    </td>
+                    <td>
+                        <button type="button" class="danger" onclick="deleteUser('${u.id}')">削除</button>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+        }
+
+        window.addUser = () => {
+            const id = document.getElementById("newUserId").value;
+            const pw = document.getElementById("newUserPw").value;
+            const name = document.getElementById("newUserName").value;
+            const role = document.getElementById("newUserRole").value;
+
+            if (!id || !pw || !name) {
+                alert("全ての項目を入力してください。");
+                return;
+            }
+
+            const users = JSON.parse(localStorage.getItem("face_users") || "[]");
+            if (users.some(u => u.id === id)) {
+                alert("そのIDは既に使用されています。");
+                return;
+            }
+
+            users.push({ id, pw, name, role });
+            localStorage.setItem("face_users", JSON.stringify(users));
+            renderUserList();
+
+            // クリア
+            document.getElementById("newUserId").value = "";
+            document.getElementById("newUserPw").value = "";
+            document.getElementById("newUserName").value = "";
+        };
+
+        window.updateUserRole = (id, newRole) => {
+            const users = JSON.parse(localStorage.getItem("face_users") || "[]");
+            const user = users.find(u => u.id === id);
+            if (user) {
+                user.role = newRole;
+                localStorage.setItem("face_users", JSON.stringify(users));
+            }
+        };
+
+        window.deleteUser = (id) => {
+            if (confirm("このユーザーを削除しますか？")) {
+                let users = JSON.parse(localStorage.getItem("face_users") || "[]");
+                users = users.filter(u => u.id !== id);
+                localStorage.setItem("face_users", JSON.stringify(users));
+                renderUserList();
+            }
+        };
+
+        window.logout = () => {
+            localStorage.removeItem("face_current_user");
+            location.href = "index.html";
+        };
+    </script>
+</body>
+
+</html>

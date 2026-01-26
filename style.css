@@ -1,0 +1,371 @@
+:root {
+    --primary: #007aff;
+    --primary-hover: #0063cc;
+    --danger: #ff3b30;
+    --success: #34c759;
+    --warning: #ffcc00;
+    --bg-main: #f5f7f9;
+    --bg-card: rgba(255, 255, 255, 0.8);
+    --txt-main: #1c1c1e;
+    --txt-muted: #8e8e93;
+    --border: #d1d1d6;
+    --radius: 12px;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
+    background-color: var(--bg-main);
+    color: var(--txt-main);
+    margin: 0;
+    padding: 24px;
+    line-height: 1.5;
+}
+
+h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 24px;
+    text-align: center;
+    color: var(--primary);
+}
+
+.nav {
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: center;
+}
+
+.user-info {
+    font-size: 13px;
+    color: var(--txt-muted);
+}
+
+.section {
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+}
+
+.section h2 {
+    font-size: 18px;
+    margin-top: 0;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section h2 .pill {
+    font-size: 11px;
+    background: var(--primary);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: normal;
+}
+
+.muted {
+    font-size: 13px;
+    color: var(--txt-muted);
+    margin-bottom: 12px;
+}
+
+/* Form Styles */
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field.full {
+    grid-column: 1 / -1;
+}
+
+label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--txt-muted);
+}
+
+input[type="text"],
+input[type="password"],
+input[type="datetime-local"],
+input[type="number"],
+textarea,
+select {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: #fff;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+input.invalid,
+textarea.invalid {
+    border-color: var(--danger);
+}
+
+textarea {
+    min-height: 38px;
+    resize: vertical;
+}
+
+/* Table Styles */
+.table-wrap {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-top: 12px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1000px;
+    background: #fff;
+}
+
+th,
+td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+
+th {
+    background: #f8f9fa;
+    font-weight: 600;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+tr.checked td {
+    background-color: #f2f9ff !important;
+}
+
+tr.subrow td {
+    background-color: #fdfdfd !important;
+}
+
+.subwrap {
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    margin: 8px 0;
+}
+
+/* Button Styles */
+.tools {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+button {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+button:hover {
+    background: #f8f9fa;
+    border-color: #acacb0;
+}
+
+button.primary {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+button.primary:hover {
+    background: var(--primary-hover);
+}
+
+button.danger {
+    color: var(--danger);
+}
+
+button.danger:hover {
+    background: #fff1f0;
+    border-color: var(--danger);
+}
+
+/* Auth Modal */
+#authOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.auth-card {
+    background: #fff;
+    padding: 32px;
+    border-radius: 20px;
+    width: 320px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.auth-card h2 {
+    margin: 0;
+    text-align: center;
+    font-size: 20px;
+}
+
+/* Thumbnails */
+.thumbs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.thumbs img {
+    width: 120px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+}
+
+.imgGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.imgBlock {
+    padding: 12px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+}
+
+.imgTitle {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--txt-muted);
+}
+
+/* Floating copy status */
+#copyStatus {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    z-index: 1000;
+}
+
+/* Print Overrides */
+@media print {
+    body {
+        padding: 0;
+        background: #fff;
+    }
+
+    .tools,
+    #reportManager,
+    .pill,
+    #copyStatus,
+    input[type="file"],
+    .no-print,
+    .nav,
+    #authOverlay {
+        display: none !important;
+    }
+
+    .section {
+        box-shadow: none;
+        border: none;
+        padding: 0;
+        margin-bottom: 24px;
+    }
+
+    .section h2 {
+        border-bottom: 2px solid #333;
+    }
+
+    table,
+    th,
+    td {
+        border: 1px solid #000 !important;
+    }
+
+    th {
+        background: #eee !important;
+        color: #000 !important;
+    }
+
+    input,
+    textarea,
+    select {
+        border: none !important;
+        padding: 0 !important;
+    }
+
+    @page {
+        size: A4 landscape;
+        margin: 10mm;
+    }
+}
