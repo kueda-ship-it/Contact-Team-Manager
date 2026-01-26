@@ -418,8 +418,22 @@
             __locations: locations,
             __currentReportId: currentReportId,
             __savedAt: new Date().toISOString(),
-            __creator: currentUser?.id
+            __creator: currentUser?.id,
+            __images: {}
         };
+        
+        // Capture image preview information
+        document.querySelectorAll(".thumbs").forEach(previewBox => {
+            const fieldName = previewBox.id.replace(/_preview$/, '');
+            const imageSrcs = [];
+            previewBox.querySelectorAll('img').forEach(img => {
+                if (img.src) imageSrcs.push(img.src);
+            });
+            if (imageSrcs.length > 0) {
+                data.__images[fieldName] = imageSrcs;
+            }
+        });
+        
         document.querySelectorAll("input, textarea, select").forEach(el => {
             if (!el.name || el.type === "file") return;
             if (el.type === "checkbox") data[el.name] = el.checked;
@@ -558,6 +572,35 @@
             if (r && confirm("データを読み込みますか？現在のフォーム内容は消去されます。")) {
                 currentReportId = id;
                 restore(r.data);
+                
+                // Restore image previews if available
+                if (r.data && r.data.__images) {
+                    Object.entries(r.data.__images).forEach(([fieldName, imagePaths]) => {
+                        const previewBox = document.querySelector(`#${fieldName}_preview`);
+                        if (previewBox && Array.isArray(imagePaths)) {
+                            previewBox.innerHTML = '';
+                            imagePaths.forEach(imagePath => {
+                                if (imagePath) {
+                                    const container = document.createElement("div");
+                                    container.style.position = "relative";
+                                    container.style.display = "inline-block";
+                                    container.style.margin = "4px";
+                                    
+                                    const img = document.createElement("img");
+                                    img.src = imagePath;
+                                    img.title = `クリックで拡大`;
+                                    img.style.maxHeight = "80px";
+                                    img.style.maxWidth = "80px";
+                                    img.style.cursor = "pointer";
+                                    img.onclick = () => { $("#dlgImg").src = imagePath; $("#imgDialog").showModal(); };
+                                    container.appendChild(img);
+                                    previewBox.appendChild(container);
+                                }
+                            });
+                        }
+                    });
+                }
+                
                 if (currentUser.role === 'viewer') {
                     document.querySelectorAll("input, textarea, select, button:not(.primary)").forEach(el => {
                         if (el.textContent !== "ログアウト" && !el.closest(".nav-container")) el.disabled = true;
