@@ -238,7 +238,11 @@
         });
     }
 
-    // --- Core Rendering preserved ---
+    function initDefaultLocations(n = 7) {
+        locations = Array.from({ length: n }, (_, i) => ({ id: cryptoId(), name: `設置場所${i + 1}` }));
+        renderAll();
+    }
+
     function renderLocations() {
         const container = $("#locationList");
         if (!container) return;
