@@ -317,8 +317,8 @@ button.danger:hover {
     z-index: 1000;
 }
 
-/* UI用区切り: 備考欄の後の装飾 */
-.section:nth-of-type(2) {
+/* UI用区切り: 基本情報の後の装飾 */
+#sectionBasic {
     border-bottom: 4px double var(--border);
     padding-bottom: 32px;
     margin-bottom: 40px;

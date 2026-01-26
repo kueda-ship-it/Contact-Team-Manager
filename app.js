@@ -619,6 +619,15 @@
         else initDefaultLocations();
     });
 
+    document.addEventListener("input", (e) => {
+        if (e.target.name?.startsWith("part_")) updatePartLinking();
+        if (e.target.name === "cnt_camera") {
+            syncLocationsFromCameraCount();
+        }
+        if (window._saveTimer) clearTimeout(window._saveTimer);
+        window._saveTimer = setTimeout(saveToLocal, 1000);
+    });
+
     function syncLocationsFromCameraCount() {
         const cntEl = getEl("cnt_camera");
         if (!cntEl) return;
