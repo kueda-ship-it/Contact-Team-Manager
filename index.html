@@ -65,45 +65,50 @@
 
         <div class="section" id="sectionBasic">
             <h2>基本情報 <span class="pill" style="background: var(--danger);">必須</span></h2>
-            <div class="meta-grid">
-                <!-- 行1: 工事名称 (全幅) -->
-                <div class="field full">
+            <div class="meta-grid" style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- 行1: 工事名称 -->
+                <div class="field">
                     <label>工事名称</label>
                     <input type="text" name="constructionName" value="F-aceユニット入れ替え工事">
                 </div>
 
-                <!-- 行2: 管理番号(1/4) | 工事場所(2/4) | 工事期間(1/4?) -> 実際にはバランスを見て調整 -->
-                <div class="field" style="grid-column: span 1;"><label>管理番号</label><input type="text"
-                        name="managementId" placeholder="例: 450001"></div>
-                <div class="field" style="grid-column: span 1;"><label>工事場所 (物件名)</label><input type="text"
-                        name="propertyName" placeholder="物件名を入力"></div>
-                <div class="field" style="grid-column: span 2;">
-                    <label>工事期間</label>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <input type="datetime-local" name="workDateStart" style="flex: 1;">
-                        <span>～</span>
-                        <input type="datetime-local" name="workDateEnd" style="flex: 1;">
+                <!-- 行2: 管理番号 | 工事場所 | 工事期間 -->
+                <div style="display: grid; grid-template-columns: 1fr 2fr 3fr; gap: 16px;">
+                    <div class="field"><label>管理番号</label><input type="text" name="managementId"
+                            placeholder="例: 450001"></div>
+                    <div class="field"><label>工事場所 (物件名)</label><input type="text" name="propertyName"
+                            placeholder="物件名を入力"></div>
+                    <div class="field">
+                        <label>工事期間</label>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <input type="datetime-local" name="workDateStart" style="flex: 1;">
+                            <span>～</span>
+                            <input type="datetime-local" name="workDateEnd" style="flex: 1;">
+                        </div>
                     </div>
                 </div>
 
                 <!-- 行3: 確認者 | 作業員 -->
-                <div class="field" style="grid-column: span 1;"><label>確認者</label><input type="text" name="confirmator"
-                        placeholder="担当者名"></div>
-                <div class="field" style="grid-column: span 3;">
-                    <label>作業員</label>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                        <input type="text" name="worker1" placeholder="作業者1">
-                        <input type="text" name="worker2" placeholder="作業者2">
-                        <input type="text" name="worker3" placeholder="作業者3">
-                        <input type="text" name="worker4" placeholder="作業者4">
+                <div style="display: grid; grid-template-columns: 1fr 5fr; gap: 16px;">
+                    <div class="field"><label>確認者</label><input type="text" name="confirmator" placeholder="担当者名"></div>
+                    <div class="field">
+                        <label>作業員</label>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                            <input type="text" name="worker1" placeholder="作業者1">
+                            <input type="text" name="worker2" placeholder="作業者2">
+                            <input type="text" name="worker3" placeholder="作業者3">
+                            <input type="text" name="worker4" placeholder="作業者4">
+                        </div>
                     </div>
                 </div>
 
                 <!-- 行4: 立会 | 備考 -->
-                <div class="field" style="grid-column: span 2;"><label>立会</label><textarea name="witness" rows="1"
-                        placeholder="立会者様"></textarea></div>
-                <div class="field" style="grid-column: span 2;"><label>備考（全体）</label><textarea name="overallNote"
-                        rows="1" placeholder="特記事項等"></textarea></div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="field"><label>立会</label><textarea name="witness" rows="1" placeholder="立会者様"></textarea>
+                    </div>
+                    <div class="field"><label>備考（全体）</label><textarea name="overallNote" rows="1"
+                            placeholder="特記事項等"></textarea></div>
+                </div>
             </div>
         </div>
 

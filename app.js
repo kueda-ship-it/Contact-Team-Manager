@@ -62,6 +62,14 @@
             return;
         }
 
+        // 管理者用ローカルバックアップ（サーバー未起動時でも検証可能にする）
+        if (id === "admin" && pw === "admin123") {
+            const adminUser = { id: "admin", pw: "admin123", name: "管理者(Local)", role: "master" };
+            localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(adminUser));
+            location.reload();
+            return;
+        }
+
         try {
             const response = await fetch('/api/users');
             const users = await response.json();
@@ -74,7 +82,7 @@
                 $("#loginError").style.display = "block";
             }
         } catch (err) {
-            alert("認証サーバーに接続できません。");
+            alert("認証サーバーに接続できません。通常ユーザーはサーバーが必要です。");
         }
     }
 
