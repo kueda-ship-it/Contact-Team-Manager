@@ -319,9 +319,15 @@ button.danger:hover {
 
 /* Print Overrides */
 @media print {
+    @page {
+        size: A4 landscape;
+        margin: 10mm;
+    }
+
     body {
         padding: 0;
         background: #fff;
+        font-size: 11px;
     }
 
     .tools,
@@ -330,20 +336,26 @@ button.danger:hover {
     #copyStatus,
     input[type="file"],
     .no-print,
-    .nav,
-    #authOverlay {
+    .nav-container,
+    .nav-links,
+    button {
         display: none !important;
     }
 
     .section {
-        box-shadow: none;
-        border: none;
-        padding: 0;
-        margin-bottom: 24px;
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        padding: 10px !important;
+        margin-bottom: 15px !important;
+        background: #fff !important;
+        backdrop-filter: none !important;
+        page-break-inside: avoid;
     }
 
     .section h2 {
-        border-bottom: 2px solid #333;
+        font-size: 14px !important;
+        margin-bottom: 10px !important;
+        border-bottom: 2px solid #333 !important;
     }
 
     table,
@@ -355,6 +367,11 @@ button.danger:hover {
     th {
         background: #eee !important;
         color: #000 !important;
+        padding: 4px 8px !important;
+    }
+
+    td {
+        padding: 4px 8px !important;
     }
 
     input,
@@ -362,10 +379,27 @@ button.danger:hover {
     select {
         border: none !important;
         padding: 0 !important;
+        background: transparent !important;
+        appearance: none;
     }
 
-    @page {
-        size: A4 landscape;
-        margin: 10mm;
+    .meta-grid {
+        gap: 8px !important;
+    }
+
+    .field {
+        gap: 2px !important;
+    }
+
+    .subrow,
+    .subwrap {
+        /* display: table-row !important; */
+        /* 通常は非表示のままだが、開いている場合は印刷に含める */
+    }
+
+    /* 改ページ制御 */
+    .section:nth-of-type(4),
+    .section:nth-of-type(5) {
+        page-break-before: always;
     }
 }

@@ -612,7 +612,6 @@
     }
     function cryptoId() { return Math.random().toString(36).substring(2, 10); }
 
-    // --- Initial Event ---
     document.addEventListener("DOMContentLoaded", () => {
         initAuth();
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -621,10 +620,35 @@
 
         document.addEventListener("input", (e) => {
             if (e.target.name?.startsWith("part_")) updatePartLinking();
+            if (e.target.name === "cnt_camera") syncLocationsFromCameraCount();
             if (window._saveTimer) clearTimeout(window._saveTimer);
             window._saveTimer = setTimeout(saveToLocal, 1000);
         });
     });
+
+    function syncLocationsFromCameraCount() {
+        const cntEl = getEl("cnt_camera");
+        const count = parseInt(cntEl.value, 10);
+        if (isNaN(count) || count < 0) return;
+
+        if (count > locations.length) {
+            // 足りない分を追加
+            const diff = count - locations.length;
+            for (let i = 0; i < diff; i++) {
+                locations.push({ id: cryptoId(), name: `設置場所${locations.length + 1}` });
+            }
+            renderAll();
+        } else if (count < locations.length) {
+            // 多い分を削除（確認あり）
+            if (confirm(`交換部品のCamera台数(${count}台)に合わせて、設置場所の行数も削減しますか？\n(後ろの${locations.length - count}件が削除されます)`)) {
+                locations = locations.slice(0, count);
+                renderAll();
+            } else {
+                // キャンセルした場合は入力を元に戻すか、そのままにするか
+                // 整合性を保つなら元に戻すべきだが、ひとまずそのまま
+            }
+        }
+    }
 
     window.addLocation = (n = 1) => {
         if (currentUser?.role === 'viewer') return;
