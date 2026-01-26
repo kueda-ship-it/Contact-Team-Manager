@@ -4,6 +4,16 @@
     const USERS_KEY = "face_users";
     const CURRENT_USER_KEY = "face_current_user";
 
+    // API Server URL configuration
+    const API_BASE_URL = (() => {
+        // If running on GitHub Pages, use the production server URL
+        if (window.location.hostname === 'kueda-ship-it.github.io') {
+            return 'https://cautious-spoon-wr6r459699793g57x-3000.app.github.dev';
+        }
+        // For local development or custom domains, use the same origin
+        return window.location.origin;
+    })();
+
     const $ = (s) => document.querySelector(s);
     let currentReportId = null;
     let locations = [];
@@ -450,7 +460,7 @@
         if (!body) return;
 
         try {
-            const response = await fetch('/api/reports');
+            const response = await fetch(`${API_BASE_URL}/api/reports`);
             const list = await response.json();
 
             body.innerHTML = "";
@@ -532,7 +542,7 @@
         };
 
         try {
-            const response = await fetch('/api/reports', {
+            const response = await fetch(`${API_BASE_URL}/api/reports`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reportData)
@@ -552,7 +562,7 @@
 
     window.loadReport = async (id) => {
         try {
-            const response = await fetch('/api/reports');
+            const response = await fetch(`${API_BASE_URL}/api/reports`);
             const list = await response.json();
             const r = list.find(x => x.id === id);
 
@@ -573,7 +583,7 @@
     window.deleteReport = async (id) => {
         if (!confirm("このレポートを削除しますか？")) return;
         try {
-            const response = await fetch(`/api/reports/${id}`, { method: 'DELETE' });
+            const response = await fetch(`${API_BASE_URL}/api/reports/${id}`, { method: 'DELETE' });
             if (response.ok) {
                 if (currentReportId === id) currentReportId = null;
                 await renderReportList();
