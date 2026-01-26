@@ -317,17 +317,25 @@ button.danger:hover {
     z-index: 1000;
 }
 
+/* UI用区切り: 備考欄の後の装飾 */
+.section:nth-of-type(2) {
+    border-bottom: 4px double var(--border);
+    padding-bottom: 32px;
+    margin-bottom: 40px;
+}
+
 /* Print Overrides */
 @media print {
     @page {
-        size: A4 landscape;
-        margin: 10mm;
+        size: A4 portrait;
+        margin: 15mm 10mm;
     }
 
     body {
         padding: 0;
         background: #fff;
-        font-size: 11px;
+        font-size: 10pt;
+        color: #000;
     }
 
     .tools,
@@ -344,36 +352,39 @@ button.danger:hover {
 
     .section {
         box-shadow: none !important;
-        border: 1px solid #ccc !important;
-        padding: 10px !important;
-        margin-bottom: 15px !important;
+        border: none !important;
+        padding: 0 !important;
+        margin-bottom: 25px !important;
         background: #fff !important;
         backdrop-filter: none !important;
         page-break-inside: avoid;
     }
 
     .section h2 {
-        font-size: 14px !important;
-        margin-bottom: 10px !important;
-        border-bottom: 2px solid #333 !important;
+        font-size: 12pt !important;
+        margin-bottom: 8px !important;
+        border-bottom: 1.5pt solid #000 !important;
+        color: #000 !important;
     }
 
     table,
     th,
     td {
-        border: 1px solid #000 !important;
+        border: 0.5pt solid #000 !important;
     }
 
     th {
-        background: #eee !important;
+        background: #f2f2f2 !important;
         color: #000 !important;
-        padding: 4px 8px !important;
+        padding: 6px 4px !important;
+        font-weight: bold !important;
     }
 
     td {
-        padding: 4px 8px !important;
+        padding: 5px 4px !important;
     }
 
+    /* 報告書形式: 入力枠の線を消す */
     input,
     textarea,
     select {
@@ -381,25 +392,45 @@ button.danger:hover {
         padding: 0 !important;
         background: transparent !important;
         appearance: none;
+        width: 100% !important;
+        font-family: inherit !important;
+        font-size: inherit !important;
+    }
+
+    /* プレースホルダを消す */
+    ::placeholder {
+        color: transparent !important;
     }
 
     .meta-grid {
-        gap: 8px !important;
+        gap: 10px !important;
+        display: block !important;
     }
 
     .field {
-        gap: 2px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: baseline !important;
+        gap: 10px !important;
+        margin-bottom: 6px !important;
+        border-bottom: 0.2pt solid #eee !important;
     }
 
-    .subrow,
-    .subwrap {
-        /* display: table-row !important; */
-        /* 通常は非表示のままだが、開いている場合は印刷に含める */
+    .field label {
+        width: 120px !important;
+        flex-shrink: 0 !important;
+        font-weight: bold !important;
+        color: #333 !important;
     }
 
-    /* 改ページ制御 */
-    .section:nth-of-type(4),
-    .section:nth-of-type(5) {
-        page-break-before: always;
+    /* 改ページ制御: 備考（基本情報）の後に区切りを入れる */
+    .section:nth-of-type(2) {
+        page-break-after: always;
+        border-bottom: none !important;
+        margin-bottom: 0 !important;
+    }
+
+    .section:nth-of-type(4) {
+        page-break-after: always;
     }
 }
