@@ -70,128 +70,127 @@
                 <div class="field full"><label>工事名称</label><input type="text" name="constructionName"
                         value="F-aceユニット入れ替え工事"></div>
                 <div class="field"><label>管理番号</label><input type="text" name="managementId" placeholder="例: 450001">
-                    <div class="field"><label>工事場所 (物件名)</label><input type="text" name="propertyName"
-                            placeholder="物件名を入力">
-                    </div>
-                    <div class="field full">
-                        <label>工事期間</label>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <input type="datetime-local" name="workDateStart" style="flex: 1;">
-                            <span>～</span>
-                            <input type="datetime-local" name="workDateEnd" style="flex: 1;">
-                        </div>
-                    </div>
-                    <div class="field"><label>確認者</label><input type="text" name="confirmator" placeholder="担当者名"></div>
-                    <div class="field full">
-                        <label>作業者</label>
-                        <div class="meta-grid" style="grid-template-columns: repeat(4, 1fr); gap: 10px;">
-                            <input type="text" name="worker1" placeholder="作業者1">
-                            <input type="text" name="worker2" placeholder="作業者2">
-                            <input type="text" name="worker3" placeholder="作業者3">
-                            <input type="text" name="worker4" placeholder="作業者4">
-                        </div>
-                    </div>
-                    <div class="field full"><label>立会</label><textarea name="witness" rows="1"
-                            placeholder="立会者（管理員様等）"></textarea></div>
-                    <div class="field full"><label>備考（全体）</label><textarea name="overallNote" rows="2"
-                            placeholder="特記事項等"></textarea></div>
                 </div>
-            </div>
-
-            <!-- 交換部品 -->
-            <div class="section">
-                <h2>交換部品 <span class="pill">チェック時個数必須</span></h2>
-                <div style="display:flex; flex-wrap:wrap; gap:32px; padding: 10px 0;">
-                    <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
-                        <input type="checkbox" name="part_express" style="width: 18px; height: 18px;"> エクスプレスサーバー
-                        <input type="number" name="cnt_express" placeholder="0" style="width: 60px;">
-                    </label>
-                    <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
-                        <input type="checkbox" name="part_camera" style="width: 18px; height: 18px;"> Camera
-                        <input type="number" name="cnt_camera" placeholder="0" style="width: 60px;">
-                    </label>
-                    <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
-                        <input type="checkbox" name="part_ups" style="width: 18px; height: 18px;"> UPS
-                        <input type="number" name="cnt_ups" placeholder="0" style="width: 60px;">
-                    </label>
-                    <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
-                        <input type="checkbox" name="part_hub" style="width: 18px; height: 18px;"> PoE HUB
-                        <input type="number" name="cnt_hub" placeholder="0" style="width: 60px;">
-                    </label>
+                <div class="field"><label>工事場所 (物件名)</label><input type="text" name="propertyName" placeholder="物件名を入力">
                 </div>
-            </div>
-
-            <!-- 設置場所 -->
-            <div class="section">
-                <h2>設置場所 <span class="pill">1つ以上必須</span></h2>
-                <div class="tools" style="margin-bottom: 20px;">
-                    <button type="button" class="danger" onclick="deleteSelectedLocations()">選択削除</button>
-                    <button type="button" onclick="addLocation(1)">＋ 1件追加</button>
-                    <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
-                        <span class="muted" style="margin-bottom: 0;">一括リセット:</span>
-                        <input type="number" id="initLocCount" value="7" style="width:50px;">
-                        <button type="button" onclick="resetLocations()" style="font-size: 12px;">実行</button>
+                <div class="field full">
+                    <label>工事期間</label>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <input type="datetime-local" name="workDateStart" style="flex: 1;">
+                        <span>～</span>
+                        <input type="datetime-local" name="workDateEnd" style="flex: 1;">
                     </div>
                 </div>
-                <div id="locationList"
-                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 10px;">
+                <div class="field"><label>確認者</label><input type="text" name="confirmator" placeholder="担当者名"></div>
+                <div class="field"><label>作業員</label>
+                    <div class="meta-grid" style="grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                        <input type="text" name="worker1" placeholder="作業者1">
+                        <input type="text" name="worker2" placeholder="作業者2">
+                        <input type="text" name="worker3" placeholder="作業者3">
+                        <input type="text" name="worker4" placeholder="作業者4">
+                    </div>
+                </div>
+                <div class="field"><label>立会</label><textarea name="witness" rows="1"
+                        placeholder="立会者（管理員様等）"></textarea></div>
+                <div class="field"><label>備考（全体）</label><textarea name="overallNote" rows="2"
+                        placeholder="特記事項等"></textarea></div>
+            </div>
+        </div>
+
+        <!-- 交換部品 -->
+        <div class="section" id="sectionParts">
+            <h2>交換部品 <span class="pill">チェック時個数必須</span></h2>
+            <div style="display:flex; flex-wrap:wrap; gap:32px; padding: 10px 0;">
+                <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
+                    <input type="checkbox" name="part_express" style="width: 18px; height: 18px;"> エクスプレスサーバー
+                    <input type="number" name="cnt_express" placeholder="0" style="width: 60px;">
+                </label>
+                <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
+                    <input type="checkbox" name="part_camera" style="width: 18px; height: 18px;"> Camera
+                    <input type="number" name="cnt_camera" placeholder="0" style="width: 60px;">
+                </label>
+                <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
+                    <input type="checkbox" name="part_ups" style="width: 18px; height: 18px;"> UPS
+                    <input type="number" name="cnt_ups" placeholder="0" style="width: 60px;">
+                </label>
+                <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
+                    <input type="checkbox" name="part_hub" style="width: 18px; height: 18px;"> PoE HUB
+                    <input type="number" name="cnt_hub" placeholder="0" style="width: 60px;">
+                </label>
+            </div>
+        </div>
+
+        <!-- 設置場所 -->
+        <div class="section" id="sectionLocations">
+            <h2>設置場所 <span class="pill">1つ以上必須</span></h2>
+            <div class="tools" style="margin-bottom: 20px;">
+                <button type="button" class="danger" onclick="deleteSelectedLocations()">選択削除</button>
+                <button type="button" onclick="addLocation(1)">＋ 1件追加</button>
+                <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+                    <span class="muted" style="margin-bottom: 0;">一括リセット:</span>
+                    <input type="number" id="initLocCount" value="7" style="width:50px;">
+                    <button type="button" onclick="resetLocations()" style="font-size: 12px;">実行</button>
                 </div>
             </div>
-
-            <!-- Camera確認 -->
-            <div class="section">
-                <h2>Camera確認 <span class="pill">確認必須</span></h2>
-                <div class="table-wrap">
-                    <table id="cameraTable">
-                        <thead>
-                            <tr>
-                                <th style="width: 40px;">No</th>
-                                <th style="width: 180px;">設置場所</th>
-                                <th style="width: 160px;">作業日時</th>
-                                <th style="width: 50px;">前</th>
-                                <th style="width: 50px;">昼</th>
-                                <th style="width: 50px;">夜</th>
-                                <th style="width: 70px;">設定値</th>
-                                <th>画像アップロード</th>
-                                <th style="width: 90px;">状態</th>
-                                <th style="width: 40px;">✅</th>
-                            </tr>
-                        </thead>
-                        <tbody id="cameraBody"></tbody>
-                    </table>
-                </div>
+            <div id="locationList"
+                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 10px;">
             </div>
+        </div>
 
-            <!-- 共通確認項目 -->
-            <div class="section">
-                <h2>共通確認項目 <span class="pill">確認必須</span></h2>
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 40px;">No</th>
-                                <th style="width: 250px;">作業項目</th>
-                                <th style="width: 150px;">予定日時</th>
-                                <th style="width: 150px;">実施日時</th>
-                                <th style="width: 100px;">担当者</th>
-                                <th style="width: 130px;">実施状況</th>
-                                <th>備考</th>
-                                <th style="width: 280px;">画像 (4枚まで)</th>
-                                <th style="width: 40px;">✅</th>
-                            </tr>
-                        </thead>
-                        <tbody id="commonBody"></tbody>
-                    </table>
-                </div>
+        <!-- Camera確認 -->
+        <div class="section" id="sectionCamera">
+            <h2>Camera確認 <span class="pill">確認必須</span></h2>
+            <div class="table-wrap">
+                <table id="cameraTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">No</th>
+                            <th style="width: 180px;">設置場所</th>
+                            <th style="width: 160px;">作業日時</th>
+                            <th style="width: 50px;">前</th>
+                            <th style="width: 50px;">昼</th>
+                            <th style="width: 50px;">夜</th>
+                            <th style="width: 70px;">設定値</th>
+                            <th>画像アップロード</th>
+                            <th style="width: 90px;">状態</th>
+                            <th style="width: 40px;">✅</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cameraBody"></tbody>
+                </table>
             </div>
+        </div>
 
-            <!-- 操作 -->
-            <div class="tools" style="justify-content: center; margin-top: 40px; margin-bottom: 60px; gap: 20px;">
-                <button type="button" class="primary" onclick="window.print()"
-                    style="padding: 14px 48px; font-size: 18px; border-radius: 30px; box-shadow: 0 10px 20px rgba(0,122,255,0.3);">
-                    PDF出力 / 印刷
-                </button>
+        <!-- 共通確認項目 -->
+        <div class="section" id="sectionCommon">
+            <h2>共通確認項目 <span class="pill">確認必須</span></h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">No</th>
+                            <th style="width: 250px;">作業項目</th>
+                            <th style="width: 150px;">予定日時</th>
+                            <th style="width: 150px;">実施日時</th>
+                            <th style="width: 100px;">担当者</th>
+                            <th style="width: 130px;">実施状況</th>
+                            <th>備考</th>
+                            <th style="width: 280px;">画像 (4枚まで)</th>
+                            <th style="width: 40px;">✅</th>
+                        </tr>
+                    </thead>
+                    <tbody id="commonBody"></tbody>
+                </table>
             </div>
+        </div>
+
+        <!-- 操作 -->
+        <div class="tools" style="justify-content: center; margin-top: 40px; margin-bottom: 60px; gap: 20px;">
+            <button type="button" class="primary" onclick="window.print()"
+                style="padding: 14px 48px; font-size: 18px; border-radius: 30px; box-shadow: 0 10px 20px rgba(0,122,255,0.3);">
+                PDF出力 / 印刷
+            </button>
+        </div>
     </form>
 
     <!-- 画像拡大ダイアログ -->
