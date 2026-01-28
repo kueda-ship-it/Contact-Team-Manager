@@ -55,6 +55,26 @@
         </div>
     </div>
 
+    <div class="section" id="systemSettingsSection">
+        <h2>点検項目・設定値マスタ</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <h3>共通確認項目</h3>
+                <div id="commonItemsEditor"></div>
+                <button type="button" onclick="addCommonItem()" style="margin-top:10px;">＋ 項目追加</button>
+            </div>
+            <div>
+                <h3>Camera設定値確認 項目名</h3>
+                <div id="cameraSettingsEditor"></div>
+                <button type="button" onclick="addCameraSetting()" style="margin-top:10px;">＋ 項目追加</button>
+            </div>
+        </div>
+        <div style="margin-top: 30px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+            <button type="button" class="primary" style="padding: 12px 40px;"
+                onclick="saveSystemSettings()">システム設定を保存</button>
+        </div>
+    </div>
+
     <script src="app.js"></script>
     <script>
         // master画面専用の初期化
@@ -69,7 +89,50 @@
 
             const display = document.getElementById("currentUserDisplay");
             if (display) display.textContent = `${user.name} (${user.role})`;
+
+            renderSystemSettings();
         });
+
+        let systemSettings = { commonItems: [], cameraSettings: [] };
+
+        async function renderSystemSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                systemSettings = await res.json();
+
+                const commonDiv = document.getElementById("commonItemsEditor");
+                commonDiv.innerHTML = systemSettings.commonItems.map((item, i) => `
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" value="${item}" onchange="systemSettings.commonItems[${i}]=this.value" style="flex:1;">
+                        <button type="button" class="danger" onclick="removeCommonItem(${i})">✕</button>
+                    </div>
+                `).join("");
+
+                const cameraDiv = document.getElementById("cameraSettingsEditor");
+                cameraDiv.innerHTML = systemSettings.cameraSettings.map((item, i) => `
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" value="${item.name}" onchange="systemSettings.cameraSettings[${i}].name=this.value" style="flex:1;">
+                        <button type="button" class="danger" onclick="removeCameraSetting(${i})">✕</button>
+                    </div>
+                `).join("");
+            } catch (err) { console.error(err); }
+        }
+
+        window.addCommonItem = () => { systemSettings.commonItems.push(""); renderSystemSettings(); };
+        window.removeCommonItem = (i) => { systemSettings.commonItems.splice(i, 1); renderSystemSettings(); };
+        window.addCameraSetting = () => { systemSettings.cameraSettings.push({ id: Date.now(), name: "" }); renderSystemSettings(); };
+        window.removeCameraSetting = (i) => { systemSettings.cameraSettings.splice(i, 1); renderSystemSettings(); };
+
+        window.saveSystemSettings = async () => {
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(systemSettings)
+                });
+                if (response.ok) alert("マスタ設定を保存しました。");
+            } catch (err) { alert("保存に失敗しました。"); }
+        };
 
         async function renderUserList() {
             try {
@@ -159,7 +222,7 @@
 
         window.logout = () => {
             localStorage.removeItem("face_current_user");
-            location.href = "index.html";
+            location.href = "login.html";
         };
     </script>
 </body>

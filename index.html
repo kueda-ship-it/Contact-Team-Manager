@@ -2,221 +2,290 @@
 <html lang="ja">
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>F-aceユニット入れ替え工事 確認表</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>F-ace 交換作業 管理システム</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        .highlight-warning {
-            background-color: #fff0f0 !important;
-            border-left: 4px solid var(--danger);
-        }
-
-        .img-upload-box {
-            border: 1px dashed var(--border);
-            padding: 4px;
-            border-radius: 4px;
-            background: rgba(255, 255, 255, 0.5);
-        }
-
-        .nav-link {
-            text-decoration: none;
-            color: var(--primary);
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .nav-link:hover {
-            text-decoration: underline;
-        }
-    </style>
 </head>
 
 <body>
-    <h1 style="margin-top: 10px;">F-aceユニット入れ替え工事 確認表</h1>
-
-    <form id="checkForm" autocomplete="off">
-        <!-- レポート管理 -->
-        <div class="section" id="reportManager">
-            <h2>レポート管理（ブラウザ保存）</h2>
-            <div class="muted">
-                入力中のデータを保存したり、保存済みデータを呼び出したりできます。
-                <br><span style="color: var(--primary);">※画像は OneDrive 同期フォルダ（images/ 等）に保存したものを選択してください。</span>
+    <!-- ==========================================
+         入力画面 (UI) - 画面上でのみ表示
+    =========================================== -->
+    <div id="edit-ui" class="no-print">
+        <header class="app-header">
+            <div class="logo">F-ace Project Dashboard</div>
+            <div id="userInfo" class="user-info-area" style="font-size: 14px; margin-left: auto; margin-right: 20px;">
             </div>
-            <div class="tools">
-                <button type="button" class="primary" onclick="saveReport()">現在の内容を保存</button>
-                <button type="button" onclick="if(confirm('入力をクリアして新規作成しますか？')) location.reload()">新規作成 (リセット)</button>
+            <div class="nav-tools">
+                <button type="button" class="list-btn" onclick="openReportsList()">📋 保存済みリスト</button>
+                <button type="button" class="primary-btn" onclick="window.saveReport()">💾 サーバーへ保存</button>
+                <button type="button" class="print-btn" onclick="window.print()">🖨️ 報告書(PDF)を出力</button>
+                <a href="master.html" id="masterLink" class="nav-link"
+                    style="display:none; color:white; margin: 0 10px;">⚙️ マスタ管理</a>
+                <button type="button" class="danger-btn" onclick="logout()">🚪 ログアウト</button>
             </div>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>保存日時</th>
-                            <th>管理番号</th>
-                            <th>物件名</th>
-                            <th>作業日</th>
-                            <th style="width: 150px;">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reportListBody"></tbody>
-                </table>
+        </header>
+
+        <main class="app-content">
+            <!-- 1. 背景保存・管理 -->
+            <div style="margin-bottom: 20px;">
+                <button type="button" onclick="newReport()">＋ 新規レポート作成</button>
             </div>
-        </div>
 
-        <div class="section" id="sectionBasic">
-            <h2>基本情報 <span class="pill" style="background: var(--danger);">必須</span></h2>
-            <div class="meta-grid" style="display: flex; flex-direction: column; gap: 16px;">
-                <!-- 行1: 工事名称 -->
-                <div class="field">
-                    <label>工事名称</label>
-                    <input type="text" name="constructionName" value="F-aceユニット入れ替え工事">
-                </div>
-
-                <!-- 行2: 管理番号 | 工事場所 | 工事期間 -->
-                <div style="display: grid; grid-template-columns: 1fr 2fr 3fr; gap: 16px;">
-                    <div class="field"><label>管理番号</label><input type="text" name="managementId"
-                            placeholder="例: 450001"></div>
-                    <div class="field"><label>工事場所 (物件名)</label><input type="text" name="propertyName"
-                            placeholder="物件名を入力"></div>
-                    <div class="field">
-                        <label>工事期間</label>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <input type="datetime-local" name="workDateStart" style="flex: 1;">
-                            <span>～</span>
-                            <input type="datetime-local" name="workDateEnd" style="flex: 1;">
+            <!-- 2. 基本情報カード -->
+            <section class="app-card">
+                <div class="card-title-row">基本情報 <span class="badge danger">必須</span></div>
+                <div class="ui-form-block">
+                    <div class="field-full">
+                        <label>工事名称</label>
+                        <input type="text" name="ui_constructionName" data-sync="constructionName"
+                            value="F-aceユニット入れ替え工事">
+                    </div>
+                    <div class="field-row">
+                        <div class="field-col" style="flex: 1;">
+                            <label>管理番号</label>
+                            <input type="text" name="ui_managementId" data-sync="managementId" placeholder="例: 450001">
+                        </div>
+                        <div class="field-col" style="flex: 2;">
+                            <label>工事物件 (物件名)</label>
+                            <input type="text" name="ui_propertyName" data-sync="propertyName" placeholder="物件名を入力">
+                        </div>
+                        <div class="field-col" style="flex: 2;">
+                            <label>工事期間</label>
+                            <div class="date-range-flex">
+                                <input type="datetime-local" name="ui_workDateStart" data-sync="workDateStart_jp">
+                                <span>〜</span>
+                                <input type="datetime-local" name="ui_workDateEnd" data-sync="workDateEnd_jp">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field-col" style="flex: 1;">
+                            <label>確認者</label>
+                            <input type="text" id="ui_confirmator" name="ui_confirmator" data-sync="confirmator"
+                                placeholder="担当者名" oninput="updateWorkerOptions()">
+                        </div>
+                        <div class="field-col" style="flex: 4;">
+                            <label>作業員</label>
+                            <div class="worker-grid">
+                                <input type="text" class="worker-input" name="worker1" placeholder="作業者1"
+                                    oninput="updateWorkerOptions()">
+                                <input type="text" class="worker-input" name="worker2" placeholder="作業者2"
+                                    oninput="updateWorkerOptions()">
+                                <input type="text" class="worker-input" name="worker3" placeholder="作業者3"
+                                    oninput="updateWorkerOptions()">
+                                <input type="text" class="worker-input" name="worker4" placeholder="作業者4"
+                                    oninput="updateWorkerOptions()">
+                            </div>
                         </div>
                     </div>
                 </div>
+            </section>
 
-                <!-- 行3: 確認者 | 作業員 -->
-                <div style="display: grid; grid-template-columns: 1fr 5fr; gap: 16px;">
-                    <div class="field"><label>確認者</label><input type="text" name="confirmator" placeholder="担当者名"></div>
-                    <div class="field">
-                        <label>作業員</label>
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                            <input type="text" name="worker1" placeholder="作業者1">
-                            <input type="text" name="worker2" placeholder="作業者2">
-                            <input type="text" name="worker3" placeholder="作業者3">
-                            <input type="text" name="worker4" placeholder="作業者4">
+            <!-- 3. 交換部品 -->
+            <section class="app-card">
+                <div class="card-title-row">交換部品 <span class="badge blue">カメラ台数に全体が連動します</span></div>
+                <div class="parts-horizontal-row">
+                    <div class="part-item-compact"
+                        style="background: #eff6ff; border-radius: 6px; border-right: none; margin-right: 10px;">
+                        <label><input type="checkbox" name="part_camera" checked> カメラ台数</label>
+                        <input type="number" id="master_cam_cnt" name="cnt_camera" value="7" data-sync="cnt_camera"
+                            style="border-color: var(--accent);">
+                    </div>
+                    <div class="part-item-compact">
+                        <label><input type="checkbox" name="part_express"> エクスプレスサーバー</label>
+                        <input type="number" name="cnt_express" value="1">
+                    </div>
+                    <div class="part-item-compact">
+                        <label><input type="checkbox" name="part_ups"> UPS</label>
+                        <input type="number" name="cnt_ups" value="0">
+                    </div>
+                    <div class="part-item-compact">
+                        <label><input type="checkbox" name="part_hub"> PoE HUB</label>
+                        <input type="number" name="cnt_hub" value="0">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. 設置場所設定 (自動連動) -->
+            <section class="app-card">
+                <div class="card-title-row">設置場所設定</div>
+                <div id="locationList" class="ui-location-list">
+                    <!-- app.js で描画 -->
+                </div>
+            </section>
+
+            <!-- 5. 作業進捗・記録 -->
+            <section class="app-card">
+                <div class="card-title-row">確認項目一覧</div>
+                <div class="table-container">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">No</th>
+                                <th>作業項目</th>
+                                <th style="width: 150px;">実施日時</th>
+                                <th style="width: 80px;">作業時間(分)</th>
+                                <th style="width: 150px;">作業終了時間</th>
+                                <th style="width: 150px;">担当者</th>
+                                <th style="width: 100px;">状況</th>
+                                <th>備考</th>
+                            </tr>
+                        </thead>
+                        <tbody id="uiWorkStatusBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- カメラ管理タイトル (マージン調整) -->
+                <div style="margin-top: 60px; border-top: 2px solid #f1f5f9; padding-top: 30px;">
+                    <div class="card-title-row">カメラ管理・写真撮影</div>
+                    <div id="uiCameraPanels" class="camera-panels-grid"></div>
+                </div>
+
+                <!-- エクスプレスサーバー写真記録 -->
+                <div style="margin-top: 40px; border-top: 2px solid #f1f5f9; padding-top: 30px;">
+                    <div class="card-title-row">エクスプレスサーバー 写真撮影</div>
+                    <div class="ui-photo-box" style="grid-template-columns: repeat(2, 1fr); max-width: 600px;">
+                        <div class="ui-photo-slot" onclick="clickInp('server_pre')" id="ui_preview_server_pre">
+                            <div class="slot-label">サーバー交換前 (旧)</div>
+                            <input type="file" id="file_server_pre" name="server_pre" style="display:none;"
+                                onchange="handleServerImg(this)">
+                        </div>
+                        <div class="ui-photo-slot" onclick="clickInp('server_post')" id="ui_preview_server_post">
+                            <div class="slot-label">サーバー交換後 (新)</div>
+                            <input type="file" id="file_server_post" name="server_post" style="display:none;"
+                                onchange="handleServerImg(this)">
                         </div>
                     </div>
                 </div>
+            </section>
 
-                <!-- 行4: 立会 | 備考 -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                    <div class="field"><label>立会</label><textarea name="witness" rows="1" placeholder="立会者様"></textarea>
-                    </div>
-                    <div class="field"><label>備考（全体）</label><textarea name="overallNote" rows="1"
-                            placeholder="特記事項等"></textarea></div>
-                </div>
-            </div>
-        </div>
+            <!-- 全体備考欄 -->
+            <section class="app-card">
+                <div class="card-title-row">全体備考</div>
+                <textarea name="ui_general_remarks" data-sync="general_remarks"
+                    style="width:100%; min-height:100px; padding:10px; border-radius:6px; border:1px solid var(--border);"
+                    placeholder="作業全体に関する備考や特記事項を入力してください"></textarea>
+            </section>
+        </main>
+    </div>
 
-        <!-- 交換部品 -->
-        <div class="section" id="sectionParts">
-            <h2>交換部品 <span class="pill">チェック時個数必須</span></h2>
-            <div style="display:flex; flex-wrap:wrap; gap:32px; padding: 10px 0;">
-                <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
-                    <input type="checkbox" name="part_express" style="width: 18px; height: 18px;"> エクスプレスサーバー
-                    <input type="number" name="cnt_express" placeholder="0" style="width: 60px;">
-                </label>
-                <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
-                    <input type="checkbox" name="part_camera" style="width: 18px; height: 18px;"> Camera
-                    <input type="number" name="cnt_camera" placeholder="0" style="width: 60px;">
-                </label>
-                <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
-                    <input type="checkbox" name="part_ups" style="width: 18px; height: 18px;"> UPS
-                    <input type="number" name="cnt_ups" placeholder="0" style="width: 60px;">
-                </label>
-                <label style="display:flex; align-items:center; gap:10px; cursor: pointer;">
-                    <input type="checkbox" name="part_hub" style="width: 18px; height: 18px;"> PoE HUB
-                    <input type="number" name="cnt_hub" placeholder="0" style="width: 60px;">
-                </label>
-            </div>
-        </div>
-
-        <!-- 設置場所 -->
-        <div class="section" id="sectionLocations">
-            <h2>設置場所 <span class="pill">1つ以上必須</span></h2>
-            <div class="tools" style="margin-bottom: 20px;">
-                <button type="button" class="danger" onclick="deleteSelectedLocations()">選択削除</button>
-                <button type="button" onclick="addLocation(1)">＋ 1件追加</button>
-                <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
-                    <span class="muted" style="margin-bottom: 0;">一括リセット:</span>
-                    <input type="number" id="initLocCount" value="7" style="width:50px;">
-                    <button type="button" onclick="resetLocations()" style="font-size: 12px;">実行</button>
-                </div>
-            </div>
-            <div id="locationList"
-                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 10px;">
-            </div>
-        </div>
-
-        <!-- Camera確認 -->
-        <div class="section" id="sectionCamera">
-            <h2>Camera確認 <span class="pill">確認必須</span></h2>
-            <div class="table-wrap">
-                <table id="cameraTable">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px;">No</th>
-                            <th style="width: 180px;">設置場所</th>
-                            <th style="width: 160px;">作業日時</th>
-                            <th style="width: 50px;">前</th>
-                            <th style="width: 50px;">昼</th>
-                            <th style="width: 50px;">夜</th>
-                            <th style="width: 70px;">設定値</th>
-                            <th>画像アップロード</th>
-                            <th style="width: 90px;">状態</th>
-                            <th style="width: 40px;">✅</th>
-                        </tr>
-                    </thead>
-                    <tbody id="cameraBody"></tbody>
+    <!-- ==========================================
+         印刷用テンプレート (Report) - 画面上では非表示
+    =========================================== -->
+    <div id="print-report">
+        <!-- 第1ページ: 基本・状況 -->
+        <article class="report-page">
+            <h1 class="report-title">F-ace顔認証ユニット入れ替え工事 作業結果表</h1>
+            <section class="section">
+                <h2 class="blue-bar">■ 工事基本情報</h2>
+                <table class="grid-table">
+                    <tr>
+                        <th style="width: 25%;">工事名称</th>
+                        <td id="p_constructionName"></td>
+                    </tr>
+                    <tr>
+                        <th>管理番号</th>
+                        <td id="p_managementId"></td>
+                    </tr>
+                    <tr>
+                        <th>工事物件</th>
+                        <td id="p_propertyName"></td>
+                    </tr>
+                    <tr>
+                        <th>工事期間</th>
+                        <td><span id="p_workDateStart_jp"></span> 〜 <span id="p_workDateEnd_jp"></span></td>
+                    </tr>
+                    <tr>
+                        <th>設置台数</th>
+                        <td><span id="p_cnt_camera"></span> 台</td>
+                    </tr>
+                    <tr>
+                        <th>担当者</th>
+                        <td id="p_confirmator"></td>
+                    </tr>
                 </table>
-            </div>
-        </div>
-
-        <!-- 共通確認項目 -->
-        <div class="section" id="sectionCommon">
-            <h2>共通確認項目 <span class="pill">確認必須</span></h2>
-            <div class="table-wrap">
-                <table>
+            </section>
+            <section class="section">
+                <h2 class="blue-bar">■ 作業実施報告</h2>
+                <table class="grid-table">
                     <thead>
                         <tr>
-                            <th style="width: 40px;">No</th>
-                            <th style="width: 250px;">作業項目</th>
-                            <th style="width: 150px;">予定日時</th>
-                            <th style="width: 150px;">実施日時</th>
-                            <th style="width: 100px;">担当者</th>
-                            <th style="width: 130px;">実施状況</th>
+                            <th style="width:30px;">#</th>
+                            <th>作業項目</th>
+                            <th style="width:90px;">予定</th>
+                            <th style="width:90px;">実施</th>
+                            <th style="width:60px;">時間</th>
+                            <th style="width:90px;">終了</th>
+                            <th style="width:70px;">担当</th>
+                            <th style="width:40px;">状</th>
                             <th>備考</th>
-                            <th style="width: 280px;">画像 (4枚まで)</th>
-                            <th style="width: 40px;">✅</th>
                         </tr>
                     </thead>
-                    <tbody id="commonBody"></tbody>
+                    <tbody id="pWorkStatusBody"></tbody>
                 </table>
+            </section>
+        </article>
+
+        <!-- カメラ詳細ページ (1カメラにつき4枚。1ページ3台。app.jsで生成) -->
+        <div id="pCameraPages"></div>
+
+        <!-- 最終ページ: サーバー記録 & その他 -->
+        <article class="report-page">
+            <h2 class="blue-bar">■ エクスプレスサーバー 交換記録</h2>
+            <div class="p-photo-grid-4">
+                <div class="p-photo-slot">
+                    <div class="p-slot-header">サーバー交換前 (旧)</div>
+                    <div class="p-img-area" id="p_server_pre"></div>
+                </div>
+                <div class="p-photo-slot">
+                    <div class="p-slot-header">サーバー交換後 (新)</div>
+                    <div class="p-img-area" id="p_server_post"></div>
+                </div>
             </div>
-        </div>
 
-        <!-- 操作 -->
-        <div class="tools" style="justify-content: center; margin-top: 40px; margin-bottom: 60px; gap: 20px;">
-            <button type="button" class="primary" onclick="window.print()"
-                style="padding: 14px 48px; font-size: 18px; border-radius: 30px; box-shadow: 0 10px 20px rgba(0,122,255,0.3);">
-                PDF出力 / 印刷
-            </button>
-        </div>
-    </form>
+            <h2 class="blue-bar mt-15">■ 全体備考</h2>
+            <div id="p_general_remarks"
+                style="min-height: 80px; border: 0.5pt solid #000; padding: 8px; font-size: 9pt; white-space: pre-wrap;">
+            </div>
 
-    <!-- 画像拡大ダイアログ -->
+            <h2 class="blue-bar mt-40">■ 工事完了確認</h2>
+            <table class="grid-table">
+                <tr>
+                    <th style="width: 25%;">全体業務完了日時</th>
+                    <td><span id="p_all_comp"></span></td>
+                </tr>
+            </table>
+        </article>
+    </div>
+
     <dialog id="imgDialog">
-        <div style="text-align: right; margin-bottom: 10px;">
-            <button type="button" onclick="document.getElementById('imgDialog').close()"
-                style="background: #eee; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">✕</button>
+        <div style="text-align: right;"><button type="button" onclick="this.closest('dialog').close()">閉じる</button>
         </div>
-        <img id="dlgImg"
-            style="max-width: 90vw; max-height: 80vh; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);"
-            alt="拡大画像">
+        <img id="dlgImg" style="max-width: 90vw; max-height: 80vh;">
+    </dialog>
+
+    <!-- レポート一覧モーダル -->
+    <dialog id="reportsListDialog" style="width: 800px; padding: 20px; border-radius: 8px; border: 1px solid #ccc;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3>保存済みレポート一覧</h3>
+            <button type="button" onclick="this.closest('dialog').close()">✕</button>
+        </div>
+        <div class="table-container">
+            <table class="app-table">
+                <thead>
+                    <tr>
+                        <th>物件名</th>
+                        <th>管理番号</th>
+                        <th>工事期間</th>
+                        <th>保存日時</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="reportsListBody"></tbody>
+            </table>
+        </div>
     </dialog>
 
     <script src="app.js"></script>

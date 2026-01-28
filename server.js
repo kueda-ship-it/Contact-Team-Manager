@@ -16,6 +16,7 @@ app.use(express.static(__dirname));
 const uploadDir = path.join(__dirname, 'uploads');
 const dataFile = path.join(__dirname, 'reports.json');
 const usersFile = path.join(__dirname, 'users.json');
+const settingsFile = path.join(__dirname, 'settings.json');
 
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
@@ -31,6 +32,27 @@ if (!fs.existsSync(usersFile)) {
         { id: "viewer", pw: "viewer123", name: "閲覧者", role: "viewer" }
     ];
     fs.writeFileSync(usersFile, JSON.stringify(defaultUsers, null, 2));
+}
+
+if (!fs.existsSync(settingsFile)) {
+    const defaultSettings = {
+        commonItems: [
+            "backup（旧サーバー）",
+            "旧サーバー・PoE HUB・UPS交換（写真必須）",
+            "IresのID削除",
+            "カメラテスト",
+            "各ゲート認証テスト",
+            "ロッカー動作確認",
+            "最終養生確認"
+        ],
+        cameraSettings: [
+            { id: 1, name: "項目1" },
+            { id: 2, name: "項目2" },
+            { id: 3, name: "項目3" },
+            { id: 4, name: "項目4" }
+        ]
+    };
+    fs.writeFileSync(settingsFile, JSON.stringify(defaultSettings, null, 2));
 }
 
 // Multer storage config
@@ -123,6 +145,27 @@ app.delete('/api/users/:id', (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Failed to delete user' });
+    }
+});
+
+// 7. Get system settings
+app.get('/api/settings', (req, res) => {
+    try {
+        const data = fs.readFileSync(settingsFile, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to read settings' });
+    }
+});
+
+// 8. Update system settings
+app.post('/api/settings', (req, res) => {
+    try {
+        const settings = req.body;
+        fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save settings' });
     }
 });
 

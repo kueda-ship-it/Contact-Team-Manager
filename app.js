@@ -1,686 +1,463 @@
 (() => {
-    const STORAGE_KEY = "camera_checklist_csv_settings_v2";
-    const REPORTS_KEY = "camera_checklist_reports_v1";
-    const USERS_KEY = "face_users";
-    const CURRENT_USER_KEY = "face_current_user";
-
+    const STORAGE_KEY = "face_app_hybrid_v2";
     const $ = (s) => document.querySelector(s);
-    let currentReportId = null;
+    const $All = (s) => document.querySelectorAll(s);
+
+    const WORK_ITEMS = [
+        "交換前カメラ情報のバックアップ", "交換前カメラの取付状態確認", "交換前カメラの映像取得",
+        "kaoato バックアップ登録", "カメラ交換及び取付後の撮影",
+        "エクスプレスサーバー交換および設定", "カメラテスト",
+        "登録テスト（F-aceIDマスタ更新）", "各ゲート認証テスト"
+    ];
+
     let locations = [];
     let currentUser = null;
 
-    const COMMON_ITEMS = [
-        "backup（旧サーバー）",
-        "旧サーバー・PoE HUB・UPS交換（写真必須）",
-        "IresのID削除",
-        "カメラテスト",
-        "各ゲート認証テスト",
-        "ロッカー動作確認",
-        "最終養生確認"
-    ];
-
-    // --- Auth Logic ---
-    async function initAuth() {
-        currentUser = JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
-        if (!currentUser) {
-            showLoginOverlay();
-        } else {
-            // セッション有効チェック（オプションでサーバーに問い合わせても良い）
-            renderUIByRole();
-        }
-    }
-
-    function showLoginOverlay() {
-        let overlay = $("#authOverlay");
-        if (!overlay) {
-            overlay = document.createElement("div");
-            overlay.id = "authOverlay";
-            overlay.innerHTML = `
-                <div class="auth-card">
-                    <h2 style="margin-bottom: 20px; text-align: center;">F-ace ログイン</h2>
-                    <div class="field"><label>ユーザーID</label><input type="text" id="loginId" placeholder="IDを入力"></div>
-                    <div class="field" style="margin-top: 10px;"><label>パスワード</label><input type="password" id="loginPw" placeholder="パスワードを入力"></div>
-                    <div id="loginError" style="color: var(--danger); font-size: 12px; margin-top: 10px; display: none;">IDまたはパスワードが違います</div>
-                    <button type="button" class="primary" id="loginBtn" style="margin-top: 20px; width: 100%; justify-content: center;">ログイン</button>
-                    <div class="muted" style="font-size: 10px; margin-top: 15px; border-top: 1px solid #eee; pt: 10px;">
-                        初期ID/PW例:<br>admin / admin123 (master)<br>user / user123 (user)
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(overlay);
-            $("#loginBtn").onclick = login;
-            $("#loginPw").onkeydown = (e) => { if (e.key === "Enter") login(); };
-        }
-        overlay.style.display = "flex";
-    }
-
-    async function login() {
-        const id = $("#loginId").value;
-        const pw = $("#loginPw").value;
-        if (!id || !pw) {
-            alert("IDとパスワードを入力してください。");
+    function checkAuth() {
+        const userStr = localStorage.getItem("face_current_user");
+        if (!userStr) {
+            location.href = "login.html";
             return;
         }
+        currentUser = JSON.parse(userStr);
+        const infoEl = $("#userInfo");
+        if (infoEl) infoEl.textContent = `${currentUser.name} (${currentUser.role})`;
 
-        // 管理者用ローカルバックアップ（サーバー未起動時でも検証可能にする）
-        if (id === "admin" && pw === "admin123") {
-            const adminUser = { id: "admin", pw: "admin123", name: "管理者(Local)", role: "master" };
-            localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(adminUser));
-            location.reload();
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/users');
-            const users = await response.json();
-            const user = users.find(u => u.id === id && u.pw === pw);
-
-            if (user) {
-                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-                location.reload();
-            } else {
-                $("#loginError").style.display = "block";
-            }
-        } catch (err) {
-            alert("認証サーバーに接続できません。通常ユーザーはサーバーが必要です。");
+        // マスタ管理リンクの表示制御
+        const masterLink = $("#masterLink");
+        if (masterLink && (currentUser.role === 'master' || currentUser.role === 'Manager')) {
+            masterLink.style.display = "inline";
         }
     }
 
     window.logout = () => {
-        localStorage.removeItem(CURRENT_USER_KEY);
-        location.reload();
+        localStorage.removeItem("face_current_user");
+        location.href = "login.html";
     };
 
-    function renderUIByRole() {
-        if (!currentUser) return;
+    function init() {
+        checkAuth();
+        renderUIWorkStatus();
+        renderUIPanels();
+        setupSync();
+        loadLocal();
+        updateReportFromUI();
 
-        let nav = $(".nav-container");
-        if (!nav) {
-            nav = document.createElement("div");
-            nav.className = "nav-container section";
-            nav.style.display = "flex";
-            nav.style.justifyContent = "space-between";
-            nav.style.alignItems = "center";
-            nav.style.padding = "10px 20px";
-            nav.innerHTML = `
-                <div class="user-info">ログイン中: <strong>${currentUser.name}</strong> (${currentUser.role})</div>
-                <div class="nav-links" style="display: flex; gap: 20px; align-items: center;">
-                    ${(currentUser.role === 'master' || currentUser.role === 'Manager') ? '<a href="master.html" class="nav-link">マスタ管理</a>' : ''}
-                    <button type="button" onclick="logout()" class="danger" style="padding: 4px 12px; font-size: 12px;">ログアウト</button>
-                </div>
-            `;
-            document.body.insertBefore(nav, document.body.firstChild);
-        }
-
-        if (currentUser.role === 'viewer') {
-            document.querySelectorAll("input, textarea, select, button:not(.primary)").forEach(el => {
-                if (el.textContent !== "ログアウト" && !el.closest(".nav-container")) {
-                    el.disabled = true;
-                    if (el.tagName === "BUTTON") el.style.display = "none";
-                }
+        // カメラ個数入力の同期監視
+        const cntCam = $("[name='cnt_camera']");
+        if (cntCam) {
+            cntCam.addEventListener("input", (e) => {
+                const n = parseInt(e.target.value) || 0;
+                syncCameraSettings(n);
+                saveLocal();
             });
-            const printBtn = document.querySelector("button.primary[onclick*='print']");
-            if (printBtn) {
-                printBtn.disabled = false;
-                printBtn.style.display = "flex";
-            }
         }
+
+        // 初期ロード時に色を適用
+        setTimeout(() => {
+            WORK_ITEMS.forEach((_, i) => {
+                const el = document.querySelector(`[name="ws_status_${i + 1}"]`);
+                if (el) updateRowColor(i + 1, el.value);
+            });
+        }, 500);
     }
 
-    // --- Validation & Linking ---
-    function validateForm() {
-        const errors = [];
-        const required = [
-            "constructionName", "managementId", "propertyName",
-            "workDateStart", "workDateEnd", "confirmator"
-        ];
+    // 1. 三位一体の同期（Camera個数 -> 設置場所 -> 管理パネル）
+    function syncCameraSettings(n) {
+        if (n < 0) n = 0;
+        if (n > 20) n = 20;
 
-        required.forEach(name => {
-            const el = getEl(name);
-            if (!el || !String(el.value).trim()) {
-                el?.classList.add("invalid");
-                errors.push(name);
+        if (locations.length !== n) {
+            if (locations.length < n) {
+                for (let i = locations.length; i < n; i++) {
+                    const defaultName = (i === 0) ? "ロッカー" : `設置場所${i + 1}`;
+                    locations.push({ id: cryptoId(), name: defaultName });
+                }
             } else {
-                el?.classList.remove("invalid");
+                locations = locations.slice(0, n);
             }
-        });
-
-        // 部品チェック時の個数
-        ["express", "camera", "ups", "hub"].forEach(p => {
-            const chk = $(`[name="part_${p}"]`);
-            const cnt = $(`[name="cnt_${p}"]`);
-            if (chk && chk.checked) {
-                if (!cnt.value || parseInt(cnt.value) <= 0) {
-                    cnt.classList.add("invalid");
-                    errors.push(`cnt_${p}`);
-                } else {
-                    cnt.classList.remove("invalid");
-                }
-            } else if (cnt) {
-                cnt.classList.remove("invalid");
-            }
-        });
-
-        if (locations.length === 0) {
-            errors.push("locations");
-            alert("設置場所を1つ以上登録してください。");
-            return false;
         }
 
-        // Camera確認チェック
-        locations.forEach(loc => {
-            const rid = `cam_${loc.id}`;
-            const chk = getEl(`${rid}_check`);
-            if (chk && !chk.checked && currentUser.role !== 'viewer') {
-                chk.closest("td").style.backgroundColor = "rgba(255, 59, 48, 0.1)";
-                errors.push(`${rid}_check`);
-            } else if (chk) {
-                chk.closest("td").style.backgroundColor = "";
+        // 1台目を常に「ロッカー」に固定（ユーザーが書き換えても初期化時等に補正）
+        if (locations.length > 0 && locations[0].name !== "ロッカー") {
+            if (locations[0].name.startsWith("設置場所") || !locations[0].name) {
+                locations[0].name = "ロッカー";
             }
-        });
-
-        // 共通項目チェック
-        COMMON_ITEMS.forEach((_, i) => {
-            const n = i + 1;
-            const chk = getEl(`common_check_${n}`);
-            const isItem2 = (n === 2);
-            const needsPartCheck = isItem2 && ($(`[name="part_ups"]`).checked || $(`[name="part_hub"]`).checked);
-
-            if (chk && !chk.checked && currentUser.role !== 'viewer') {
-                if (!isItem2 || needsPartCheck) {
-                    chk.closest("td").style.backgroundColor = "rgba(255, 59, 48, 0.1)";
-                    errors.push(`common_check_${n}`);
-                }
-            } else if (chk) {
-                chk.closest("td").style.backgroundColor = "";
-            }
-        });
-
-        return errors.length === 0;
-    }
-
-    function updatePartLinking() {
-        const ups = $(`[name="part_ups"]`)?.checked;
-        const hub = $(`[name="part_hub"]`)?.checked;
-        const item2Row = document.querySelector("#commonBody tr:nth-child(2)");
-        if (!item2Row) return;
-
-        const labelCell = item2Row.querySelector("td:nth-child(2)");
-        if (ups || hub) {
-            item2Row.classList.add("highlight-warning");
-            labelCell.innerHTML = `旧サーバー・PoE HUB・UPS交換 <span class="pill" style="background:var(--danger)">確認必須</span>`;
-        } else {
-            item2Row.classList.remove("highlight-warning");
-            labelCell.textContent = "旧サーバー・PoE HUB・UPS交換（写真必須）";
         }
-    }
 
-    // --- Image Handling (OneDrive usage) ---
-    function attachPreview(input, box) {
-        if (!input || !box) return;
-        input.addEventListener("change", () => {
-            box.innerHTML = "";
-            const files = Array.from(input.files);
-            if (files.length > 0) {
-                const info = document.createElement("div");
-                info.className = "muted";
-                info.style.fontSize = "10px";
-                info.style.marginBottom = "4px";
-                info.textContent = "OneDrive同期フォルダに保存してください";
-                box.appendChild(info);
-            }
-            files.forEach(f => {
-                const url = URL.createObjectURL(f);
-                const container = document.createElement("div");
-                container.style.position = "relative";
-                container.style.display = "inline-block";
-
-                const img = document.createElement("img");
-                img.src = url;
-                img.title = `ファイル名: ${f.name}\nクリックで拡大`;
-                img.onclick = () => { $("#dlgImg").src = url; $("#imgDialog").showModal(); };
-                container.appendChild(img);
-
-                box.appendChild(container);
-            });
-        });
-    }
-
-    function initDefaultLocations(n = 7) {
-        locations = Array.from({ length: n }, (_, i) => ({ id: cryptoId(), name: `設置場所${i + 1}` }));
         renderAll();
     }
 
-    function renderLocations() {
-        const container = $("#locationList");
-        if (!container) return;
-        container.innerHTML = "";
-        locations.forEach((loc) => {
-            const div = document.createElement("div");
-            div.className = "loc-row";
-            div.style.marginBottom = "8px";
-            div.style.display = "flex";
-            div.style.alignItems = "center";
-            div.style.gap = "12px";
-            div.innerHTML = `
-                <input type="checkbox" class="loc-check" value="${loc.id}" ${currentUser?.role === 'viewer' ? 'disabled' : ''}>
-                <input type="text" value="${escapeHtml(loc.name)}" placeholder="場所名を入力" 
-                       oninput="updateLocationName('${loc.id}', this.value)" 
-                       style="flex: 1;" ${currentUser?.role === 'viewer' ? 'disabled' : ''}>
-            `;
-            container.appendChild(div);
-        });
+    function renderAll() {
+        renderUILocations();
+        renderUIPanels();
+        updateWorkerOptions();
+        updateReportFromUI();
     }
 
-    window.updateLocationName = (id, name) => {
+    function renderUIWorkStatus() {
+        const body = $("#uiWorkStatusBody");
+        const pBody = $("#pWorkStatusBody");
+        if (!body || !pBody) return;
+
+        body.innerHTML = WORK_ITEMS.map((text, i) => `
+            <tr id="ws_row_${i + 1}">
+                <td>${i + 1}</td>
+                <td style="font-weight:bold;">${text}</td>
+                <td><input type="datetime-local" name="ws_time_${i + 1}" data-sync="ws_time_${i + 1}" onchange="updateEndTime(${i + 1})"></td>
+                <td><input type="number" name="ws_dur_${i + 1}" data-sync="ws_dur_${i + 1}" style="width:60px;" oninput="updateEndTime(${i + 1})"></td>
+                <td><input type="text" name="ws_end_${i + 1}" data-sync="ws_end_${i + 1}" readonly placeholder="自動計算" style="background:#eee;"></td>
+                <td><select name="ws_person_${i + 1}" class="worker-dropdown" data-sync="ws_person_${i + 1}"><option value="">(選択)</option></select></td>
+                <td><select name="ws_status_${i + 1}" data-sync="ws_status_${i + 1}" onchange="updateRowColor(${i + 1}, this.value)"><option value="未">未</option><option value="済">済</option><option value="無">無</option></select></td>
+                <td><input type="text" name="ws_note_${i + 1}" data-sync="ws_note_${i + 1}" placeholder="備考"></td>
+            </tr>
+        `).join("");
+
+        pBody.innerHTML = WORK_ITEMS.map((text, i) => `
+            <tr>
+                <td>${i + 1}</td>
+                <td style="font-size:8pt;">${text}</td>
+                <td></td>
+                <td id="p_ws_time_${i + 1}"></td>
+                <td id="p_ws_dur_${i + 1}" style="text-align:center;"></td>
+                <td id="p_ws_end_${i + 1}"></td>
+                <td id="p_ws_person_${i + 1}"></td>
+                <td id="p_ws_status_${i + 1}" style="text-align:center;"></td>
+                <td id="p_ws_note_${i + 1}"></td>
+            </tr>
+        `).join("");
+    }
+
+    window.updateRowColor = (id, status) => {
+        const row = document.getElementById(`ws_row_${id}`);
+        if (row) {
+            if (status === "済") {
+                row.classList.add("status-completed");
+            } else {
+                row.classList.remove("status-completed");
+            }
+        }
+    };
+
+    window.updateEndTime = (id) => {
+        const timeVal = $(`[name="ws_time_${id}"]`).value;
+        const durVal = parseInt($(`[name="ws_dur_${id}"]`).value) || 0;
+        const endInp = $(`[name="ws_end_${id}"]`);
+
+        if (timeVal && durVal > 0) {
+            const start = new Date(timeVal);
+            const end = new Date(start.getTime() + durVal * 60000);
+
+            // フォーマット YYYY-MM-DD HH:mm → PDF用には短く MM-DD HH:mm
+            const endStr = `${(end.getMonth() + 1).toString().padStart(2, '0')}-${end.getDate().toString().padStart(2, '0')} ${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+            endInp.value = endStr;
+            syncField(endInp);
+        } else {
+            endInp.value = "";
+            syncField(endInp);
+        }
+        saveLocal();
+    };
+
+    window.updateWorkerOptions = () => {
+        const confirmator = $("#ui_confirmator").value;
+        const w1 = $("[name='worker1']").value;
+        const w2 = $("[name='worker2']").value;
+        const w3 = $("[name='worker3']").value;
+        const w4 = $("[name='worker4']").value;
+        const names = [confirmator, w1, w2, w3, w4].filter(n => n.trim() !== "");
+        $All(".worker-dropdown").forEach(dd => {
+            const cur = dd.value;
+            dd.innerHTML = `<option value="">(選択)</option>` + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+            if (names.includes(cur)) dd.value = cur;
+        });
+    };
+
+    function renderUILocations() {
+        const list = $("#locationList");
+        if (!list) return;
+        list.innerHTML = locations.map((loc, i) => `
+            <div class="loc-ui-row" style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
+                <div style="font-size: 12px; color: #666; width: 25px;">${i + 1}.</div>
+                <input type="text" value="${escapeHtml(loc.name)}" 
+                    oninput="updateLocationName('${loc.id}', this.value)" 
+                    style="flex:1; ${i === 0 ? 'background:#f1f5f9; color:#64748b; cursor:not-allowed;' : ''}" 
+                    ${i === 0 ? 'readonly' : ''}
+                    placeholder="場所名を入力">
+                <div style="font-size: 10px; color: #999;">${i === 0 ? '(固定項目)' : '(カメラ台数と連動しています)'}</div>
+            </div>
+        `).join("");
+    }
+
+    window.updateLocationName = (id, val) => {
         const loc = locations.find(l => l.id === id);
         if (loc) {
-            loc.name = name;
-            const camHeader = document.querySelector(`tr[data-locid="${id}"] td:nth-child(2)`);
-            if (camHeader) camHeader.textContent = name;
-            const subTitle = document.querySelector(`#sub_${id} .title`);
-            if (subTitle) subTitle.textContent = `設定値（${name}）`;
+            loc.name = val;
+            const idx = locations.indexOf(loc) + 1;
+            // 管理パネルのタイトルを更新
+            const title = document.querySelector(`#cam_title_${idx}`);
+            if (title) title.textContent = `カメラ #${idx}：${val}`;
+            // 印刷用レポートのタイトルを更新
+            setText(`p_cam_loc_${idx}_f`, val);
+            saveLocal();
         }
     };
 
-    function renderCommonItems() {
-        const body = $("#commonBody");
-        if (!body) return;
-        body.innerHTML = "";
-        COMMON_ITEMS.forEach((item, i) => {
-            const n = i + 1;
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td>${n}</td>
-                <td>${escapeHtml(item)}</td>
-                <td><input type="datetime-local" name="common_plan_${n}"></td>
-                <td><input type="datetime-local" name="common_act_${n}"></td>
-                <td><input type="text" name="common_person_${n}" style="width: 80px;"></td>
-                <td style="white-space: nowrap;">
-                    <div style="display: flex; gap: 8px;">
-                        <label><input type="radio" name="common_stat_${n}" value="未"> 未</label>
-                        <label><input type="radio" name="common_stat_${n}" value="中"> 中</label>
-                        <label><input type="radio" name="common_stat_${n}" value="完"> 完</label>
-                    </div>
-                </td>
-                <td><textarea name="common_rem_${n}" rows="1" style="width: 100%;"></textarea></td>
-                <td>
-                    <div class="imgGrid" style="grid-template-columns: repeat(2, 1fr);">
-                        ${[1, 2, 3, 4].map(k => `
-                            <div class="img-upload-box">
-                                <input type="file" name="common_img_${n}_${k}" accept="image/*" style="font-size: 10px; width: 100%;">
-                                <div id="common_img_${n}_${k}_preview" class="thumbs"></div>
-                            </div>
-                        `).join("")}
-                    </div>
-                </td>
-                <td style="text-align: center;"><input type="checkbox" name="common_check_${n}"></td>
+    function renderUIPanels() {
+        const panels = $("#uiCameraPanels");
+        const pPages = $("#pCameraPages");
+        if (!panels || !pPages) return;
+
+        panels.innerHTML = "";
+        pPages.innerHTML = "";
+
+        locations.forEach((loc, idx) => {
+            const i = idx + 1;
+            // UI管理カード
+            const card = document.createElement("div");
+            card.className = "camera-card";
+            card.innerHTML = `
+                <div id="cam_title_${i}" class="card-title-row" style="font-size:14px; color:var(--primary);">カメラ #${i}：${escapeHtml(loc.name)}</div>
+                <div class="ui-photo-box">
+                    ${createUISlot(i, 'ftg_pre', '映像(前)')}
+                    ${createUISlot(i, 'ftg_day', '映像(昼)')}
+                    ${createUISlot(i, 'ftg_night', '映像(夜)')}
+                    ${createUISlot(i, 'repl_pre', '交換前')}
+                    ${createUISlot(i, 'repl_post', '交換後')}
+                </div>
+                <div class="field-row mt-10">
+                    <div class="field-col" style="flex:1"><label>品質</label><select name="cam_q_${i}" data-sync="cam_q_${i}"><option value="-">-</option><option value="良好">良好</option><option value="不良">不良</option></select></div>
+                    <div class="field-col" style="flex:1"><label>接続</label><select name="cam_c_${i}" data-sync="cam_c_${i}"><option value="-">-</option><option value="OK">OK</option><option value="NG">NG</option></select></div>
+                </div>
             `;
-            body.appendChild(tr);
-            const checkbox = tr.querySelector(`input[name="common_check_${n}"]`);
-            checkbox.addEventListener("change", () => tr.classList.toggle("checked", checkbox.checked));
+            panels.appendChild(card);
 
-            [1, 2, 3, 4].forEach(k => {
-                const input = tr.querySelector(`[name="common_img_${n}_${k}"]`);
-                const box = tr.querySelector(`#common_img_${n}_${k}_preview`);
-                attachPreview(input, box);
-            });
-        });
-        updatePartLinking();
-    }
-
-    function renderCamera() {
-        const body = $("#cameraBody");
-        if (!body) return;
-        body.innerHTML = "";
-        locations.forEach((loc, i) => {
-            const n = i + 1;
-            const rid = `cam_${loc.id}`;
-            const subId = `sub_${loc.id}`;
-
-            const tr = document.createElement("tr");
-            tr.setAttribute("data-locid", loc.id);
-            tr.innerHTML = `
-                <td>${n}</td>
-                <td>${escapeHtml(loc.name)}</td>
-                <td>
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <input type="datetime-local" name="${rid}_time_start" style="font-size: 11px;">
-                        <input type="datetime-local" name="${rid}_time_end" style="font-size: 11px;">
-                    </div>
-                </td>
-                <td><input type="number" name="${rid}_pre" style="width: 45px;"></td>
-                <td><input type="number" name="${rid}_day" style="width: 45px;"></td>
-                <td><input type="number" name="${rid}_night" style="width: 45px;"></td>
-                <td style="text-align: center;"><button type="button" onclick="toggleSubRow('${subId}')" style="padding: 4px 8px; font-size: 11px;">設定値</button></td>
-                <td>
-                    <div class="imgGrid">
-                        <div class="imgBlock"><div class="imgTitle">前</div><input type="file" name="${rid}_pre_img" accept="image/*" multiple style="font-size: 10px;"><div id="${rid}_pre_preview" class="thumbs"></div></div>
-                        <div class="imgBlock"><div class="imgTitle">昼</div><input type="file" name="${rid}_day_img" accept="image/*" multiple style="font-size: 10px;"><div id="${rid}_day_preview" class="thumbs"></div></div>
-                        <div class="imgBlock"><div class="imgTitle">夜</div><input type="file" name="${rid}_night_img" accept="image/*" multiple style="font-size: 10px;"><div id="${rid}_night_preview" class="thumbs"></div></div>
-                    </div>
-                </td>
-                <td style="white-space: nowrap;">
-                    <label><input type="radio" name="${rid}_status" value="正常" checked> 正常</label><br>
-                    <label><input type="radio" name="${rid}_status" value="異常"> 異常</label>
-                </td>
-                <td style="text-align: center;"><input type="checkbox" name="${rid}_check"></td>
-            `;
-            body.appendChild(tr);
-
-            const sub = document.createElement("tr");
-            sub.className = "subrow";
-            sub.id = subId;
-            sub.style.display = "none";
-            sub.innerHTML = `
-                <td colspan="10">
-                    <div class="subwrap" style="box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
-                        <div class="title" style="font-weight:bold;margin-bottom:12px; color: var(--primary);">設定値確認: ${escapeHtml(loc.name)}</div>
-                        <div class="table-wrap">
-                            <table class="subtable">
-                                <thead><tr><th style="width: 40px;">No</th><th>項目名</th><th>日時</th><th style="width: 60px;">前</th><th style="width: 60px;">後</th><th style="width: 40px;">一致</th><th>備考</th></tr></thead>
-                                <tbody>
-                                    ${Array.from({ length: 10 }, (_, k) => `
-                                        <tr>
-                                            <td>${k + 1}</td>
-                                            <td><input type="text" name="set_${loc.id}_${k + 1}_name" style="width: 100%;"></td>
-                                            <td><input type="text" name="set_${loc.id}_${k + 1}_time" style="width: 80px;" placeholder="HH:mm"></td>
-                                            <td><input type="number" name="set_${loc.id}_${k + 1}_before" oninput="updateMatch('${loc.id}', ${k + 1})" style="width: 50px;"></td>
-                                            <td><input type="number" name="set_${loc.id}_${k + 1}_after" oninput="updateMatch('${loc.id}', ${k + 1})" style="width: 50px;"></td>
-                                            <td style="text-align: center;"><input type="checkbox" name="set_${loc.id}_${k + 1}_match" disabled></td>
-                                            <td><input type="text" name="set_${loc.id}_${k + 1}_note" style="width: 100%;"></td>
-                                        </tr>
-                                    `).join("")}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </td>
-            `;
-            body.appendChild(sub);
-            const checkbox = tr.querySelector(`input[name="${rid}_check"]`);
-            checkbox.addEventListener("change", () => tr.classList.toggle("checked", checkbox.checked));
-            ["pre", "day", "night"].forEach(kind => attachPreview(tr.querySelector(`[name="${rid}_${kind}_img"]`), tr.querySelector(`#${rid}_${kind}_preview`)));
-        });
-    }
-
-    window.updateMatch = (locId, n) => {
-        const before = getEl(`set_${locId}_${n}_before`).value;
-        const after = getEl(`set_${locId}_${n}_after`).value;
-        const chk = getEl(`set_${locId}_${n}_match`);
-        if (before && after) {
-            chk.checked = (before === after);
-        } else {
-            chk.checked = false;
-        }
-    };
-
-    window.toggleSubRow = (id) => {
-        const el = $(`#${id}`);
-        if (el) el.style.display = (el.style.display === "none") ? "" : "none";
-    };
-
-    // --- Local Storage Management ---
-    function snapshot() {
-        const data = {
-            __locations: locations,
-            __currentReportId: currentReportId,
-            __savedAt: new Date().toISOString(),
-            __creator: currentUser?.id
-        };
-        document.querySelectorAll("input, textarea, select").forEach(el => {
-            if (!el.name || el.type === "file") return;
-            if (el.type === "checkbox") data[el.name] = el.checked;
-            else if (el.type === "radio") { if (el.checked) data[el.name] = el.value; }
-            else data[el.name] = el.value;
-        });
-        return data;
-    }
-
-    function restore(data) {
-        if (!data) return;
-        if (data.__locations) locations = data.__locations;
-        renderAll();
-        Object.entries(data).forEach(([k, v]) => {
-            if (k.startsWith("__")) return;
-            setVal(k, v);
-        });
-        updatePartLinking();
-        // マッチチェックの初期反映
-        locations.forEach(loc => {
-            for (let i = 1; i <= 10; i++) updateMatch(loc.id, i);
-        });
-    }
-
-    async function renderReportList() {
-        const body = $("#reportListBody");
-        if (!body) return;
-
-        try {
-            const response = await fetch('/api/reports');
-            const list = await response.json();
-
-            body.innerHTML = "";
-            list.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt)).forEach(r => {
-                const isCreator = r.data.__creator === currentUser?.id;
-                const canEdit = currentUser?.role === 'master' || (currentUser?.role === 'Manager' && isCreator) || (currentUser?.role === 'user' && isCreator);
-                const canDelete = currentUser?.role === 'master' || (currentUser?.role === 'Manager' && isCreator);
-
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${new Date(r.savedAt).toLocaleString()}</td>
-                    <td>${escapeHtml(r.managementId)}</td>
-                    <td>${escapeHtml(r.propertyName)}</td>
-                    <td>${escapeHtml(r.workDate)}</td>
-                    <td>
-                        <div style="display: flex; gap: 8px;">
-                            <button type="button" onclick="loadReport('${r.id}')" ${!canEdit && currentUser?.role !== 'viewer' ? 'style="display:none"' : ''}>
-                                ${currentUser?.role === 'viewer' ? '閲覧' : '読込'}
-                            </button>
-                            ${canDelete ? `<button type="button" class="danger" onclick="deleteReport('${r.id}')" style="padding: 4px 8px;">削除</button>` : ''}
-                        </div>
-                    </td>
-                `;
-                body.appendChild(tr);
-            });
-        } catch (err) {
-            console.error('Failed to load reports from server:', err);
-            // Fallback to local
-            const list = JSON.parse(localStorage.getItem(REPORTS_KEY) || "[]");
-            body.innerHTML = "";
-            list.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt)).forEach(r => {
-                const isCreator = r.data.__creator === currentUser?.id;
-                const canEdit = currentUser?.role === 'master' || (currentUser?.role === 'Manager' && isCreator) || (currentUser?.role === 'user' && isCreator);
-                const canDelete = currentUser?.role === 'master' || (currentUser?.role === 'Manager' && isCreator);
-
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${new Date(r.savedAt).toLocaleString()}</td>
-                    <td>${escapeHtml(r.managementId)}</td>
-                    <td>${escapeHtml(r.propertyName)}</td>
-                    <td>${escapeHtml(r.workDate)}</td>
-                    <td>
-                        <div style="display: flex; gap: 8px;">
-                            <button type="button" onclick="loadReport('${r.id}')" ${!canEdit && currentUser?.role !== 'viewer' ? 'style="display:none"' : ''}>
-                                ${currentUser?.role === 'viewer' ? '閲覧' : '読込'}
-                            </button>
-                            ${canDelete ? `<button type="button" class="danger" onclick="deleteReport('${r.id}')" style="padding: 4px 8px;">削除</button>` : ''}
-                        </div>
-                    </td>
-                `;
-                body.appendChild(tr);
-            });
-        }
-    }
-
-    function saveToLocal() {
-        if (currentUser?.role === 'viewer') return;
-        const data = snapshot();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    }
-
-    window.saveReport = async () => {
-        if (currentUser?.role === 'viewer') return;
-        if (!validateForm()) {
-            alert("必須項目が未入力、または正しくありません。赤枠を確認してください。");
-            return;
-        }
-
-        const data = snapshot();
-        const id = currentReportId || cryptoId();
-
-        const reportData = {
-            id,
-            managementId: getVal("managementId"),
-            propertyName: getVal("propertyName"),
-            workDate: getVal("workDateStart"),
-            savedAt: new Date().toISOString(),
-            data
-        };
-
-        try {
-            const response = await fetch('/api/reports', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(reportData)
-            });
-            if (response.ok) {
-                currentReportId = id;
-                await renderReportList();
-                alert("サーバーに保存しました。");
-            } else {
-                throw new Error('Save failed');
+            // Report: 1カメラにつき4枚 (映像夜は印刷対象外)
+            if ((i - 1) % 3 === 0) {
+                const page = document.createElement("article");
+                page.className = "report-page";
+                page.innerHTML = `<h2 class="blue-bar">■ カメラ交換・映像記録 (Page ${Math.ceil(i / 3)})</h2><div class="p-page-container"></div>`;
+                pPages.appendChild(page);
             }
-        } catch (err) {
-            alert("サーバーへの保存に失敗しました。Node.jsサーバーが起動しているか確認してください。");
-            console.error(err);
+            const pageContainer = pPages.lastElementChild.querySelector(".p-page-container");
+            const camBlock = document.createElement("div");
+            camBlock.className = "p-cam-block";
+            camBlock.innerHTML = `
+                <div class="p-cam-block-title">カメラ #${i}：<span id="p_cam_loc_${i}_f">${escapeHtml(loc.name)}</span></div>
+                <div class="p-photo-grid-2">
+                    <div class="p-photo-slot"><div class="p-slot-header">交換前（基板）</div><div class="p-img-area" id="p_cam_img_${i}_repl_pre"></div></div>
+                    <div class="p-photo-slot"><div class="p-slot-header">交換後（基板）</div><div class="p-img-area" id="p_cam_img_${i}_repl_post"></div></div>
+                </div>
+                <div class="p-footage-details">
+                    品質判定: <span id="p_cam_q_${i}"></span> ／ 接続確認: <span id="p_cam_c_${i}"></span>
+                </div>
+            `;
+            pageContainer.appendChild(camBlock);
+        });
+    }
+
+    function createUISlot(idx, type, lbl) {
+        const id = `cam_${idx}_${type}`;
+        return `<div class="ui-photo-slot" onclick="clickInp('${id}')" id="ui_preview_${id}"><div class="slot-label">${lbl}</div><input type="file" id="file_${id}" data-cam="${idx}" data-type="${type}" style="display:none;" onchange="handleUIImg(this)"></div>`;
+    }
+
+    // --- Core Sync ---
+    function setupSync() {
+        document.body.addEventListener("input", (e) => { if (e.target.dataset.sync) { syncField(e.target); saveLocal(); } });
+        document.body.addEventListener("change", (e) => { if (e.target.dataset.sync) { syncField(e.target); saveLocal(); } });
+    }
+
+    function syncField(el) {
+        const key = el.dataset.sync, val = el.value;
+        if (key.startsWith('ws_time_')) {
+            setText(`p_${key}`, val ? val.replace(/.*-(\d\d-\d\dT\d\d:\d\d)/, '$1').replace('T', ' ') : "");
+        } else if (key.startsWith('ws_end_')) {
+            // 文字列そのまま（すでにフォーマット済み想定）
+            setText(`p_${key}`, val);
+        } else {
+            setText(`p_${key}`, val);
         }
+    }
+
+    function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text || ""; }
+
+    // --- Image Handling ---
+    function commonProcessImage(file, input) {
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        const uiSlotId = input.id.replace('file_', 'ui_preview_');
+        const uiSlot = document.getElementById(uiSlotId);
+        if (uiSlot) {
+            let img = uiSlot.querySelector("img");
+            if (!img) { img = document.createElement("img"); uiSlot.appendChild(img); }
+            img.src = url;
+            uiSlot.classList.add("has-image");
+        }
+
+        // PDF Sync
+        const cam = input.dataset.cam;
+        const type = input.dataset.type;
+        if (cam) {
+            // 映像（前・昼・夜）はPDFに出力しない
+            if (type === 'ftg_pre' || type === 'ftg_day' || type === 'ftg_night') return;
+            const pSlot = $(`#p_cam_img_${cam}_${type}`);
+            if (pSlot) pSlot.innerHTML = `<img src="${url}">`;
+        } else {
+            const name = input.name;
+            const pSlot = $(`#p_${name}`);
+            if (pSlot) pSlot.innerHTML = `<img src="${url}">`;
+        }
+        saveLocal();
+    }
+
+    window.clickInp = (id) => $(`#file_${id}`).click();
+    window.handleUIImg = (input) => commonProcessImage(input.files[0], input);
+    window.handleServerImg = (input) => commonProcessImage(input.files[0], input);
+
+    // Global Drag & Drop for .ui-photo-slot
+    document.addEventListener("dragover", e => {
+        const slot = e.target.closest(".ui-photo-slot");
+        if (slot) {
+            e.preventDefault();
+            slot.classList.add("drag-over");
+        }
+    });
+    document.addEventListener("dragleave", e => {
+        const slot = e.target.closest(".ui-photo-slot");
+        if (slot) slot.classList.remove("drag-over");
+    });
+    document.addEventListener("drop", e => {
+        const slot = e.target.closest(".ui-photo-slot");
+        if (slot) {
+            e.preventDefault();
+            slot.classList.remove("drag-over");
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith("image/")) {
+                const input = slot.querySelector('input[type="file"]');
+                if (input) commonProcessImage(file, input);
+            }
+        }
+    });
+
+    // --- Persistence ---
+    window.saveLocal = () => {
+        const data = { l: locations };
+        document.querySelectorAll("#edit-ui input,#edit-ui textarea,#edit-ui select").forEach(el => { if (el.name) { if (el.type === "checkbox") data[el.name] = el.checked; else if (el.type === "radio") { if (el.checked) data[el.name] = el.value; } else if (el.type !== "file") data[el.name] = el.value; } });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     };
 
-    window.loadReport = async (id) => {
-        try {
-            const response = await fetch('/api/reports');
-            const list = await response.json();
-            const r = list.find(x => x.id === id);
-
-            if (r && confirm("データを読み込みますか？現在のフォーム内容は消去されます。")) {
-                currentReportId = id;
-                restore(r.data);
-                if (currentUser.role === 'viewer') {
-                    document.querySelectorAll("input, textarea, select, button:not(.primary)").forEach(el => {
-                        if (el.textContent !== "ログアウト" && !el.closest(".nav-container")) el.disabled = true;
-                    });
+    function loadLocal() {
+        const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return;
+        const data = JSON.parse(raw);
+        if (data.l) { locations = data.l; renderAll(); }
+        Object.entries(data).forEach(([k, v]) => {
+            const el = document.querySelector(`[name="${k}"]`);
+            if (el) {
+                if (el.type === "checkbox") el.checked = !!v;
+                else if (el.type !== "file") el.value = v;
+                if (el.dataset.sync) syncField(el);
+                if (k.startsWith("ws_status_")) {
+                    const id = k.replace("ws_status_", "");
+                    updateRowColor(id, v);
                 }
             }
+        });
+    }
+
+    function updateReportFromUI() { $All('[data-sync]').forEach(el => syncField(el)); }
+    function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function cryptoId() { return Math.random().toString(36).substring(2, 10); }
+
+    window.saveReport = async () => {
+        const data = {
+            id: $("[name='ui_managementId']").value || cryptoId(),
+            updatedAt: new Date().toISOString(),
+            l: locations
+        };
+        document.querySelectorAll("#edit-ui input,#edit-ui textarea,#edit-ui select").forEach(el => {
+            if (el.name) {
+                if (el.type === "checkbox") data[el.name] = el.checked;
+                else if (el.type === "radio") { if (el.checked) data[el.name] = el.value; }
+                else if (el.type !== "file") data[el.name] = el.value;
+            }
+        });
+
+        try {
+            const res = await fetch('/api/reports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) alert("サーバーに保存しました。");
+            else alert("保存に失敗しました。");
         } catch (err) {
-            alert("読み込みに失敗しました。");
+            alert("通信エラーが発生しました。");
         }
+    };
+
+    window.openReportsList = async () => {
+        const dialog = $("#reportsListDialog");
+        const body = $("#reportsListBody");
+        if (!dialog || !body) return;
+
+        try {
+            const res = await fetch('/api/reports');
+            const reports = await res.json();
+            body.innerHTML = reports.map(r => `
+                <tr>
+                    <td>${escapeHtml(r.ui_propertyName || "無題")}</td>
+                    <td>${escapeHtml(r.id)}</td>
+                    <td>${escapeHtml(r.ui_workDateStart_jp || "")}</td>
+                    <td>${new Date(r.updatedAt).toLocaleString()}</td>
+                    <td>
+                        <button type="button" onclick="loadReportFromServer('${r.id}')">開く</button>
+                        <button type="button" class="danger-btn" onclick="deleteReport('${r.id}')">削除</button>
+                    </td>
+                </tr>
+            `).join("");
+            dialog.showModal();
+        } catch (err) {
+            alert("一覧の取得に失敗しました。");
+        }
+    };
+
+    window.loadReportFromServer = async (id) => {
+        try {
+            const res = await fetch('/api/reports');
+            const reports = await res.json();
+            const data = reports.find(r => r.id === id);
+            if (data) {
+                populateData(data);
+                $("#reportsListDialog").close();
+            }
+        } catch (err) { alert("読み込みに失敗しました。"); }
     };
 
     window.deleteReport = async (id) => {
         if (!confirm("このレポートを削除しますか？")) return;
         try {
-            const response = await fetch(`/api/reports/${id}`, { method: 'DELETE' });
-            if (response.ok) {
-                if (currentReportId === id) currentReportId = null;
-                await renderReportList();
+            const res = await fetch(`/api/reports/${id}`, { method: 'DELETE' });
+            if (res.ok) openReportsList();
+        } catch (err) { alert("削除に失敗しました。"); }
+    };
+
+    function populateData(data) {
+        if (data.l) { locations = data.l; renderAll(); }
+        Object.entries(data).forEach(([k, v]) => {
+            const el = document.querySelector(`[name="${k}"]`);
+            if (el) {
+                if (el.type === "checkbox") el.checked = !!v;
+                else if (el.type !== "file") el.value = v;
+                if (el.dataset.sync) syncField(el);
+                if (k.startsWith("ws_status_")) {
+                    const id = k.replace("ws_status_", "");
+                    updateRowColor(id, v);
+                }
             }
-        } catch (err) {
-            alert("削除に失敗しました。");
-        }
-    };
-
-    function renderAll() {
-        renderLocations();
-        renderCommonItems();
-        renderCamera();
-        renderReportList();
-        renderUIByRole();
+        });
     }
 
-    // --- Helpers ---
-    function getEl(name) { return document.querySelector(`[name="${cssEscape(name)}"]`); }
-    function cssEscape(name) { return name.replace(/["\\]/g, "\\$&"); }
-    function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-    function setVal(name, value) {
-        const el = getEl(name);
-        if (!el) {
-            const radios = document.querySelectorAll(`[name="${cssEscape(name)}"]`);
-            radios.forEach(r => { r.checked = (r.value === value); });
-            return;
-        }
-        if (el.type === "checkbox") el.checked = !!value;
-        else if (el.type === "file") { }
-        else el.value = (value ?? "");
-    }
-    function getVal(name) {
-        const el = getEl(name);
-        if (!el) return "";
-        if (el.type === "checkbox") return el.checked;
-        const checked = document.querySelector(`input[name="${name}"]:checked`);
-        if (el.type === "radio") return checked ? checked.value : "";
-        return el.value;
-    }
-    function cryptoId() { return Math.random().toString(36).substring(2, 10); }
+    window.newReport = () => { if (confirm("リセットしますか？")) { localStorage.removeItem(STORAGE_KEY); location.reload(); } };
 
-    document.addEventListener("DOMContentLoaded", () => {
-        initAuth();
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) restore(JSON.parse(raw));
-        else initDefaultLocations();
-    });
-
-    document.addEventListener("input", (e) => {
-        if (e.target.name?.startsWith("part_")) updatePartLinking();
-        if (e.target.name === "cnt_camera") {
-            syncLocationsFromCameraCount();
-        }
-        if (window._saveTimer) clearTimeout(window._saveTimer);
-        window._saveTimer = setTimeout(saveToLocal, 1000);
-    });
-
-    function syncLocationsFromCameraCount() {
-        const cntEl = getEl("cnt_camera");
-        if (!cntEl) return;
-        const count = parseInt(cntEl.value, 10);
-        if (isNaN(count) || count < 0) return;
-
-        if (count > locations.length) {
-            const diff = count - locations.length;
-            for (let i = 0; i < diff; i++) {
-                locations.push({ id: cryptoId(), name: `設置場所${locations.length + 1}` });
-            }
-            renderAll();
-        } else if (count < locations.length) {
-            if (confirm(`交換部品のCamera台数(${count}台)に合わせて、設置場所の行数も削減しますか？\n(後ろの${locations.length - count}件が削除されます)`)) {
-                locations = locations.slice(0, count);
-                renderAll();
-            }
-        }
-    }
-
-    window.addLocation = (n = 1) => {
-        if (currentUser?.role === 'viewer') return;
-        for (let i = 0; i < n; i++) locations.push({ id: cryptoId(), name: "" });
-        renderAll();
-    };
-
-    window.deleteSelectedLocations = () => {
-        if (currentUser?.role === 'viewer') return;
-        const selected = Array.from(document.querySelectorAll(".loc-check:checked")).map(el => el.value);
-        if (selected.length === 0) return;
-        if (confirm(`${selected.length}件の設置場所を削除しますか？`)) {
-            locations = locations.filter(l => !selected.includes(l.id));
-            renderAll();
-        }
-    };
-
-    window.resetLocations = () => {
-        if (currentUser?.role === 'viewer') return;
-        const n = parseInt($("#initLocCount").value, 10);
-        if (n > 0 && confirm(`設置場所を${n}箇所にリセットしますか？入力済みの場所データは失われます。`)) {
-            locations = Array.from({ length: n }, (_, i) => ({ id: cryptoId(), name: `設置場所${i + 1}` }));
-            renderAll();
-        }
-    };
+    document.addEventListener("DOMContentLoaded", init);
 })();
