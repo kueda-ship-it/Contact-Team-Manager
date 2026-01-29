@@ -1080,10 +1080,13 @@ function renderThreads() {
     // Scroll to bottom (newest posts) after rendering
     setTimeout(() => {
         const searchQuery = globalSearchInp.value.trim();
-        if (!searchQuery) {
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        if (!searchQuery && feedThreads.length > 0) {
+            const lastThread = threadListEl.lastElementChild;
+            if (lastThread) {
+                lastThread.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
         }
-    }, 100);
+    }, 200);
 }
 
 function highlightMentions(text) {
@@ -1408,10 +1411,15 @@ document.querySelectorAll('.btn-close-modal').forEach(b => {
 // 管理画面のタブ切り替え
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.onclick = () => {
+        console.log("Switching to tab:", btn.dataset.tab);
         document.querySelectorAll('.tab-btn, .tab-content').forEach(el => el.classList.remove('active'));
         btn.classList.add('active');
         const target = document.getElementById(btn.dataset.tab);
-        if (target) target.classList.add('active');
+        if (target) {
+            target.classList.add('active');
+        } else {
+            console.error("Tab target not found:", btn.dataset.tab);
+        }
     };
 });
 

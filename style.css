@@ -516,8 +516,9 @@ header {
 
 .input-field {
     width: 100%;
-    background: #2D2C2B;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 10px;
+    /* Space between fields */
     color: var(--text-main);
     padding: 10px 14px;
     border-radius: 8px;
@@ -1132,4 +1133,32 @@ html {
 
 .sidebar-list {
     padding-bottom: 80px;
+}
+
+/* --- Admin Modal Tabs --- */
+.tab-content {
+    display: none !important;
+}
+
+.tab-content.active {
+    display: block !important;
+}
+
+.tab-btn.active {
+    color: white !important;
+    border-bottom: 2px solid var(--primary) !important;
+    font-weight: bold;
+}
+
+.tab-btn {
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: white !important;
+}
+
+/* Scroll support */
+html {
+    scroll-behavior: smooth;
 }
