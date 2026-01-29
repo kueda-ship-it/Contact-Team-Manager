@@ -245,7 +245,8 @@ header {
     border: 1px solid rgba(255, 255, 255, 0.1);
     margin-bottom: 12px;
     position: relative;
-    overflow: visible;
+    overflow: visible !important;
+    /* Ensure reactions are never clipped */
     /* Changed to visible to allow floating reactions */
     min-height: 120px;
     display: flex;
@@ -1012,15 +1013,19 @@ html {
 .reaction-container-bottom .reaction-menu {
     position: absolute;
     bottom: 38px;
-    /* 少し近づける (元40px) */
     left: 0;
+    z-index: 10001 !important;
+    /* Higher than anything else */
     display: flex;
-    gap: 4px;
-    padding: 6px 8px;
+    gap: 6px;
+    /* Slightly more gap */
+    padding: 8px 12px;
+    /* More padding */
     background: #252423;
     border-radius: 30px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    /* Brighter border */
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
     opacity: 0;
     visibility: hidden;
     transform: scale(0.8) translateY(10px);
@@ -1028,8 +1033,6 @@ html {
     pointer-events: none;
     white-space: nowrap;
     width: max-content;
-    z-index: 9999 !important;
-    /* Extremely high layer */
 }
 
 /* 透明なブリッジ (Reaction Menu) */

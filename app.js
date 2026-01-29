@@ -911,8 +911,15 @@ function renderThreads() {
         const reactionsHtml = Object.entries(emojiCounts)
             .sort(([a], [b]) => reactionTypes.indexOf(a) - reactionTypes.indexOf(b))
             .map(([emoji, count]) => {
+                const reactors = reactionsForThread
+                    .filter(r => r.emoji === emoji)
+                    .map(r => {
+                        const p = allProfiles.find(prof => prof.id === r.profile_id);
+                        return p ? (p.display_name || p.email) : '不明';
+                    });
+                const title = reactors.join(', ');
                 const hasMyReaction = reactionsForThread.some(r => r.profile_id === currentUser.id && r.emoji === emoji);
-                return `<span class="reaction-badge ${hasMyReaction ? 'active' : ''}" onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji} ${count}</span>`;
+                return `<span class="reaction-badge ${hasMyReaction ? 'active' : ''}" title="${title}" onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji} ${count}</span>`;
             }).join('');
 
         const currentReplies = thread.replies || [];
@@ -928,8 +935,15 @@ function renderThreads() {
             const replyReactionsHtml = Object.entries(replyEmojiCounts)
                 .sort(([a], [b]) => reactionTypesForReply.indexOf(a) - reactionTypesForReply.indexOf(b))
                 .map(([emoji, count]) => {
+                    const reactors = reactionsForReply
+                        .filter(r => r.emoji === emoji)
+                        .map(r => {
+                            const p = allProfiles.find(prof => prof.id === r.profile_id);
+                            return p ? (p.display_name || p.email) : '不明';
+                        });
+                    const title = reactors.join(', ');
                     const hasMyReaction = reactionsForReply.some(r => r.profile_id === currentUser.id && r.emoji === emoji);
-                    return `<span class="reaction-badge ${hasMyReaction ? 'active' : ''}" style="font-size: 0.7rem; padding: 1px 6px;" onclick="addReaction('${reply.id}', 'reply', '${emoji}')">${emoji} ${count}</span>`;
+                    return `<span class="reaction-badge ${hasMyReaction ? 'active' : ''}" style="font-size: 0.7rem; padding: 1px 6px;" title="${title}" onclick="addReaction('${reply.id}', 'reply', '${emoji}')">${emoji} ${count}</span>`;
                 }).join('');
 
             const isReplyOwner = reply.author === (currentProfile.display_name || currentUser.email);
