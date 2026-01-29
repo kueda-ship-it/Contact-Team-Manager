@@ -24,6 +24,7 @@ let currentTeamId = null; // Currently selected team (null = All)
 let allTeams = [];
 let whitelist = [];
 let allReactions = [];
+let currentSortOrder = 'asc'; // 'asc' = oldest activity first, 'desc' = newest activity first
 
 // --- UI Elements ---
 const authContainer = document.getElementById('auth-container');
@@ -49,6 +50,10 @@ const globalSearchInp = document.getElementById('global-search');
 const filterStatus = document.getElementById('filter-status'); // This might be null if not in HTML
 window.filterThreads = function (value) {
     currentFilter = value;
+    renderThreads();
+};
+window.toggleSortOrder = function () {
+    currentSortOrder = (currentSortOrder === 'asc' ? 'desc' : 'asc');
     renderThreads();
 };
 const assignedSidebarListEl = document.getElementById('assigned-sidebar-list');
@@ -803,8 +808,21 @@ function renderThreads() {
     const searchQuery = globalSearchInp.value.trim().toLowerCase();
 
     // --- Central Feed Data ---
-    let feedThreads = [...threads].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-        .filter(t => (filter === 'all' || t.status === filter));
+    const getLatestActivity = (t) => {
+        let latest = new Date(t.created_at).getTime();
+        if (t.replies && t.replies.length > 0) {
+            const lastReply = t.replies[t.replies.length - 1];
+            const replyTime = new Date(lastReply.created_at).getTime();
+            if (replyTime > latest) latest = replyTime;
+        }
+        return latest;
+    };
+
+    let feedThreads = [...threads].sort((a, b) => {
+        const timeA = getLatestActivity(a);
+        const timeB = getLatestActivity(b);
+        return currentSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+    }).filter(t => (filter === 'all' || t.status === filter));
 
     if (searchQuery) {
         feedThreads = feedThreads.filter(t =>
@@ -825,12 +843,23 @@ function renderThreads() {
 
     const assignedThreads = threads.filter(t => {
         if (t.status === 'completed') return false;
-        if (!t.content) return false;
-        const mentions = t.content.match(/@\S+/g) || [];
-        return mentions.some(m => {
-            const name = m.substring(1);
-            return name === myName || myTagNames.includes(name);
-        });
+
+        // メンションチェック関数
+        const hasMention = (content) => {
+            if (!content) return false;
+            const mentions = content.match(/@\S+/g) || [];
+            return mentions.some(m => {
+                const name = m.substring(1);
+                return name === myName || myTagNames.includes(name);
+            });
+        };
+
+        // 親記事のチェック
+        if (hasMention(t.content)) return true;
+
+        // 返信のチェック
+        const currentReplies = t.replies || [];
+        return currentReplies.some(r => hasMention(r.content));
     }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     threadListEl.innerHTML = '';
@@ -848,6 +877,13 @@ function renderThreads() {
                     <option value="pending" ${currentFilter === 'pending' ? 'selected' : ''}>未完了</option>
                     <option value="completed" ${currentFilter === 'completed' ? 'selected' : ''}>完了済み</option>
                 </select>
+                <button class="btn-sort-toggle" onclick="toggleSortOrder()" title="並び替え順を切り替え">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="7 15 12 20 17 15"></polyline>
+                        <polyline points="7 9 12 4 17 9"></polyline>
+                    </svg>
+                    ${currentSortOrder === 'asc' ? '昇順' : '降順'}
+                </button>
             </div>
         </div>
     `;
