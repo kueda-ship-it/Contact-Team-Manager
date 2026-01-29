@@ -100,21 +100,18 @@ header {
     margin-left: auto;
 }
 
-/* --- Dashboard Layout --- */
+/* --- Dashboard Layout ---*/
 .dashboard-layout {
     display: flex;
     justify-content: flex-start;
-    /* Aligned left next to sidebar */
     gap: 30px;
     padding-bottom: 120px;
-    margin-left: 20px;
 }
 
 /* --- Teams Sidebar --- */
 .teams-sidebar {
     width: 72px;
     background: #1E1F22;
-    /* Teams/Discord dark sidebar color */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -122,6 +119,12 @@ header {
     gap: 8px;
     flex-shrink: 0;
     border-right: 1px solid rgba(0, 0, 0, 0.2);
+    position: fixed;
+    /* Fixed to left */
+    top: 50px;
+    left: 0;
+    bottom: 0;
+    z-index: 1000;
 }
 
 .team-icon {
@@ -517,14 +520,30 @@ header {
 .input-field {
     width: 100%;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    margin-bottom: 10px;
-    /* Space between fields */
+    margin-bottom: 15px !important;
+    /* Increased space between fields */
     color: var(--text-main);
     padding: 10px 14px;
     border-radius: 8px;
-    /* More rounded */
     outline: none;
     transition: border-color 0.2s, background 0.2s;
+}
+
+select.input-field {
+    background: #2D2C2B !important;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 10px center !important;
+    background-size: 16px !important;
+    padding-right: 35px !important;
+}
+
+select.input-field option {
+    background: #1F1E1D;
+    color: white;
 }
 
 .compact-form .input-field,
