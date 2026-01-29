@@ -76,7 +76,10 @@ header {
 
 /* --- Header Search --- */
 .header-search-container {
-    margin-left: 20px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     width: 300px;
     height: 32px;
     /* Fixed height for centered flex child */
@@ -502,6 +505,8 @@ header {
     overflow-y: auto;
     flex: 1;
     padding-right: 5px;
+    padding-bottom: 50px;
+    /* Buffer for reaction menus at the bottom */
     scrollbar-width: thin;
     scrollbar-color: #444 transparent;
 }
@@ -957,8 +962,9 @@ html {
     border-radius: 0 0 8px 8px;
 }
 
-.menu-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+.reply-item:hover {
+    z-index: 1000;
+    /* Raise layer on hover to ensure menu is on top of siblings */
 }
 
 .menu-item:active {
