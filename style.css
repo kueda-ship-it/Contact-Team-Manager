@@ -35,6 +35,18 @@ body {
     padding: 0 20px;
 }
 
+/* Force dark background for autofill and focus */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text-main) !important;
+    -webkit-box-shadow: 0 0 0px 1000px #2D2C2B inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
 /* --- Fixed Top Header --- */
 header {
     position: fixed;
@@ -76,8 +88,9 @@ header {
 }
 
 .search-input:focus {
-    background: #fff !important;
-    color: #111 !important;
+    background: #1E1E1E !important;
+    color: #fff !important;
+    border-color: var(--primary) !important;
 }
 
 .user-profile {
@@ -520,8 +533,27 @@ header {
 }
 
 .input-field:focus {
-    border-color: var(--primary);
-    background: #3D3C3B;
+    border-color: var(--primary) !important;
+    background: #2D2C2B !important;
+    /* Keep original background on focus */
+    color: var(--text-main) !important;
+}
+
+.input-field::placeholder {
+    color: var(--text-muted);
+}
+
+/* Ensure no background flip on typing */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea {
+    background-color: #2D2C2B !important;
+    color: var(--text-main) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+textarea.input-field {
+    min-height: 80px;
+    resize: vertical;
 }
 
 /* Form refinement */

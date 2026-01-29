@@ -135,7 +135,7 @@ function renderWhitelist() {
                 ${new Date(item.added_at).toLocaleString()}
             </td>
             <td style="padding: 10px;">
-                <button class="btn btn-sm" style="background: var(--danger);" onclick="removeWhitelist('${item.email}')">削除</button>
+                <button class="btn btn-sm" style="background: var(--danger);" onclick="window.removeWhitelist('${item.email}')">削除</button>
             </td>
         `;
         adminWhitelistList.appendChild(tr);
@@ -145,6 +145,7 @@ function renderWhitelist() {
 window.addWhitelist = async function () {
     const email = whitelistEmailInp.value.trim();
     if (!email) return;
+    if (!['Admin', 'Manager'].includes(currentProfile.role)) return alert("権限がありません。");
 
     const { error } = await supabaseClient.from('allowed_users').insert([{ email, added_by: currentUser.id }]);
     if (error) {
@@ -156,6 +157,7 @@ window.addWhitelist = async function () {
 };
 
 window.removeWhitelist = async function (email) {
+    if (!['Admin', 'Manager'].includes(currentProfile.role)) return alert("権限がありません。");
     if (!confirm(`${email} をホワイトリストから削除しますか？`)) return;
     try {
         const { error } = await supabaseClient.from('allowed_users').delete().eq('email', email);
@@ -255,7 +257,7 @@ function handleAuthState() {
         }
     }
 
-    // ロール名を正規化（先頭大文字）
+    // ロール名を正規化（先頭大文字）して状態を更新
     if (currentProfile.role) {
         currentProfile.role = currentProfile.role.charAt(0).toUpperCase() + currentProfile.role.slice(1).toLowerCase();
     }
@@ -398,10 +400,11 @@ function sendStyledNotification(title, body) {
 
 async function loadMasterData() {
     const { data: p } = await supabaseClient.from('profiles').select('*');
-    allProfiles = (p || []).map(profile => ({
-        ...profile,
-        role: profile.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1).toLowerCase() : 'User'
-    }));
+    allProfiles = (p || []).map(profile => {
+        let role = profile.role || 'User';
+        role = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+        return { ...profile, role };
+    });
     const { data: t } = await supabaseClient.from('tags').select('*');
     allTags = t || [];
     const { data: tm } = await supabaseClient.from('tag_members').select('*');
@@ -452,7 +455,7 @@ window.deleteTag = async function (tagId) {
 };
 
 window.toggleUserTag = async function (profileId, tagId) {
-    if (currentProfile.role !== 'Admin') return alert("権限がありません。");
+    if (!['Admin', 'Manager'].includes(currentProfile.role)) return alert("権限がありません。");
     const existing = allTagMembers.find(m => m.profile_id === profileId && m.tag_id === tagId);
     if (existing) {
         const { error } = await supabaseClient.from('tag_members').delete().eq('id', existing.id);
@@ -668,15 +671,19 @@ async function loadData() {
 async function addThread() {
     const title = newTitleInp.value.trim();
     const content = newContentInp.value.trim();
-    if (!title || !content || currentProfile.role === 'Viewer') return;
+
+    if (currentProfile.role === 'Viewer') return alert("閲覧専用権限（Viewer）のため、投稿できません。");
+    if (!title || !content) return alert("タイトルと内容を入力してください。");
+
     addThreadBtn.disabled = true;
+    // Don't change textContent to keep the paper airplane SVG
     const authorName = currentProfile.display_name || currentUser.email;
     const { error } = await supabaseClient.from('threads').insert([
         {
             title,
             content,
             author_id: currentUser.id,
-            author: authorName, // Reverted from author_name to author for consistency
+            author: authorName,
             team_id: currentTeamId
         }
     ]);
@@ -687,7 +694,6 @@ async function addThread() {
         newContentInp.value = '';
     }
     addThreadBtn.disabled = false;
-    addThreadBtn.textContent = '+ Post';
 }
 
 window.addReply = async function (threadId) {
@@ -1072,7 +1078,7 @@ function renderAdminUsers() {
             <tr>
                 <td>${p.display_name || '-'} <br><small>${p.email}</small></td>
                 <td>
-                    <select onchange="updateRole('${p.id}', this.value)" class="input-field btn-sm" style="width: auto;" ${currentProfile.role !== 'Admin' ? 'disabled' : ''}>
+                    <select onchange="window.updateRole('${p.id}', this.value)" class="input-field btn-sm" style="width: auto;" ${currentProfile.role !== 'Admin' ? 'disabled' : ''}>
                         ${roleOptions}
                     </select>
                 </td>
@@ -1084,7 +1090,7 @@ function renderAdminUsers() {
             return `
                                 <button class="btn btn-sm ${isMember ? 'btn-primary' : ''}" 
                                         style="font-size: 0.6rem; padding: 2px 5px; ${!isMember ? 'background: rgba(255,255,255,0.1);' : ''}" 
-                                        onclick="toggleUserTag('${p.id}', '${t.id}')" 
+                                        onclick="window.toggleUserTag('${p.id}', '${t.id}')" 
                                         ${currentProfile.role !== 'Admin' ? 'disabled' : ''}>
                                     ${t.name}
                                 </button>`;
@@ -1104,7 +1110,7 @@ function renderAdminTags() {
                 <td>${t.name}</td>
                 <td>${count}人</td>
                 <td>
-                    ${currentProfile.role === 'Admin' ? `<button class="btn btn-sm" style="background: var(--danger);" onclick="deleteTag('${t.id}')">削除</button>` : '-'}
+                    ${currentProfile.role === 'Admin' ? `<button class="btn btn-sm" style="background: var(--danger);" onclick="window.deleteTag('${t.id}')">削除</button>` : '-'}
                 </td>
             </tr>
         `;
@@ -1383,7 +1389,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     };
 });
 
-addTagBtn.onclick = window.addTag;
+if (addTagBtn) addTagBtn.onclick = window.addTag;
 
 // --- Initialization ---
 
