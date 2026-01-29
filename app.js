@@ -9,6 +9,21 @@ const SUPABASE_KEY = "sb_publishable_--SSOcbdXqye0lPUQXMhMQ_PXcYrk6c";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// --- Global State ---
+window.toggleExpand = function (id) {
+    const content = document.getElementById('expand-' + id);
+    const btn = document.getElementById('btn-' + id);
+    if (!content || !btn) return;
+
+    if (content.classList.contains('is-expanded')) {
+        content.classList.remove('is-expanded');
+        btn.textContent = '詳細を表示';
+    } else {
+        content.classList.add('is-expanded');
+        btn.textContent = '表示を閉じる';
+    }
+};
+
 // --- State ---
 let threads = [];
 let currentUser = null;
@@ -528,7 +543,7 @@ window.editThread = function (threadId) {
         <textarea id="edit-content-${threadId}" class="input-field" style="height: 100px; resize: vertical;">${escapeHtml(originalContent)}</textarea>
         <div style="display: flex; gap: 8px; margin-top: 8px;">
             <button class="btn btn-primary btn-sm" onclick="saveEdit('${threadId}')">更新</button>
-            <button class="btn btn-sm" style="background: var(--surface-light);" onclick="cancelEdit('${threadId}', '${escapeHtml(originalTitle)}', '${escapeHtml(originalContent)}')">キャンセル</button>
+            <button class="btn btn-sm btn-outline" onclick="cancelEdit('${threadId}')">キャンセル</button>
         </div>
     `;
 };
@@ -572,7 +587,7 @@ window.editReply = function (replyId, threadId) {
         <textarea id="edit-reply-content-${replyId}" class="input-field" style="height: 60px; resize: vertical; font-size: 0.8rem; margin-top: 5px;">${escapeHtml(originalContent)}</textarea>
         <div style="display: flex; gap: 8px; margin-top: 8px;">
             <button class="btn btn-primary btn-sm" onclick="saveReply('${replyId}', '${threadId}')">更新</button>
-            <button class="btn btn-sm" style="background: rgba(255,255,255,0.1);" onclick="renderThreads()">キャンセル</button>
+            <button class="btn btn-sm btn-outline" onclick="renderThreads()">キャンセル</button>
         </div>
     `;
 };
@@ -616,8 +631,8 @@ window.deleteReply = async function (replyId) {
     }
 };
 
-window.cancelEdit = function (threadId, originalTitle, originalContent) {
-    renderThreads(); // 単純に再描画してしまうのが確実
+window.cancelEdit = function (threadId) {
+    renderThreads();
 };
 
 // Helper for escaping HTML in inline event handlers
@@ -1030,7 +1045,7 @@ function renderThreads() {
                 </div>
             </div>
 
-                <div class="reply-section">
+                <div class="reply-section ${currentReplies.length === 0 ? 'is-empty' : ''}">
                     <div class="reply-scroll-area">${repliesHtml}</div>
                     ${(currentProfile.role !== 'Viewer' && thread.status !== 'completed') ? `
                     <div class="reply-form" style="position:relative; display: flex; align-items: center; gap: 4px;">
@@ -1430,7 +1445,6 @@ saveSettingsBtn.onclick = async () => {
             reader.readAsDataURL(avatarFile);
         });
     }
-
     const { error } = await supabaseClient.from('profiles').update({
         notification_preference: pref,
         display_name: display,
@@ -1478,6 +1492,21 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 if (addTagBtn) addTagBtn.onclick = window.addTag;
+
+// --- Expand/Collapse Content ---
+window.toggleExpand = function (id) {
+    const content = document.getElementById('expand-' + id);
+    const btn = document.getElementById('btn-' + id);
+    if (!content || !btn) return;
+
+    if (content.classList.contains('is-expanded')) {
+        content.classList.remove('is-expanded');
+        btn.textContent = '詳細を表示';
+    } else {
+        content.classList.add('is-expanded');
+        btn.textContent = '表示を閉じる';
+    }
+};
 
 // --- Initialization ---
 

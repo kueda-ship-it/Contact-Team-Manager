@@ -76,15 +76,13 @@ header {
 
 /* --- Header Search --- */
 .header-search-container {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
+    margin-left: 20px;
     width: 300px;
     height: 32px;
-    /* Fixed height for centered flex child */
     display: flex;
     align-items: center;
+    margin-top: 0 !important;
+    /* Shifted to the top as requested */
 }
 
 .search-input {
@@ -110,6 +108,20 @@ header {
     align-items: center;
     gap: 12px;
     margin-left: auto;
+}
+
+#logout-btn {
+    background: rgba(232, 17, 35, 0.15) !important;
+    border: 1px solid rgba(232, 17, 35, 0.3) !important;
+    color: #FF6666 !important;
+    transition: all 0.2s ease;
+}
+
+#logout-btn:hover {
+    background: #E81123 !important;
+    color: white !important;
+    border-color: #E81123 !important;
+    box-shadow: 0 0 10px rgba(232, 17, 35, 0.5);
 }
 
 /* --- Dashboard Layout ---*/
@@ -243,15 +255,13 @@ header {
 .task-card {
     background: var(--card-bg);
     border-radius: 8px;
-    /* Slightly more rounded */
-    padding: 1.2rem;
+    padding: 10px 14px;
+    /* Even more tightened */
     border: 1px solid rgba(255, 255, 255, 0.1);
     margin-bottom: 12px;
     position: relative;
     overflow: visible !important;
-    /* Ensure reactions are never clipped */
-    /* Changed to visible to allow floating reactions */
-    min-height: 120px;
+    min-height: auto;
     display: flex;
     flex-direction: column;
     transition: var(--transition);
@@ -396,12 +406,8 @@ header {
     line-height: 1.5;
     margin-bottom: 0.8rem;
     color: var(--text-main);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    line-clamp: 2;
-    /* 標準プロパティ */
-    overflow: hidden;
+    /* Remove line-clamp to allow full display when expanded */
+    overflow: visible;
 }
 
 /* --- Actions & Footer --- */
@@ -409,7 +415,8 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: auto;
+    margin-top: 8px;
+    /* Changed from auto to fixed to keep it compact */
     padding-top: 8px;
 }
 
@@ -486,27 +493,54 @@ header {
     font-size: 0.75rem;
 }
 
+.btn-outline {
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    color: var(--text-main) !important;
+}
+
+.btn-outline:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.task-author-info .timestamp {
+    font-size: 0.7rem;
+    /* Smaller timestamp */
+    color: var(--text-muted);
+}
+
+/* --- Reply Section --- */
 .reply-section {
     background: rgba(0, 0, 0, 0.15);
     border-radius: 4px;
     padding: 0.5rem;
     overflow: visible !important;
-    /* Allow menus to float outside */
-    flex: 1;
     display: flex;
     flex-direction: column;
     margin-bottom: 8px;
     z-index: 5;
-    /* Base for inner elements */
+    transition: all 0.2s ease;
+}
+
+.reply-section.is-empty {
+    background: transparent;
+    padding: 0;
+    margin-bottom: 0;
+}
+
+.reply-section.is-empty .reply-scroll-area {
+    display: none;
 }
 
 .reply-scroll-area {
-    max-height: 400px;
+    max-height: 450px;
+    /* Slightly taller to show more info */
     overflow-y: auto;
+    overflow-x: visible !important;
     flex: 1;
-    padding-right: 5px;
-    padding-bottom: 50px;
-    /* Buffer for reaction menus at the bottom */
+    padding: 20px 5px !important;
+    /* Minimized buffer while still preventing menu clipping */
     scrollbar-width: thin;
     scrollbar-color: #444 transparent;
 }
@@ -517,19 +551,29 @@ header {
 }
 
 .reply-item {
-    padding: 4px 8px;
-    background: transparent;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    margin-bottom: 2px;
-    font-size: 0.8rem;
+    padding: 6px 10px;
+    /* Tightened reply padding */
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 5px;
+    font-size: 0.85rem;
+    transition: background 0.2s ease;
+}
+
+.reply-item:hover {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .reply-header {
     display: flex;
-    gap: 10px;
-    font-weight: bold;
+    justify-content: flex-start;
+    /* Kept next to name */
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 4px;
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
 }
 
 .reply-form {
@@ -542,8 +586,8 @@ header {
 .input-field {
     width: 100%;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    margin-bottom: 15px !important;
-    /* Increased space between fields */
+    margin-bottom: 10px;
+    /* Reduced space between fields */
     color: var(--text-main);
     padding: 10px 14px;
     border-radius: 8px;
@@ -594,7 +638,8 @@ textarea {
 }
 
 textarea.input-field {
-    min-height: 80px;
+    min-height: 40px;
+    /* Further reduced to shrink height */
     resize: vertical;
 }
 
@@ -602,6 +647,8 @@ textarea.input-field {
 .compact-form .input-field {
     border: none !important;
     background: rgba(255, 255, 255, 0.03);
+    margin-bottom: 0 !important;
+    /* Reset global margin for precise manual control */
 }
 
 /* --- Floating Post Form --- */
@@ -611,24 +658,24 @@ textarea.input-field {
     left: 0;
     right: 0;
     background: linear-gradient(to top, #11100F 80%, transparent);
-    /* 透過させて広く見せる */
-    padding: 20px 0;
+    padding: 0;
+    /* Minimized vertical space */
     z-index: 1500;
 }
 
 .compact-form {
     background: rgba(31, 30, 29, 0.95) !important;
     border: none !important;
-    /* Removed border per user request */
     border-radius: 12px;
-    /* Added rounding */
     backdrop-filter: blur(10px);
-    margin: 0 auto;
-    max-width: 900px !important;
-    padding: 10px 15px;
+    margin: 5px auto !important;
+    /* Tightened outer frame */
+    max-width: 880px !important;
+    /* Reduced width by 20px (from 900px) */
+    padding: 2px 15px;
+    /* Minimized height */
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     overflow: visible !important;
-    /* Allow mention list to escape */
 }
 
 /* --- Sidebar Items --- */
@@ -958,6 +1005,10 @@ html {
     border-radius: 8px 8px 0 0;
 }
 
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
 .menu-item:last-child {
     border-radius: 0 0 8px 8px;
 }
@@ -985,6 +1036,59 @@ html {
     margin-right: 12px;
     font-size: 1.1rem;
     text-align: center;
+}
+
+/* --- Expandable Content --- */
+.expandable-wrapper {
+    position: relative;
+    margin-bottom: 8px;
+    overflow: visible;
+    /* Need visibility for tools or menus if any */
+}
+
+.expandable-content {
+    max-height: 200px;
+    /* Increased from 150px per user request */
+    overflow: hidden;
+    position: relative;
+    transition: max-height 0.3s ease;
+    white-space: pre-wrap;
+    /* Ensure line breaks are preserved for height calc */
+}
+
+.expandable-content.is-expanded {
+    max-height: none !important;
+}
+
+.expand-fade {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(to bottom, transparent, var(--card-bg) 90%);
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 2;
+    display: none;
+}
+
+.expandable-content.is-expanded .expand-fade {
+    display: none !important;
+}
+
+.btn-show-more {
+    color: var(--accent);
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-weight: 600;
+    margin-top: 4px;
+    display: inline-block;
+    padding: 2px 4px;
+}
+
+.btn-show-more:hover {
+    text-decoration: underline;
 }
 
 /* --- Reaction Container Bottom --- */
@@ -1018,19 +1122,17 @@ html {
 
 .reaction-container-bottom .reaction-menu {
     position: absolute;
-    bottom: 38px;
+    bottom: 100%;
+    /* Position above the plus button */
     left: 0;
+    margin-bottom: 8px;
     z-index: 10001 !important;
-    /* Higher than anything else */
     display: flex;
     gap: 6px;
-    /* Slightly more gap */
     padding: 8px 12px;
-    /* More padding */
     background: #252423;
     border-radius: 30px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    /* Brighter border */
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
     opacity: 0;
     visibility: hidden;

@@ -76,7 +76,16 @@
                 </div>
                 <button id="settings-btn" class="btn btn-sm"
                     style="background: rgba(255,255,255,0.1); padding: 5px 8px;">⚙️</button>
-                <button id="logout-btn" class="btn btn-sm" style="background: rgba(255,255,255,0.1);">ログアウト</button>
+                <button id="logout-btn" class="btn btn-sm"
+                    style="background: rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <span>ログアウト</span>
+                </button>
             </div>
         </header>
 
@@ -136,15 +145,16 @@
                     <section class="form-container compact-form">
                         <div style="display: flex; gap: 15px; align-items: flex-end;">
                             <div style="flex: 1;">
-                                <input type="text" id="new-title" class="input-field" placeholder="件名...">
-                                <div style="position: relative;">
-                                    <textarea id="new-content" class="input-field"
-                                        placeholder="内容... @メンション"></textarea>
+                                <input type="text" id="new-title" class="input-field" placeholder="件名..."
+                                    style="margin-top: 10px !important;">
+                                <div style="position: relative; margin-top: 10px !important;">
+                                    <textarea id="new-content" class="input-field" placeholder="内容... @メンション"
+                                        style="margin-top: 0 !important;"></textarea>
                                     <div id="mention-list" class="mention-list"
                                         style="bottom: 100%; top: auto; display: none;"></div>
                                 </div>
                             </div>
-                            <button id="add-thread-btn" class="btn btn-primary">
+                            <button id="add-thread-btn" class="btn btn-primary" style="position: relative; top: -10px;">
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white"
                                     stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="22" y1="2" x2="11" y2="13"></line>
