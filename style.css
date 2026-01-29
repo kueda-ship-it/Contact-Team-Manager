@@ -4,8 +4,10 @@
     --primary-dark: #464775;
     --bg-dark: #11100F;
     --card-bg: #1F1E1D;
-    --text-main: #F5F5F5;
-    --text-muted: #ADADAD;
+    --text-main: #FFFFFF;
+    /* Pure white for better visibility */
+    --text-muted: #D1D1D1;
+    /* Brighter gray */
     --accent: #00B7C3;
     --danger: #C4314B;
     --success: #92C353;
@@ -76,12 +78,16 @@ header {
 .header-search-container {
     margin-left: 20px;
     width: 300px;
+    height: 32px;
+    /* Fixed height for centered flex child */
     display: flex;
     align-items: center;
-    /* Center vertically */
 }
 
 .search-input {
+    margin: 0 !important;
+    height: 32px !important;
+    display: block !important;
     background: rgba(255, 255, 255, 0.05) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     height: 32px !important;
@@ -480,21 +486,28 @@ header {
     background: rgba(0, 0, 0, 0.15);
     border-radius: 4px;
     padding: 0.5rem;
-    overflow: hidden;
+    overflow: visible !important;
+    /* Allow menus to float outside */
     flex: 1;
     display: flex;
     flex-direction: column;
     margin-bottom: 8px;
+    z-index: 5;
+    /* Base for inner elements */
 }
 
 .reply-scroll-area {
     max-height: 400px;
-    /* Increased from 250px */
     overflow-y: auto;
     flex: 1;
     padding-right: 5px;
     scrollbar-width: thin;
     scrollbar-color: #444 transparent;
+}
+
+.reply-scroll-area.no-scroll {
+    max-height: none !important;
+    overflow-y: visible !important;
 }
 
 .reply-item {
@@ -608,6 +621,8 @@ textarea.input-field {
     max-width: 900px !important;
     padding: 10px 15px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    overflow: visible !important;
+    /* Allow mention list to escape */
 }
 
 /* --- Sidebar Items --- */
@@ -659,7 +674,8 @@ textarea.input-field {
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
     border-radius: 4px;
-    z-index: 2100;
+    z-index: 9999 !important;
+    /* Top layer */
     max-height: 300px;
     overflow-y: auto;
     width: 280px;
@@ -896,8 +912,9 @@ html {
     transform: scale(0.9) translateY(-10px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     min-width: 140px;
+    z-index: 9999 !important;
+    /* Extremely high layer */
     pointer-events: none;
-    z-index: 100;
 }
 
 /* 透明なブリッジ (Dot Menu) */
@@ -1011,7 +1028,8 @@ html {
     pointer-events: none;
     white-space: nowrap;
     width: max-content;
-    z-index: 100;
+    z-index: 9999 !important;
+    /* Extremely high layer */
 }
 
 /* 透明なブリッジ (Reaction Menu) */
@@ -1073,6 +1091,32 @@ html {
 .btn-revert:hover {
     background: #9B7EDE !important;
     color: #fff !important;
+}
+
+/* --- Sort Toggle Styles (Minimal) --- */
+.btn-sort-toggle {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-muted);
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0.8;
+}
+
+.btn-sort-toggle:hover {
+    color: white;
+    opacity: 1;
+}
+
+.btn-sort-toggle svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.5;
 }
 
 /* --- Reply Button Styles --- */

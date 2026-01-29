@@ -1055,7 +1055,11 @@ function renderThreads() {
         setTimeout(() => {
             const scrollArea = card.querySelector('.reply-scroll-area');
             if (scrollArea) {
-                scrollArea.scrollTop = scrollArea.scrollHeight;
+                if (currentReplies.length <= 1) {
+                    scrollArea.classList.add('no-scroll');
+                } else {
+                    scrollArea.scrollTop = scrollArea.scrollHeight;
+                }
             }
         }, 50);
     });
