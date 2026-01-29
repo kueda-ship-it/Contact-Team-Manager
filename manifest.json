@@ -1,0 +1,17 @@
+{
+  "name": "Contact Team Manager",
+  "short_name": "Contact Mgr",
+  "description": "Real-time task and communication manager",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b0c14",
+  "theme_color": "#6264A7",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/9187/9187604.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

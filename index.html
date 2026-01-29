@@ -3,290 +3,271 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>F-ace 交換作業 管理システム</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Team Manager | Standalone</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
-    <!-- ==========================================
-         入力画面 (UI) - 画面上でのみ表示
-    =========================================== -->
-    <div id="edit-ui" class="no-print">
-        <header class="app-header">
-            <div class="logo">F-ace Project Dashboard</div>
-            <div id="userInfo" class="user-info-area" style="font-size: 14px; margin-left: auto; margin-right: 20px;">
+    <!-- Auth UI -->
+    <div id="auth-container" class="container" style="max-width: 400px; padding-top: 100px;">
+        <section class="form-container">
+            <h2 style="text-align: center; margin-bottom: 2rem;">ログイン / サインアップ</h2>
+            <div class="form-group">
+                <label>ユーザー ID / メールアドレス</label>
+                <input type="text" id="auth-email" class="input-field" placeholder="example@mail.com または 'admin'">
             </div>
-            <div class="nav-tools">
-                <button type="button" class="list-btn" onclick="openReportsList()">📋 保存済みリスト</button>
-                <button type="button" class="primary-btn" onclick="window.saveReport()">💾 サーバーへ保存</button>
-                <button type="button" class="print-btn" onclick="window.print()">🖨️ 報告書(PDF)を出力</button>
-                <a href="master.html" id="masterLink" class="nav-link"
-                    style="display:none; color:white; margin: 0 10px;">⚙️ マスタ管理</a>
-                <button type="button" class="danger-btn" onclick="logout()">🚪 ログアウト</button>
+            <div class="form-group">
+                <label>パスワード</label>
+                <input type="password" id="auth-password" class="input-field" placeholder="•••••••• または 'admin123'">
+            </div>
+            <div style="display: grid; gap: 10px; margin-top: 1.5rem;">
+                <button id="login-btn" class="btn btn-primary">ログイン</button>
+                <button id="microsoft-login-btn" class="btn"
+                    style="background: #2F2F2F; color: white; border: 1px solid #444; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <svg width="20" height="20" viewBox="0 0 23 23" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="#f3f3f3" d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v23H0zM12 12h11v11H12z"
+                            opacity=".2" />
+                        <path fill="#f35325" d="M0 0h11v11H0z" />
+                        <path fill="#81bc06" d="M12 0h11v11H12z" />
+                        <path fill="#05a6f0" d="M0 12h11v11H0z" />
+                        <path fill="#ffba08" d="M12 12h11v11H12z" />
+                    </svg>
+                    Microsoft でサインイン
+                </button>
+                <div style="text-align: center; margin: 10px 0; color: var(--text-muted); font-size: 0.8rem;">または</div>
+                <button id="signup-btn" class="btn" style="background: rgba(255,255,255,0.1);">メールアドレスで新規登録</button>
+            </div>
+            <p id="auth-error"
+                style="color: var(--danger); font-size: 0.8rem; margin-top: 1rem; text-align: center; display: none;">
+            </p>
+        </section>
+    </div>
+
+    <!-- Main Dashboard (Initially Hidden) -->
+    <div id="main-dashboard" style="display: none;">
+        <header>
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" rx="8" fill="var(--accent)" />
+                    <path
+                        d="M16 8C11.5817 8 8 11.134 8 15C8 17.13 9.1165 19.035 10.875 20.25L10 24L14.25 22.125C14.8125 22.25 15.4062 22.3125 16 22.3125C20.4183 22.3125 24 19.1785 24 15.3125C24 11.4465 20.4183 8.3125 16 8.3125V8Z"
+                        fill="white" />
+                    <circle cx="16" cy="14" r="3" fill="var(--bg-dark)" />
+                </svg>
+                <span>Contact Team Manager</span>
+                <div class="header-search-container">
+                    <input type="text" id="global-search" class="input-field search-input" placeholder="検索 (CTRL+E)">
+                </div>
+            </div>
+            <div class="user-profile">
+                <button id="admin-btn" class="btn btn-sm"
+                    style="background: var(--accent); color: var(--bg-dark); display: none;">マスタ管理</button>
+                <div style="display: flex; align-items: center; gap: 10px; text-align: right;">
+                    <div id="header-avatar-img" class="avatar" style="width: 28px; height: 28px;"></div>
+                    <div>
+                        <span id="user-display" class="username"
+                            style="display: block; font-size: 0.85rem; font-weight: 600;"></span>
+                        <span id="user-role" style="font-size: 0.65rem; color: var(--accent);"></span>
+                    </div>
+                </div>
+                <button id="settings-btn" class="btn btn-sm"
+                    style="background: rgba(255,255,255,0.1); padding: 5px 8px;">⚙️</button>
+                <button id="logout-btn" class="btn btn-sm" style="background: rgba(255,255,255,0.1);">ログアウト</button>
             </div>
         </header>
 
-        <main class="app-content">
-            <!-- 1. 背景保存・管理 -->
-            <div style="margin-bottom: 20px;">
-                <button type="button" onclick="newReport()">＋ 新規レポート作成</button>
+        <div class="main-wrapper" style="display: flex; min-height: calc(100vh - 50px); margin-top: 50px;">
+            <aside id="teams-sidebar" class="teams-sidebar">
+                <!-- Teams icons here -->
+                <div class="team-icon active" title="All Threads" onclick="switchTeam(null)">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </div>
+                <div class="sidebar-divider"></div>
+                <div id="teams-list" class="teams-list">
+                    <!-- Dynamic teams -->
+                </div>
+                <button id="btn-add-team" class="team-icon add-team-btn" title="Create Team">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </aside>
+
+            <div class="container" style="flex: 1; padding-top: 20px;">
+                <div class="dashboard-layout">
+                    <main class="main-feed-area">
+                        <div id="thread-list" class="feed-list">
+                            <!-- Threads will be injected here -->
+                        </div>
+                    </main>
+
+                    <aside class="side-panel">
+                        <h3
+                            style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-muted); padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                            Not Finished</h3>
+                        <div id="pending-sidebar-list" class="sidebar-list">
+                            <!-- Pending small cards will be injected here -->
+                        </div>
+
+                        <h3
+                            style="font-size: 1rem; margin-top: 2rem; margin-bottom: 1rem; color: var(--accent); padding-bottom: 0.5rem; border-bottom: 1px solid var(--accent-light);">
+                            Assigned to Me</h3>
+                        <div id="assigned-sidebar-list" class="sidebar-list">
+                            <!-- Personal tasks will be injected here -->
+                        </div>
+                    </aside>
+                </div>
             </div>
 
-            <!-- 2. 基本情報カード -->
-            <section class="app-card">
-                <div class="card-title-row">基本情報 <span class="badge danger">必須</span></div>
-                <div class="ui-form-block">
-                    <div class="field-full">
-                        <label>工事名称</label>
-                        <input type="text" name="ui_constructionName" data-sync="constructionName"
-                            value="F-aceユニット入れ替え工事">
-                    </div>
-                    <div class="field-row">
-                        <div class="field-col" style="flex: 1;">
-                            <label>管理番号</label>
-                            <input type="text" name="ui_managementId" data-sync="managementId" placeholder="例: 450001">
-                        </div>
-                        <div class="field-col" style="flex: 2;">
-                            <label>工事物件 (物件名)</label>
-                            <input type="text" name="ui_propertyName" data-sync="propertyName" placeholder="物件名を入力">
-                        </div>
-                        <div class="field-col" style="flex: 2;">
-                            <label>工事期間</label>
-                            <div class="date-range-flex">
-                                <input type="datetime-local" name="ui_workDateStart" data-sync="workDateStart_jp">
-                                <span>〜</span>
-                                <input type="datetime-local" name="ui_workDateEnd" data-sync="workDateEnd_jp">
+            <!-- Floating Post Form -->
+            <div class="floating-form-container">
+                <div class="container">
+                    <section class="form-container compact-form">
+                        <div style="display: flex; gap: 15px; align-items: flex-end;">
+                            <div style="flex: 1;">
+                                <input type="text" id="new-title" class="input-field" placeholder="件名..."
+                                    style="margin-bottom: 8px; padding: 8px;">
+                                <div style="position: relative;">
+                                    <textarea id="new-content" class="input-field" placeholder="内容... @メンション"
+                                        style="min-height: 40px; padding: 8px;"></textarea>
+                                    <div id="mention-list" class="mention-list"
+                                        style="bottom: 100%; top: auto; display: none;"></div>
+                                </div>
                             </div>
+                            <button id="add-thread-btn" class="btn">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2.5"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
                         </div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-col" style="flex: 1;">
-                            <label>確認者</label>
-                            <input type="text" id="ui_confirmator" name="ui_confirmator" data-sync="confirmator"
-                                placeholder="担当者名" oninput="updateWorkerOptions()">
-                        </div>
-                        <div class="field-col" style="flex: 4;">
-                            <label>作業員</label>
-                            <div class="worker-grid">
-                                <input type="text" class="worker-input" name="worker1" placeholder="作業者1"
-                                    oninput="updateWorkerOptions()">
-                                <input type="text" class="worker-input" name="worker2" placeholder="作業者2"
-                                    oninput="updateWorkerOptions()">
-                                <input type="text" class="worker-input" name="worker3" placeholder="作業者3"
-                                    oninput="updateWorkerOptions()">
-                                <input type="text" class="worker-input" name="worker4" placeholder="作業者4"
-                                    oninput="updateWorkerOptions()">
-                            </div>
-                        </div>
-                    </div>
+                    </section>
                 </div>
-            </section>
+            </div>
+        </div>
+    </div>
 
-            <!-- 3. 交換部品 -->
-            <section class="app-card">
-                <div class="card-title-row">交換部品 <span class="badge blue">カメラ台数に全体が連動します</span></div>
-                <div class="parts-horizontal-row">
-                    <div class="part-item-compact"
-                        style="background: #eff6ff; border-radius: 6px; border-right: none; margin-right: 10px;">
-                        <label><input type="checkbox" name="part_camera" checked> カメラ台数</label>
-                        <input type="number" id="master_cam_cnt" name="cnt_camera" value="7" data-sync="cnt_camera"
-                            style="border-color: var(--accent);">
-                    </div>
-                    <div class="part-item-compact">
-                        <label><input type="checkbox" name="part_express"> エクスプレスサーバー</label>
-                        <input type="number" name="cnt_express" value="1">
-                    </div>
-                    <div class="part-item-compact">
-                        <label><input type="checkbox" name="part_ups"> UPS</label>
-                        <input type="number" name="cnt_ups" value="0">
-                    </div>
-                    <div class="part-item-compact">
-                        <label><input type="checkbox" name="part_hub"> PoE HUB</label>
-                        <input type="number" name="cnt_hub" value="0">
-                    </div>
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay">
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal">
+            <h3>個人設定</h3>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>表示名</label>
+                <input type="text" id="pref-display-name" class="input-field" placeholder="名前を入力...">
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>プロフィール画像</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div id="pref-avatar-preview" class="avatar" style="width: 50px; height: 50px;"></div>
+                    <input type="file" id="pref-avatar-input" accept="image/*" style="font-size: 0.8rem;">
                 </div>
-            </section>
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>通知設定</label>
+                <select id="pref-notification" class="input-field">
+                    <option value="all">全ての投稿を通知</option>
+                    <option value="mentions">自分・タグ宛てのメンションのみ通知</option>
+                    <option value="none">通知オフ</option>
+                </select>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 2rem;">
+                <button class="btn btn-close-modal">キャンセル</button>
+                <button id="save-settings-btn" class="btn btn-primary">保存</button>
+            </div>
+        </div>
 
-            <!-- 4. 設置場所設定 (自動連動) -->
-            <section class="app-card">
-                <div class="card-title-row">設置場所設定</div>
-                <div id="locationList" class="ui-location-list">
-                    <!-- app.js で描画 -->
-                </div>
-            </section>
-
-            <!-- 5. 作業進捗・記録 -->
-            <section class="app-card">
-                <div class="card-title-row">確認項目一覧</div>
-                <div class="table-container">
-                    <table class="app-table">
+        <!-- Admin Master Modal -->
+        <div id="admin-modal" class="modal" style="max-width: 800px; width: 90%;">
+            <h3>マスタ管理 <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">管理者専用</span></h3>
+            <div class="admin-tabs"
+                style="display: flex; gap: 10px; margin-top: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <button class="tab-btn active" data-tab="tab-users"
+                    style="padding: 10px; background: none; border: none; color: white; cursor: pointer;">ユーザー管理</button>
+                <button class="tab-btn" data-tab="tab-tags"
+                    style="padding: 10px; background: none; border: none; color: var(--text-muted); cursor: pointer;">タグ管理</button>
+                <button class="tab-btn" data-tab="tab-whitelist"
+                    style="padding: 10px; background: none; border: none; color: var(--text-muted); cursor: pointer;">ホワイトリスト</button>
+            </div>
+            <div id="tab-users" class="tab-content active" style="margin-top: 1rem;">
+                <div class="admin-table-container">
+                    <table class="admin-table" style="width: 100%; border-collapse: collapse;">
                         <thead>
-                            <tr>
-                                <th style="width: 50px;">No</th>
-                                <th>作業項目</th>
-                                <th style="width: 150px;">実施日時</th>
-                                <th style="width: 80px;">作業時間(分)</th>
-                                <th style="width: 150px;">作業終了時間</th>
-                                <th style="width: 150px;">担当者</th>
-                                <th style="width: 100px;">状況</th>
-                                <th>備考</th>
+                            <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                <th style="padding: 10px;">ユーザー</th>
+                                <th style="padding: 10px;">ロール</th>
+                                <th style="padding: 10px;">所属</th>
+                                <th style="padding: 10px;">操作</th>
                             </tr>
                         </thead>
-                        <tbody id="uiWorkStatusBody"></tbody>
+                        <tbody id="admin-user-list"></tbody>
                     </table>
                 </div>
-
-                <!-- カメラ管理タイトル (マージン調整) -->
-                <div style="margin-top: 60px; border-top: 2px solid #f1f5f9; padding-top: 30px;">
-                    <div class="card-title-row">カメラ管理・写真撮影</div>
-                    <div id="uiCameraPanels" class="camera-panels-grid"></div>
+            </div>
+            <div id="tab-tags" class="tab-content" style="display: none; margin-top: 1rem;">
+                <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+                    <input type="text" id="new-tag-name" class="input-field" placeholder="新規タグ名">
+                    <button id="add-tag-btn" class="btn btn-primary">追加</button>
                 </div>
-
-                <!-- エクスプレスサーバー写真記録 -->
-                <div style="margin-top: 40px; border-top: 2px solid #f1f5f9; padding-top: 30px;">
-                    <div class="card-title-row">エクスプレスサーバー 写真撮影</div>
-                    <div class="ui-photo-box" style="grid-template-columns: repeat(2, 1fr); max-width: 600px;">
-                        <div class="ui-photo-slot" onclick="clickInp('server_pre')" id="ui_preview_server_pre">
-                            <div class="slot-label">サーバー交換前 (旧)</div>
-                            <input type="file" id="file_server_pre" name="server_pre" style="display:none;"
-                                onchange="handleServerImg(this)">
-                        </div>
-                        <div class="ui-photo-slot" onclick="clickInp('server_post')" id="ui_preview_server_post">
-                            <div class="slot-label">サーバー交換後 (新)</div>
-                            <input type="file" id="file_server_post" name="server_post" style="display:none;"
-                                onchange="handleServerImg(this)">
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 全体備考欄 -->
-            <section class="app-card">
-                <div class="card-title-row">全体備考</div>
-                <textarea name="ui_general_remarks" data-sync="general_remarks"
-                    style="width:100%; min-height:100px; padding:10px; border-radius:6px; border:1px solid var(--border);"
-                    placeholder="作業全体に関する備考や特記事項を入力してください"></textarea>
-            </section>
-        </main>
-    </div>
-
-    <!-- ==========================================
-         印刷用テンプレート (Report) - 画面上では非表示
-    =========================================== -->
-    <div id="print-report">
-        <!-- 第1ページ: 基本・状況 -->
-        <article class="report-page">
-            <h1 class="report-title">F-ace顔認証ユニット入れ替え工事 作業結果表</h1>
-            <section class="section">
-                <h2 class="blue-bar">■ 工事基本情報</h2>
-                <table class="grid-table">
-                    <tr>
-                        <th style="width: 25%;">工事名称</th>
-                        <td id="p_constructionName"></td>
-                    </tr>
-                    <tr>
-                        <th>管理番号</th>
-                        <td id="p_managementId"></td>
-                    </tr>
-                    <tr>
-                        <th>工事物件</th>
-                        <td id="p_propertyName"></td>
-                    </tr>
-                    <tr>
-                        <th>工事期間</th>
-                        <td><span id="p_workDateStart_jp"></span> 〜 <span id="p_workDateEnd_jp"></span></td>
-                    </tr>
-                    <tr>
-                        <th>設置台数</th>
-                        <td><span id="p_cnt_camera"></span> 台</td>
-                    </tr>
-                    <tr>
-                        <th>担当者</th>
-                        <td id="p_confirmator"></td>
-                    </tr>
-                </table>
-            </section>
-            <section class="section">
-                <h2 class="blue-bar">■ 作業実施報告</h2>
-                <table class="grid-table">
+                <table class="admin-table" style="width: 100%; border-collapse: collapse;">
                     <thead>
-                        <tr>
-                            <th style="width:30px;">#</th>
-                            <th>作業項目</th>
-                            <th style="width:90px;">予定</th>
-                            <th style="width:90px;">実施</th>
-                            <th style="width:60px;">時間</th>
-                            <th style="width:90px;">終了</th>
-                            <th style="width:70px;">担当</th>
-                            <th style="width:40px;">状</th>
-                            <th>備考</th>
+                        <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                            <th style="padding: 10px;">タグ名</th>
+                            <th style="padding: 10px;">所属人数</th>
+                            <th style="padding: 10px;">操作</th>
                         </tr>
                     </thead>
-                    <tbody id="pWorkStatusBody"></tbody>
+                    <tbody id="admin-tag-list"></tbody>
                 </table>
-            </section>
-        </article>
-
-        <!-- カメラ詳細ページ (1カメラにつき4枚。1ページ3台。app.jsで生成) -->
-        <div id="pCameraPages"></div>
-
-        <!-- 最終ページ: サーバー記録 & その他 -->
-        <article class="report-page">
-            <h2 class="blue-bar">■ エクスプレスサーバー 交換記録</h2>
-            <div class="p-photo-grid-4">
-                <div class="p-photo-slot">
-                    <div class="p-slot-header">サーバー交換前 (旧)</div>
-                    <div class="p-img-area" id="p_server_pre"></div>
-                </div>
-                <div class="p-photo-slot">
-                    <div class="p-slot-header">サーバー交換後 (新)</div>
-                    <div class="p-img-area" id="p_server_post"></div>
-                </div>
             </div>
 
-            <h2 class="blue-bar mt-15">■ 全体備考</h2>
-            <div id="p_general_remarks"
-                style="min-height: 80px; border: 0.5pt solid #000; padding: 8px; font-size: 9pt; white-space: pre-wrap;">
+            <div id="tab-whitelist" class="tab-content" style="display: none; margin-top: 1rem;">
+                <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+                    <input type="email" id="whitelist-email-inp" class="input-field" placeholder="許可するメールアドレス">
+                    <button id="add-whitelist-btn" class="btn btn-primary">許可</button>
+                </div>
+                <div class="admin-table-container">
+                    <table class="admin-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                <th style="padding: 10px;">メールアドレス</th>
+                                <th style="padding: 10px;">追加日</th>
+                                <th style="padding: 10px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-whitelist-list"></tbody>
+                    </table>
+                </div>
             </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
+                <button class="btn btn-close-modal">閉じる</button>
+            </div>
+        </div>
 
-            <h2 class="blue-bar mt-40">■ 工事完了確認</h2>
-            <table class="grid-table">
-                <tr>
-                    <th style="width: 25%;">全体業務完了日時</th>
-                    <td><span id="p_all_comp"></span></td>
-                </tr>
-            </table>
-        </article>
+        <!-- Add Team Modal -->
+        <div id="team-modal" class="modal" style="max-width: 400px;">
+            <h3>新規チーム作成</h3>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>チーム名</label>
+                <input type="text" id="new-team-name" class="input-field" placeholder="チーム名を入力">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 2rem;">
+                <button class="btn btn-close-modal">キャンセル</button>
+                <button id="save-team-btn" class="btn btn-primary">作成</button>
+            </div>
+        </div>
     </div>
-
-    <dialog id="imgDialog">
-        <div style="text-align: right;"><button type="button" onclick="this.closest('dialog').close()">閉じる</button>
-        </div>
-        <img id="dlgImg" style="max-width: 90vw; max-height: 80vh;">
-    </dialog>
-
-    <!-- レポート一覧モーダル -->
-    <dialog id="reportsListDialog" style="width: 800px; padding: 20px; border-radius: 8px; border: 1px solid #ccc;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3>保存済みレポート一覧</h3>
-            <button type="button" onclick="this.closest('dialog').close()">✕</button>
-        </div>
-        <div class="table-container">
-            <table class="app-table">
-                <thead>
-                    <tr>
-                        <th>物件名</th>
-                        <th>管理番号</th>
-                        <th>工事期間</th>
-                        <th>保存日時</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="reportsListBody"></tbody>
-            </table>
-        </div>
-    </dialog>
 
     <script src="app.js"></script>
 </body>
