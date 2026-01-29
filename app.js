@@ -110,10 +110,7 @@ async function fetchThreads() {
     }
 
     const { data, error } = await query;
-    if (data) {
-        threads = data;
-        renderThreads();
-    }
+    return data || [];
 }
 
 async function fetchWhitelist() {
@@ -215,7 +212,7 @@ window.switchTeam = function (teamId) {
         const teamIcon = Array.from(teamsListEl.children).find(el => el.title === allTeams.find(t => t.id === teamId)?.name);
         if (teamIcon) teamIcon.classList.add('active');
     }
-    renderThreads(); // Filter threads by team
+    loadData(); // Re-fetch threads for the selected team
 };
 
 async function createTeam() {
@@ -657,15 +654,19 @@ function subscribeToChanges() {
 
 async function loadData() {
     if (!currentUser) return;
-    // const { data: threadData } = await supabaseClient.from('threads').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
-    await fetchThreads(); // Use the new fetchThreads function
-    const { data: replyData } = await supabaseClient.from('replies').select('*').order('created_at', { ascending: true });
+    try {
+        const threadData = await fetchThreads();
+        const { data: replyData, error: replyError } = await supabaseClient.from('replies').select('*').order('created_at', { ascending: true });
+        if (replyError) throw replyError;
 
-    threads = (threads || []).map(t => ({ // Use the threads populated by fetchThreads
-        ...t,
-        replies: (replyData || []).filter(r => r.thread_id === t.id)
-    }));
-    renderThreads();
+        threads = (threadData || []).map(t => ({
+            ...t,
+            replies: (replyData || []).filter(r => r.thread_id === t.id)
+        }));
+        renderThreads();
+    } catch (e) {
+        console.error("loadData error:", e);
+    }
 }
 
 async function addThread() {
@@ -682,7 +683,6 @@ async function addThread() {
         {
             title,
             content,
-            author_id: currentUser.id,
             author: authorName,
             team_id: currentTeamId
         }
@@ -782,6 +782,7 @@ window.deleteThread = async function (threadId) {
 // --- Rendering Logic ---
 
 function renderThreads() {
+    if (!currentUser) return; // Prevent crash if called before auth
     const filter = currentFilter;
     const searchQuery = globalSearchInp.value.trim().toLowerCase();
 
@@ -862,7 +863,8 @@ function renderThreads() {
                 return `<span class="reaction-badge ${hasMyReaction ? 'active' : ''}" onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji} ${count}</span>`;
             }).join('');
 
-        let repliesHtml = thread.replies.map(reply => {
+        const currentReplies = thread.replies || [];
+        let repliesHtml = currentReplies.map(reply => {
             // 返信へのリアクション
             const reactionsForReply = allReactions.filter(r => r.reply_id === reply.id);
             const replyEmojiCounts = reactionsForReply.reduce((acc, r) => {
@@ -1012,7 +1014,7 @@ function renderThreads() {
         item.className = 'sidebar-item';
 
         // メンションの抽出
-        const mentions = thread.content.match(/@\S+/g) || [];
+        const mentions = (thread.content || "").match(/@\S+/g) || [];
         const uniqueMentions = [...new Set(mentions)].join(' ');
 
         const authorName = thread.author_name || thread.author || 'Unknown';
