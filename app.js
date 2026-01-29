@@ -419,23 +419,35 @@ async function loadMasterData() {
 
 window.updateRole = async function (profileId, newRole) {
     if (currentProfile.role !== 'Admin') return alert("権限がありません。");
-    await supabaseClient.from('profiles').update({ role: newRole }).eq('id', profileId);
-    loadMasterData();
+    const { error } = await supabaseClient.from('profiles').update({ role: newRole }).eq('id', profileId);
+    if (error) {
+        alert("ロール更新失敗: " + error.message);
+    } else {
+        loadMasterData();
+    }
 };
 
 window.addTag = async function () {
     const name = newTagNameInp.value.trim();
     if (!name || !['Admin', 'Manager'].includes(currentProfile.role)) return;
-    await supabaseClient.from('tags').insert([{ name }]);
-    newTagNameInp.value = '';
-    loadMasterData();
+    const { error } = await supabaseClient.from('tags').insert([{ name }]);
+    if (error) {
+        alert("タグ追加失敗: " + error.message);
+    } else {
+        newTagNameInp.value = '';
+        loadMasterData();
+    }
 };
 
 window.deleteTag = async function (tagId) {
     if (currentProfile.role !== 'Admin') return alert("権限がありません。");
     if (confirm("タグを削除しますか？")) {
-        await supabaseClient.from('tags').delete().eq('id', tagId);
-        loadMasterData();
+        const { error } = await supabaseClient.from('tags').delete().eq('id', tagId);
+        if (error) {
+            alert("タグ削除失敗: " + error.message);
+        } else {
+            loadMasterData();
+        }
     }
 };
 
@@ -443,9 +455,11 @@ window.toggleUserTag = async function (profileId, tagId) {
     if (currentProfile.role !== 'Admin') return alert("権限がありません。");
     const existing = allTagMembers.find(m => m.profile_id === profileId && m.tag_id === tagId);
     if (existing) {
-        await supabaseClient.from('tag_members').delete().eq('id', existing.id);
+        const { error } = await supabaseClient.from('tag_members').delete().eq('id', existing.id);
+        if (error) alert("タグ削除失敗: " + error.message);
     } else {
-        await supabaseClient.from('tag_members').insert([{ profile_id: profileId, tag_id: tagId }]);
+        const { error } = await supabaseClient.from('tag_members').insert([{ profile_id: profileId, tag_id: tagId }]);
+        if (error) alert("タグ追加失敗: " + error.message);
     }
     loadMasterData();
 };
@@ -656,19 +670,24 @@ async function addThread() {
     const content = newContentInp.value.trim();
     if (!title || !content || currentProfile.role === 'Viewer') return;
     addThreadBtn.disabled = true;
-    addThreadBtn.textContent = '...';
     const authorName = currentProfile.display_name || currentUser.email;
     const { error } = await supabaseClient.from('threads').insert([
         {
             title,
             content,
             author_id: currentUser.id,
-            author_name: currentProfile.display_name || currentUser.email,
-            team_id: currentTeamId // Associate with active team
+            author: authorName, // Reverted from author_name to author for consistency
+            team_id: currentTeamId
         }
     ]);
-    if (!error) { newTitleInp.value = ''; newContentInp.value = ''; }
+    if (error) {
+        alert("投稿失敗: " + error.message);
+    } else {
+        newTitleInp.value = '';
+        newContentInp.value = '';
+    }
     addThreadBtn.disabled = false;
+    addThreadBtn.textContent = '+ Post';
 }
 
 window.addReply = async function (threadId) {
@@ -677,7 +696,9 @@ window.addReply = async function (threadId) {
     if (!content || currentProfile.role === 'Viewer') return;
     const authorName = currentProfile.display_name || currentUser.email;
     const { error } = await supabaseClient.from('replies').insert([{ thread_id: threadId, content, author: authorName }]);
-    if (!error) {
+    if (error) {
+        alert("返信失敗: " + error.message);
+    } else {
         input.value = '';
         // Scroll to bottom after adding a reply
         setTimeout(() => {
@@ -731,7 +752,8 @@ window.togglePin = async function (threadId) {
     if (currentProfile.role === 'Viewer') return;
     const thread = threads.find(t => t.id === threadId);
     if (!thread) return;
-    await supabaseClient.from('threads').update({ is_pinned: !thread.is_pinned }).eq('id', threadId);
+    const { error } = await supabaseClient.from('threads').update({ is_pinned: !thread.is_pinned }).eq('id', threadId);
+    if (error) alert("ピン留め失敗: " + error.message);
 }
 
 window.deleteThread = async function (threadId) {
@@ -739,13 +761,15 @@ window.deleteThread = async function (threadId) {
     if (!thread) return;
 
     // 削除権限チェック
-    const isOwner = thread.author === (currentProfile.display_name || currentUser.email);
+    const threadAuthor = thread.author_name || thread.author;
+    const isOwner = threadAuthor === (currentProfile.display_name || currentUser.email);
     const hasAdminPower = ['Admin', 'Manager'].includes(currentProfile.role);
 
     if (!isOwner && !hasAdminPower) return alert("削除権限がありません。");
 
     if (confirm("この項目を削除しますか？")) {
-        await supabaseClient.from('threads').delete().eq('id', threadId);
+        const { error } = await supabaseClient.from('threads').delete().eq('id', threadId);
+        if (error) alert("削除失敗: " + error.message);
     }
 }
 
