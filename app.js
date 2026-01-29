@@ -23,6 +23,7 @@ let currentMentionCandidates = [];
 let currentTeamId = null; // Currently selected team (null = All)
 let allTeams = [];
 let whitelist = [];
+let allReactions = [];
 
 // --- UI Elements ---
 const authContainer = document.getElementById('auth-container');
@@ -142,19 +143,26 @@ function renderWhitelist() {
 window.addWhitelist = async function () {
     const email = whitelistEmailInp.value.trim();
     if (!email) return;
-    if (!['Admin', 'Manager'].includes(currentProfile.role)) return alert("権限がありません。");
+    if (!['Admin', 'Manager'].includes(currentProfile.role)) {
+        console.error("Permission denied for addWhitelist. Current role:", currentProfile.role);
+        return alert("権限がありません。");
+    }
 
     const { error } = await supabaseClient.from('allowed_users').insert([{ email, added_by: currentUser.id }]);
     if (error) {
+        console.error("addWhitelist DB error:", error);
         alert("追加に失敗しました: " + error.message);
     } else {
         whitelistEmailInp.value = '';
-        fetchWhitelist();
+        await fetchWhitelist();
     }
 };
 
 window.removeWhitelist = async function (email) {
-    if (!['Admin', 'Manager'].includes(currentProfile.role)) return alert("権限がありません。");
+    if (!['Admin', 'Manager'].includes(currentProfile.role)) {
+        console.error("Permission denied for removeWhitelist. Current role:", currentProfile.role);
+        return alert("権限がありません。");
+    }
     if (!confirm(`${email} をホワイトリストから削除しますか？`)) return;
     try {
         const { error } = await supabaseClient.from('allowed_users').delete().eq('email', email);
@@ -418,7 +426,7 @@ async function loadMasterData() {
 }
 
 window.updateRole = async function (profileId, newRole) {
-    if (currentProfile.role !== 'Admin') return alert("権限がありません。");
+    if (!['Admin', 'Manager'].includes(currentProfile.role)) return alert("権限がありません。");
     const { error } = await supabaseClient.from('profiles').update({ role: newRole }).eq('id', profileId);
     if (error) {
         alert("ロール更新失敗: " + error.message);
@@ -429,9 +437,14 @@ window.updateRole = async function (profileId, newRole) {
 
 window.addTag = async function () {
     const name = newTagNameInp.value.trim();
-    if (!name || !['Admin', 'Manager'].includes(currentProfile.role)) return;
+    if (!name) return;
+    if (!['Admin', 'Manager'].includes(currentProfile.role)) {
+        console.error("Permission denied for addTag. Current role:", currentProfile.role);
+        return alert("権限がありません。");
+    }
     const { error } = await supabaseClient.from('tags').insert([{ name }]);
     if (error) {
+        console.error("addTag DB error:", error);
         alert("タグ追加失敗: " + error.message);
     } else {
         newTagNameInp.value = '';
@@ -440,7 +453,7 @@ window.addTag = async function () {
 };
 
 window.deleteTag = async function (tagId) {
-    if (currentProfile.role !== 'Admin') return alert("権限がありません。");
+    if (!['Admin', 'Manager'].includes(currentProfile.role)) return alert("権限がありません。");
     if (confirm("タグを削除しますか？")) {
         const { error } = await supabaseClient.from('tags').delete().eq('id', tagId);
         if (error) {
@@ -452,7 +465,10 @@ window.deleteTag = async function (tagId) {
 };
 
 window.toggleUserTag = async function (profileId, tagId) {
-    if (!['Admin', 'Manager'].includes(currentProfile.role)) return alert("権限がありません。");
+    if (!['Admin', 'Manager'].includes(currentProfile.role)) {
+        console.error("Permission denied for toggleUserTag. Current role:", currentProfile.role);
+        return alert("権限がありません。");
+    }
     const existing = allTagMembers.find(m => m.profile_id === profileId && m.tag_id === tagId);
     if (existing) {
         const { error } = await supabaseClient.from('tag_members').delete().eq('id', existing.id);
@@ -787,7 +803,7 @@ function renderThreads() {
     const searchQuery = globalSearchInp.value.trim().toLowerCase();
 
     // --- Central Feed Data ---
-    let feedThreads = [...threads].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    let feedThreads = [...threads].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         .filter(t => (filter === 'all' || t.status === filter));
 
     if (searchQuery) {
@@ -1060,6 +1076,14 @@ function renderThreads() {
         };
         assignedSidebarListEl.appendChild(item);
     });
+
+    // Scroll to bottom (newest posts) after rendering
+    setTimeout(() => {
+        const searchQuery = globalSearchInp.value.trim();
+        if (!searchQuery) {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+    }, 100);
 }
 
 function highlightMentions(text) {
