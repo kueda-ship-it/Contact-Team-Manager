@@ -317,9 +317,12 @@ function renderSecondarySidebar() {
             divider.style.margin = '12px 16px';
             channelListEl.appendChild(divider);
 
-            const settingsItem = document.createElement('div');
-            settingsItem.className = 'channel-item';
-            settingsItem.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> チーム設定`;
+            settingsItem.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg> チーム管理
+            `;
             settingsItem.onclick = () => window.openTeamSettings();
             channelListEl.appendChild(settingsItem);
         }
@@ -493,7 +496,7 @@ window.updateTeamMemberRole = async function (userId, newRole) {
     // Check if the current user has permission (Team Owner or Overall Admin)
     const team = allTeams.find(t => t.id === currentTeamId);
     const isOwner = team && team.created_by === currentUser.id;
-    const isAdmin = currentProfile.role === 'Admin';
+    const isAdmin = (currentProfile.role || '').toLowerCase() === 'admin';
 
     if (!isOwner && !isAdmin) {
         alert("権限がありません（所有者または全体管理者のみ変更可能です）");
@@ -1177,7 +1180,12 @@ function renderThreads() {
         <div class="feed-header-sticky">
             <div style="display:flex; align-items:center; gap:10px;">
                 <h2 style="font-size: 1.2rem; font-weight: 700;">${escapeHtml(currentTeamName)} <span id="task-count-sticky" style="color: var(--primary-light); margin-left:10px;">${feedThreads.length}</span> 件</h2>
-                ${currentTeamId ? `<button class="btn btn-sm btn-outline" onclick="window.openTeamSettings()" title="チーム設定">⚙️</button>` : ''}
+                ${currentTeamId ? `<button class="btn btn-sm btn-outline" onclick="window.openTeamSettings()" title="チーム設定">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>` : ''}
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
                 <select id="filter-status-sticky" class="input-field" style="width: auto; padding: 2px 10px; font-size: 0.8rem;" onchange="filterThreads(this.value)">
@@ -1442,6 +1450,8 @@ function renderThreads() {
     assignedSidebarListEl.innerHTML = '';
 
     // --- Right Sidebar Rendering (Not Finished / Mentions) ---
+
+    // Define local helper specifically for sidebar snippet extraction
     const getPlainTextForSidebar = (html) => {
         const tmp = document.createElement('div');
         tmp.innerHTML = html || '';
@@ -1470,23 +1480,10 @@ function renderThreads() {
         sidebarListEl.appendChild(item);
     });
 
-    const myName = currentProfile.display_name || currentUser.email;
-    const myTagIds = allTagMembers.filter(m => m.profile_id === currentProfile.id).map(m => m.tag_id);
-    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => t.name);
-
-    const hasMentionForSidebar = (content) => {
-        if (!content) return false;
-        const mentions = content.match(/@\S+/g) || [];
-        return mentions.some(m => {
-            const name = m.substring(1);
-            return name === myName || myTagNames.includes(name);
-        });
-    };
-
     const assignedThreads = threads.filter(t => {
         if (t.status === 'completed') return false;
-        if (hasMentionForSidebar(t.content)) return true;
-        return (t.replies || []).some(r => hasMentionForSidebar(r.content));
+        if (hasMention(t.content)) return true;
+        return (t.replies || []).some(r => hasMention(r.content));
     }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     assignedThreads.forEach(thread => {
@@ -2100,7 +2097,9 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
     }
 });
 
+// Start initialization
 checkUser();
+
 
 
 globalSearchInp.addEventListener('input', () => {
@@ -2115,194 +2114,5 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-// --- Team Management Logic ---
-
-window.openTeamSettings = function () {
-    if (!currentTeamId) return;
-    const team = allTeams.find(t => t.id === currentTeamId);
-    if (!team) return;
-
-    modalOverlay.style.display = 'flex';
-    teamManageModal.style.display = 'block';
-    adminModal.style.display = 'none';
-    settingsModal.style.display = 'none';
-    teamModal.style.display = 'none';
-
-    renderTeamMembers(currentTeamId);
-};
-
-// チームメンバー一覧の描画
-async function renderTeamMembers(teamId) {
-    const listEl = document.getElementById('team-member-list');
-    listEl.innerHTML = '<tr><td colspan="3" style="text-align:center;">読み込み中...</td></tr>';
-
-    // チームメンバーの取得
-    const { data: members, error } = await supabaseClient
-        .from('team_members')
-        .select('*')
-        .eq('team_id', teamId);
-
-    if (error) {
-        console.error('Error fetching team members:', error);
-        listEl.innerHTML = '<tr><td colspan="3" style="color:var(--danger);">エラーが発生しました</td></tr>';
-        return;
-    }
-
-    // 描画
-    if (members.length === 0) {
-        listEl.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-muted);">メンバーがいません</td></tr>';
-    } else {
-        listEl.innerHTML = members.map(m => {
-            const profile = allProfiles.find(p => p.id === m.user_id);
-            if (!profile) return '';
-
-            // ロール操作は現状UIのみ（バックエンドでの保存機能は今回範囲外だが、表示はしておく）
-            const role = m.role || 'member'; // default
-            const isSelf = profile.id === currentUser.id;
-
-            return `
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 8px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div class="avatar" style="width:24px; height:24px; font-size:0.7rem;">
-                                ${profile.avatar_url ? `<img src="${profile.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (profile.display_name || profile.email)[0].toUpperCase()}
-                            </div>
-                            <div>
-                                <div style="font-size:0.9rem;">${escapeHtml(profile.display_name || 'No Name')}</div>
-                                <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(profile.email)}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td style="padding: 8px;">
-                        <span style="font-size:0.8rem; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.1);">${role}</span>
-                    </td>
-                    <td style="padding: 8px;">
-                        ${!isSelf ? `<button class="btn btn-sm" style="background:#C4314B; padding:2px 6px; font-size:0.7rem;" onclick="removeTeamMember('${teamId}', '${profile.id}')">削除</button>` : ''}
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    }
-}
-
-// メンバー検索＆追加用
-const teamMemberInput = document.getElementById('team-member-input');
-const teamMemberSuggestions = document.getElementById('team-member-suggestions');
-
-if (teamMemberInput) {
-    teamMemberInput.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-        if (!query) {
-            teamMemberSuggestions.style.display = 'none';
-            return;
-        }
-
-        // 既にチームにいるメンバーを除外すべきだが、まずは全件検索
-        // (簡易実装: 全ユーザーから検索)
-        const candidates = allProfiles.filter(p =>
-            (p.display_name && p.display_name.toLowerCase().includes(query)) ||
-            (p.email && p.email.toLowerCase().includes(query))
-        );
-
-        if (candidates.length === 0) {
-            teamMemberSuggestions.style.display = 'none';
-            return;
-        }
-
-        teamMemberSuggestions.innerHTML = candidates.map(p => `
-            <div class="mention-item" onclick="addMemberToTeam('${currentTeamId}', '${p.id}')">
-                <div class="avatar">${p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : (p.display_name || p.email)[0].toUpperCase()}</div>
-                <div class="mention-info">
-                    <span class="mention-name">${escapeHtml(p.display_name || 'No Name')}</span>
-                    <span class="mention-email">${escapeHtml(p.email)}</span>
-                </div>
-            </div>
-        `).join('');
-        teamMemberSuggestions.style.display = 'block';
-    });
-}
-
-window.addMemberToTeam = async (teamId, userId) => {
-    if (!teamId || !userId) return;
-
-    // 重複チェック
-    const { data: existing } = await supabaseClient
-        .from('team_members')
-        .select('id')
-        .eq('team_id', teamId)
-        .eq('user_id', userId)
-        .single();
-
-    if (existing) {
-        alert('このユーザーは既に追加されています。');
-        teamMemberSuggestions.style.display = 'none';
-        teamMemberInput.value = '';
-        return;
-    }
-
-    const { error } = await supabaseClient
-        .from('team_members')
-        .insert({ team_id: teamId, user_id: userId, role: 'member' });
-
-    if (error) {
-        console.error('Error adding member:', error);
-        alert('メンバー追加に失敗しました: ' + error.message);
-    } else {
-        renderTeamMembers(teamId);
-        teamMemberSuggestions.style.display = 'none';
-        teamMemberInput.value = '';
-    }
-};
-
-window.removeTeamMember = async (teamId, userId) => {
-    if (!confirm('本当にこのメンバーをチームから削除しますか？')) return;
-
-    const { error } = await supabaseClient
-        .from('team_members')
-        .delete()
-        .eq('team_id', teamId)
-        .eq('user_id', userId);
-
-    if (error) {
-        console.error('Error removing member:', error);
-        alert('メンバー削除に失敗しました');
-    } else {
-        renderTeamMembers(teamId);
-    }
-};
-
-// --- Initialization & Event Listeners ---
-
-if (loginBtn) loginBtn.onclick = handleLogin;
-if (signupBtn) signupBtn.onclick = handleSignup;
-if (microsoftLoginBtn) {
-    microsoftLoginBtn.onclick = async () => {
-        const { error } = await supabaseClient.auth.signInWithOAuth({
-            provider: 'azure',
-            options: {
-                scopes: 'openid profile email User.Read',
-                redirectTo: window.location.origin
-            }
-        });
-        if (error) alert("Microsoftログインエラー: " + error.message);
-    };
-}
-if (logoutBtn) logoutBtn.onclick = handleLogout;
-
-btnAddTeam.onclick = () => {
-    modalOverlay.style.display = 'block';
-    teamModal.style.display = 'block';
-};
-
-saveTeamBtn.onclick = createTeam;
-
-modalOverlay.onclick = () => {
-    modalOverlay.style.display = 'none';
-    settingsModal.style.display = 'none';
-    adminModal.style.display = 'none';
-    teamModal.style.display = 'none';
-    teamManageModal.style.display = 'none';
-};
-
-// Start
+// Start initialization
 checkUser();
