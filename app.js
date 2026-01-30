@@ -1420,15 +1420,15 @@ function renderThreads() {
         const item = document.createElement('div');
         item.className = 'sidebar-item';
 
-        // メンションの抽出
-        const mentions = (thread.content || "").match(/@\S+/g) || [];
         const uniqueMentions = [...new Set(mentions)].join(' ');
         const plainContent = getPlainText(thread.content);
+        // Re-highlight mentions in the plain text snippet
+        const styledContent = highlightMentions(escapeHtml(plainContent));
 
         const authorName = thread.author_name || thread.author || 'Unknown';
         item.innerHTML = `
             <div style="font-weight: bold; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(thread.title)}</div>
-            <div class="line-clamp-2">${escapeHtml(plainContent)}</div>
+            <div class="line-clamp-2">${styledContent}</div>
             <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 4px;">
                 <span>by ${escapeHtml(authorName)}</span>
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
@@ -1454,10 +1454,11 @@ function renderThreads() {
 
         const authorName = thread.author_name || thread.author || 'Unknown';
         const plainContent = getPlainText(thread.content);
+        const styledContent = highlightMentions(escapeHtml(plainContent));
 
         item.innerHTML = `
             <div style="font-weight: bold; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(thread.title)}</div>
-            <div class="line-clamp-2">${escapeHtml(plainContent)}</div>
+            <div class="line-clamp-2">${styledContent}</div>
             <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 4px;">
                 <span>by ${escapeHtml(authorName)}</span>
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
