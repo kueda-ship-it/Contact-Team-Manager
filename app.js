@@ -1236,7 +1236,7 @@ function renderThreads() {
                     <div class="reply-form" style="display: flex; gap: 15px; align-items: flex-start; margin-top: 10px;">
                         <div style="flex: 1; position: relative;">
                             <div id="reply-input-${thread.id}" contenteditable="true" class="input-field btn-sm rich-editor" placeholder="返信 (メンションは@を入力)..." 
-                                   style="min-height: 100px; margin-top: 0;"
+                                   style="min-height: 80px; margin-top: 0;"
                                    oninput="handleReplyInput(this, '${thread.id}')"></div>
                              <div id="mention-list-${thread.id}" class="mention-list" style="bottom: 100%; top: auto; display: none;"></div>
                              <div id="reply-attachment-preview-${thread.id}" class="attachment-preview-area" style="padding-left: 0; margin-top: 5px;"></div>
