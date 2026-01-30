@@ -1420,6 +1420,8 @@ function renderThreads() {
         const item = document.createElement('div');
         item.className = 'sidebar-item';
 
+        // メンションの抽出 (Ensure variable is defined)
+        const mentions = (thread.content || "").match(/@\S+/g) || [];
         const uniqueMentions = [...new Set(mentions)].join(' ');
         const plainContent = getPlainText(thread.content);
         // Re-highlight mentions in the plain text snippet
