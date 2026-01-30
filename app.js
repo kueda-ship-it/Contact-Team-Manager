@@ -1065,36 +1065,6 @@ function renderThreads() {
         );
     }
 
-    // --- Sidebar Data (Not Finished) ---
-    const pendingThreads = threads.filter(t => t.status === 'pending')
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-    // --- Sidebar Data (Assigned to Me) ---
-    const myName = currentProfile.display_name || currentUser.email;
-    const myTagIds = allTagMembers.filter(m => m.profile_id === currentProfile.id).map(m => m.tag_id);
-    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => t.name);
-
-    const assignedThreads = threads.filter(t => {
-        if (t.status === 'completed') return false;
-
-        // メンションチェック関数
-        const hasMention = (content) => {
-            if (!content) return false;
-            const mentions = content.match(/@\S+/g) || [];
-            return mentions.some(m => {
-                const name = m.substring(1);
-                return name === myName || myTagNames.includes(name);
-            });
-        };
-
-        // 親記事のチェック
-        if (hasMention(t.content)) return true;
-
-        // 返信のチェック
-        const currentReplies = t.replies || [];
-        return currentReplies.some(r => hasMention(r.content));
-    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
     threadListEl.innerHTML = '';
     sidebarListEl.innerHTML = '';
     assignedSidebarListEl.innerHTML = '';
