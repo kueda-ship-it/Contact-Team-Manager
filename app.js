@@ -1429,9 +1429,9 @@ function renderThreads() {
 
         const authorName = thread.author_name || thread.author || 'Unknown';
         item.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(thread.title)}</div>
+            <div class="sidebar-title">${escapeHtml(thread.title)}</div>
             <div class="line-clamp-2">${styledContent}</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 4px;">
+            <div style="font-size: 0.65rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 6px; opacity: 0.7;">
                 <span>by ${escapeHtml(authorName)}</span>
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
             </div>
@@ -1459,9 +1459,9 @@ function renderThreads() {
         const styledContent = highlightMentions(escapeHtml(plainContent));
 
         item.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(thread.title)}</div>
+            <div class="sidebar-title">${escapeHtml(thread.title)}</div>
             <div class="line-clamp-2">${styledContent}</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 4px;">
+            <div style="font-size: 0.65rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 6px; opacity: 0.7;">
                 <span>by ${escapeHtml(authorName)}</span>
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
             </div>
