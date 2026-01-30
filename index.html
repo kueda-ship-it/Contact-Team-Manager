@@ -144,8 +144,21 @@
                 <div class="container">
                     <section class="form-container compact-form">
                         <div style="display: flex; gap: 15px;">
+                            <div style="flex: 1;">
+                                <input type="text" id="new-title" class="input-field" placeholder="件名..."
+                                    style="margin-top: 0 !important; margin-bottom: 10px; width: 100%;">
+                                <div style="position: relative; width: 100%;">
+                                    <div id="new-content" contenteditable="true" class="input-field rich-editor"
+                                        placeholder="内容... @メンション"
+                                        style="margin-top: 0 !important; min-height: 38px; width: 100%;">
+                                    </div>
+                                    <div id="attachment-preview-area" class="attachment-preview-area"></div>
+                                    <div id="mention-list" class="mention-list"
+                                        style="bottom: 100%; top: auto; display: none;"></div>
+                                </div>
+                            </div>
                             <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 5px;">
-                                <!-- Icon Column -->
+                                <!-- Icon Column (Right) -->
                                 <button id="attach-file-btn" class="btn btn-outline"
                                     style="position: relative; padding: 6px 10px; height: 38px; width: 38px; display: flex; align-items: center; justify-content: center;"
                                     title="ファイルを添付">
@@ -165,18 +178,6 @@
                                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                                     </svg>
                                 </button>
-                            </div>
-                            <div style="flex: 1;">
-                                <input type="text" id="new-title" class="input-field" placeholder="件名..."
-                                    style="margin-top: 0 !important; margin-bottom: 10px;">
-                                <div style="position: relative;">
-                                    <div id="new-content" contenteditable="true" class="input-field rich-editor"
-                                        placeholder="内容... @メンション" style="margin-top: 0 !important; min-height: 38px;">
-                                    </div>
-                                    <div id="attachment-preview-area" class="attachment-preview-area"></div>
-                                    <div id="mention-list" class="mention-list"
-                                        style="bottom: 100%; top: auto; display: none;"></div>
-                                </div>
                             </div>
                         </div>
                     </section>
