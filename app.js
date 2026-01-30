@@ -1137,6 +1137,11 @@ function renderThreads() {
         });
     };
 
+    // List Sticky Header Title Calculation (Moved up for filtering usage)
+    const currentTeamName = currentTeamId
+        ? (allTeams.find(t => t.id === currentTeamId)?.name || 'Team')
+        : 'List';
+
     let feedThreads = [...threads].sort((a, b) => {
         const timeA = getLatestActivity(a);
         const timeB = getLatestActivity(b);
@@ -1158,11 +1163,6 @@ function renderThreads() {
         // Default: filter by currentTeamId if selected
         if (!currentTeamId) return true;
 
-        // Special handling for "連絡" (Contact) team to include legacy threads (null team_id)
-        if (currentTeamName === '連絡' || currentTeamName === 'Contact') {
-            return t.team_id === currentTeamId || t.team_id === null;
-        }
-
         return t.team_id === currentTeamId;
     });
 
@@ -1181,9 +1181,8 @@ function renderThreads() {
     if (taskCountEl) taskCountEl.textContent = feedThreads.length;
 
     // List Sticky Header
-    const currentTeamName = currentTeamId
-        ? (allTeams.find(t => t.id === currentTeamId)?.name || 'Team')
-        : 'List';
+    // List Sticky Header
+
 
     threadListEl.innerHTML = `
         <div class="feed-header-sticky">
@@ -1374,7 +1373,7 @@ function renderThreads() {
             </div>
 
             <div class="task-title-line" id="title-${thread.id}">${thread.title}</div>
-            <div class="task-content" id="content-${thread.id}" style="white-space: pre-wrap;">${highlightMentions(thread.content)}</div>
+            <div class="task-content line-clamp-2" id="content-${thread.id}" style="white-space: pre-wrap; cursor: pointer;" onclick="this.classList.toggle('line-clamp-2')" title="クリックで全文表示/折りたたみ">${highlightMentions(thread.content)}</div>
             
             ${(() => {
                 if (thread.attachments && thread.attachments.length > 0) {

@@ -236,14 +236,14 @@ header {
     top: 50px;
     z-index: 1001;
     /* Higher than task dots */
-    background: var(--bg-main);
+    background: var(--bg-dark);
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    padding: 12px 20px;
+    padding: 12px 14px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     margin-bottom: 15px;
-    max-width: 800px;
+    max-width: 880px;
     margin-left: auto;
     margin-right: auto;
     width: 100%;
@@ -442,7 +442,8 @@ header {
 }
 
 .task-content {
-    font-size: 0.9rem;
+    font-size: 0.9rem !important;
+    /* Forced reduction */
     line-height: 1.5;
     margin-bottom: 0.8rem;
     color: var(--text-main);
@@ -840,7 +841,7 @@ textarea.input-field {
     /* Tightened outer frame */
     max-width: 880px !important;
     /* Reduced width by 20px (from 900px) */
-    padding: 2px 15px;
+    padding: 10px 14px !important;
     /* Minimized height */
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     overflow: visible !important;
@@ -1477,7 +1478,7 @@ html {
 /* --- Content Visibility Fixes --- */
 .feed-list {
     padding-bottom: 150px;
-    max-width: 800px;
+    max-width: 880px;
     margin: 0 auto;
     width: 100%;
 }
