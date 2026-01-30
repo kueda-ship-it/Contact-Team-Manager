@@ -305,6 +305,20 @@
             <h3>チームメンバー管理</h3>
             <div
                 style="margin-top: 1rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">チーム設定</h4>
+                <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                    <div id="team-icon-preview"
+                        style="width: 40px; height: 40px; border-radius: 4px; background: #333; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                        <span style="font-size: 1.2rem;">T</span>
+                    </div>
+                    <input type="file" id="team-icon-input" accept="image/*" style="display: none;"
+                        onchange="handleTeamIconSelect(this)">
+                    <button class="btn btn-sm btn-outline"
+                        onclick="document.getElementById('team-icon-input').click()">アイコン変更</button>
+                    <button id="save-team-icon-btn" class="btn btn-sm btn-primary" style="display: none;"
+                        onclick="saveTeamIcon()">保存</button>
+                </div>
+
                 <h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">メンバーを追加</h4>
                 <div style="display: flex; gap: 10px; position: relative;">
                     <div style="flex: 1; position: relative;">

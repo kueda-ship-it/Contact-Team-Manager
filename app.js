@@ -1156,7 +1156,14 @@ function renderThreads() {
         }
 
         // Default: filter by currentTeamId if selected
-        return !currentTeamId || t.team_id === currentTeamId;
+        if (!currentTeamId) return true;
+
+        // Special handling for "連絡" (Contact) team to include legacy threads (null team_id)
+        if (currentTeamName === '連絡' || currentTeamName === 'Contact') {
+            return t.team_id === currentTeamId || t.team_id === null;
+        }
+
+        return t.team_id === currentTeamId;
     });
 
 
@@ -2107,11 +2114,6 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
     }
 });
 
-// Start initialization
-checkUser();
-
-
-
 globalSearchInp.addEventListener('input', () => {
     renderThreads();
 });
@@ -2123,6 +2125,50 @@ window.addEventListener('keydown', (e) => {
         globalSearchInp.focus();
     }
 });
+
+// --- Team Icon Management ---
+window.handleTeamIconSelect = (input) => {
+    const file = input.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const preview = document.getElementById('team-icon-preview');
+            preview.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+            document.getElementById('save-team-icon-btn').style.display = 'inline-block';
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
+window.saveTeamIcon = async () => {
+    const input = document.getElementById('team-icon-input');
+    const file = input.files[0];
+    if (!file || !currentTeamId) return;
+
+    try {
+        const reader = new FileReader();
+        const base64Icon = await new Promise((resolve) => {
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsDataURL(file);
+        });
+
+        const { error } = await supabaseClient
+            .from('teams')
+            .update({ avatar_url: base64Icon })
+            .eq('id', currentTeamId);
+
+        if (error) throw error;
+
+        alert('チームアイコンを更新しました');
+        document.getElementById('save-team-icon-btn').style.display = 'none';
+
+        // Refresh teams list
+        await loadMasterData();
+    } catch (e) {
+        console.error('Error saving team icon:', e);
+        alert('チームアイコンの更新に失敗しました: ' + e.message);
+    }
+};
 
 // Start initialization
 checkUser();
