@@ -1410,6 +1410,12 @@ function renderThreads() {
     });
 
     // サイドバーの描画 (Not Finished)
+    const getPlainText = (html) => {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html || '';
+        return tmp.textContent || tmp.innerText || '';
+    };
+
     pendingThreads.forEach(thread => {
         const item = document.createElement('div');
         item.className = 'sidebar-item';
@@ -1417,13 +1423,14 @@ function renderThreads() {
         // メンションの抽出
         const mentions = (thread.content || "").match(/@\S+/g) || [];
         const uniqueMentions = [...new Set(mentions)].join(' ');
+        const plainContent = getPlainText(thread.content);
 
         const authorName = thread.author_name || thread.author || 'Unknown';
         item.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${thread.title}</div>
-            <div style="font-size: 0.75rem; color: var(--accent); margin-bottom: 4px;">${uniqueMentions}</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between;">
-                <span>by ${authorName}</span>
+            <div style="font-weight: bold; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(thread.title)}</div>
+            <div class="line-clamp-2">${escapeHtml(plainContent)}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 4px;">
+                <span>by ${escapeHtml(authorName)}</span>
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
             </div>
         `;
@@ -1446,10 +1453,13 @@ function renderThreads() {
         item.style.borderLeft = '3px solid var(--accent)';
 
         const authorName = thread.author_name || thread.author || 'Unknown';
+        const plainContent = getPlainText(thread.content);
+
         item.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${thread.title}</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between;">
-                <span>by ${authorName}</span>
+            <div style="font-weight: bold; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(thread.title)}</div>
+            <div class="line-clamp-2">${escapeHtml(plainContent)}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 4px;">
+                <span>by ${escapeHtml(authorName)}</span>
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
             </div>
         `;
