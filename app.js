@@ -368,127 +368,7 @@ window.updateTeamMemberRole = async function (userId, newRole) {
     }
 };
 
-// --- Add Member Autocomplete Logic ---
-const teamMemberInput = document.getElementById('team-member-input');
-const teamMemberSuggestions = document.getElementById('team-member-suggestions');
-let selectedMemberCandidate = null;
 
-if (teamMemberInput) {
-    teamMemberInput.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-        selectedMemberCandidate = null;
-
-        if (!query) {
-            teamMemberSuggestions.style.display = 'none';
-            return;
-        }
-
-        // Filter profiles excluding those already in the list (handled loosely here, can be stricter)
-        // Need to know current members? For now just show all profiles matching.
-        // Ideally we filter out those who are already members.
-        // We can fetch current members IDs from the rendered list or fetch them properly.
-        // For simplicity, just search allProfiles.
-        const matches = allProfiles.filter(p => {
-            const name = (p.display_name || '').toLowerCase();
-            const mail = (p.email || '').toLowerCase();
-            return name.includes(query) || mail.includes(query);
-        }).slice(0, 10);
-
-        if (matches.length === 0) {
-            teamMemberSuggestions.style.display = 'none';
-            return;
-        }
-
-        teamMemberSuggestions.innerHTML = matches.map(p => `
-            <div class="mention-candidate" onclick="selectMemberCandidate('${p.id}', '${escapeHtml(p.display_name || p.email)}')">
-                <div style="font-weight:bold;">${escapeHtml(p.display_name || 'No Name')}</div>
-                <div style="font-size:0.7em; color:#888;">${escapeHtml(p.email)}</div>
-            </div>
-        `).join('');
-        teamMemberSuggestions.style.display = 'block';
-    });
-
-    // Close suggestions on click outside
-    document.addEventListener('click', (e) => {
-        if (!teamMemberInput.contains(e.target) && !teamMemberSuggestions.contains(e.target)) {
-            teamMemberSuggestions.style.display = 'none';
-        }
-    });
-
-    // Allow Enter key to commit if exact match or selected (simplified: just try exact email match if Enter)
-    teamMemberInput.addEventListener('keydown', async (e) => {
-        if (e.key === 'Enter') {
-            await window.addTeamMember();
-        }
-    });
-}
-
-window.selectMemberCandidate = function (id, name) {
-    selectedMemberCandidate = id;
-    teamMemberInput.value = name; // Update input for visual confirmation
-    teamMemberSuggestions.style.display = 'none';
-    window.addTeamMember(); // Auto add on select? or wait for button? Let's auto add for smooth UX or just fill.
-    // User requested "Like mention", usually that means select -> fill -> enter/add.
-    // Let's call add directly for speed.
-};
-
-window.addTeamMember = async function () {
-    const inputVal = teamMemberInput.value.trim();
-    if (!inputVal || !currentTeamId) return;
-
-    let targetUserId = selectedMemberCandidate;
-
-    // If no candidate selected from list, try to find by exact email
-    if (!targetUserId) {
-        // Local search first
-        const p = allProfiles.find(p => p.email === inputVal);
-        if (p) {
-            targetUserId = p.id;
-        } else {
-            // DB search fallback
-            const { data: user } = await supabaseClient.from('profiles').select('id').eq('email', inputVal).single();
-            if (user) targetUserId = user.id;
-        }
-    }
-
-    if (!targetUserId) {
-        alert("ユーザーが見つかりません。リストから選択するか、正確なメールアドレスを入力してください。");
-        return;
-    }
-
-    const { error } = await supabaseClient
-        .from('team_members')
-        .insert([{ team_id: currentTeamId, user_id: targetUserId }]);
-
-    if (error) {
-        if (error.code === '23505') {
-            alert("すでにメンバーに追加されています。");
-        } else {
-            alert("追加失敗: " + error.message);
-        }
-    } else {
-        teamMemberInput.value = '';
-        selectedMemberCandidate = null;
-        fetchTeamMembers(currentTeamId);
-    }
-};
-
-window.removeTeamMember = async function (userId) {
-    if (!currentTeamId) return;
-    if (!confirm("このメンバーをチームから削除しますか？")) return;
-
-    const { error } = await supabaseClient
-        .from('team_members')
-        .delete()
-        .eq('team_id', currentTeamId)
-        .eq('user_id', userId);
-
-    if (error) {
-        alert("削除に失敗しました: " + error.message);
-    } else {
-        fetchTeamMembers(currentTeamId);
-    }
-};
 
 function handleAuthState() {
     // ヘッダーのユーザー情報更新
@@ -1353,9 +1233,6 @@ function renderThreads() {
                 <div class="reply-section ${currentReplies.length === 0 ? 'is-empty' : ''}">
                     <div class="reply-scroll-area">${repliesHtml}</div>
                     ${(currentProfile.role !== 'Viewer' && thread.status !== 'completed') ? `
-                <div class="reply-section ${currentReplies.length === 0 ? 'is-empty' : ''}">
-                    <div class="reply-scroll-area">${repliesHtml}</div>
-                    ${(currentProfile.role !== 'Viewer' && thread.status !== 'completed') ? `
                     <div class="reply-form" style="display: flex; gap: 10px; align-items: flex-start; margin-top: 10px;">
                         <div style="flex: 1; position: relative;">
                             <div id="reply-input-${thread.id}" contenteditable="true" class="input-field btn-sm rich-editor" placeholder="返信 (メンションは@を入力)..." 
@@ -1381,7 +1258,7 @@ function renderThreads() {
                             </button>
                         </div>
                     </div>`
-                    : (thread.status === 'completed' ? '' : '')}
+                : (thread.status === 'completed' ? '' : '')}
                 </div>
 
 
@@ -1391,8 +1268,8 @@ function renderThreads() {
                 </div>
                 <div class="actions" style="display: flex; align-items: center; gap: 10px;">
                     ${thread.status === 'completed' && completerName ?
-                    `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
-                    : ''}
+                `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
+                : ''}
                     ${currentProfile.role !== 'Viewer' ? `
                     <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
                     ` : ''}
