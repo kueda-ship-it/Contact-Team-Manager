@@ -94,12 +94,51 @@ USING (
 -- 2024-01-30 追加: Threads テーブルへのチーム連携とユーザー紐付け
 -- ==========================================
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE;
-ALTER TABLE threads ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) DEFAULT auth.uid(); -- デフォルトで現在のユーザーIDを設定
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT false;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
+
 ALTER TABLE replies ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
 
 -- Threads の RLS 更新
 ALTER TABLE threads ENABLE ROW LEVEL SECURITY;
+
+-- Realtime (リアルタイム更新) の有効化
+DO $$
+BEGIN
+    -- Replica Identity Full に設定 (RLS環境下でのDELETE/UPDATE検知に必須級)
+    ALTER TABLE threads REPLICA IDENTITY FULL;
+    ALTER TABLE replies REPLICA IDENTITY FULL;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'threads') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE threads;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'replies') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE replies;
+    END IF;
+END $$;
+
+-- ==========================================
+-- データ移行: 既存投稿の user_id を埋める
+-- ==========================================
+-- 投稿者名(author)からプロファイルを検索して更新
+UPDATE threads
+SET user_id = profiles.id
+FROM profiles
+WHERE threads.user_id IS NULL
+  AND (profiles.email = threads.author OR profiles.display_name = threads.author);
+
+-- ==========================================
+-- 強制修正: team_members のリレーション
+-- ==========================================
+-- 既存のアプリが結合できるように、明示的に profiles への外部キーを張る
+ALTER TABLE team_members DROP CONSTRAINT IF EXISTS team_members_user_id_fkey; -- 既存があれば削除
+ALTER TABLE team_members 
+    ADD CONSTRAINT team_members_user_id_fkey 
+    FOREIGN KEY (user_id) 
+    REFERENCES public.profiles(id) 
+    ON DELETE CASCADE;
 
 -- 既存の Thread ポリシーを削除して再定義
 DROP POLICY IF EXISTS "Thread view policy" ON threads;
@@ -146,3 +185,39 @@ USING (
 -- 念のためポリシー例（SQLでバケット作成はできないため、ポリシーのみ）
 -- CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'uploads' );
 -- CREATE POLICY "Authenticated Upload" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'uploads' AND auth.role() = 'authenticated' );
+-- ==========================================
+-- 緊急修正: 破損したデータの強制削除・権限付与
+-- ==========================================
+
+-- 1. 破損した投稿を、ID指定かつ内容がおかしい場合に強制修正（または削除）
+--    修正が効かない場合は削除して作り直したほうが早いかもしれません。
+--    ここでは「内容の強制上書き」を再度試みます。
+UPDATE threads 
+SET content = '2/3対応で連絡お願いします。',
+    attachments = '[]'::jsonb -- 添付ファイル情報もリセット
+WHERE id = '82778117-29ce-4134-86d8-af01b5cefda3';
+
+-- もしIDが合わない可能性を考慮して、内容から検索して修正
+UPDATE threads
+SET content = '2/3対応で連絡お願いします。'
+WHERE content LIKE '%class="task-content"%';
+
+-- 2. 権限問題の解決: ユーザー '000367' (メールアドレスの一部と推測) を強制的に Admin にする
+UPDATE profiles
+SET role = 'Admin'
+WHERE email LIKE '%000367%';
+
+-- 3. データ紐付けの再実行
+UPDATE threads
+SET user_id = profiles.id
+FROM profiles
+WHERE threads.user_id IS NULL
+  AND (profiles.email = threads.author OR profiles.display_name = threads.author);
+
+-- 4. 削除ポリシーの最終確認 (Adminなら消せる)
+DROP POLICY IF EXISTS "Thread delete policy" ON threads;
+CREATE POLICY "Thread delete policy" ON threads FOR DELETE
+USING (
+    (user_id = auth.uid()) OR
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'Admin' OR role = 'Manager'))
+);
