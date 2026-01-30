@@ -97,11 +97,16 @@ const mentionListEl = document.getElementById('mention-list');
 const prefAvatarInput = document.getElementById('pref-avatar-input');
 const prefAvatarPreview = document.getElementById('pref-avatar-preview');
 
-// --- New Features Elements ---
 const whitelistEmailInp = document.getElementById('whitelist-email-inp');
 const addWhitelistBtn = document.getElementById('add-whitelist-btn');
 const adminWhitelistList = document.getElementById('admin-whitelist-list');
 const teamsSidebarEl = document.getElementById('teams-sidebar');
+const teamsListEl = document.getElementById('teams-list');
+const secondarySidebarEl = document.getElementById('secondary-sidebar');
+const channelListEl = document.getElementById('channel-list');
+const currentTeamNameSidebar = document.getElementById('current-team-name-sidebar');
+const sidePanelEl = document.querySelector('.side-panel');
+
 const btnAddTeam = document.getElementById('btn-add-team');
 const teamModal = document.getElementById('team-modal');
 const newTeamNameInp = document.getElementById('new-team-name');
@@ -2187,3 +2192,39 @@ window.removeTeamMember = async (teamId, userId) => {
         renderTeamMembers(teamId);
     }
 };
+
+// --- Initialization & Event Listeners ---
+
+if (loginBtn) loginBtn.onclick = handleLogin;
+if (signupBtn) signupBtn.onclick = handleSignup;
+if (microsoftLoginBtn) {
+    microsoftLoginBtn.onclick = async () => {
+        const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: 'azure',
+            options: {
+                scopes: 'openid profile email User.Read',
+                redirectTo: window.location.origin
+            }
+        });
+        if (error) alert("Microsoftログインエラー: " + error.message);
+    };
+}
+if (logoutBtn) logoutBtn.onclick = handleLogout;
+
+btnAddTeam.onclick = () => {
+    modalOverlay.style.display = 'block';
+    teamModal.style.display = 'block';
+};
+
+saveTeamBtn.onclick = createTeam;
+
+modalOverlay.onclick = () => {
+    modalOverlay.style.display = 'none';
+    settingsModal.style.display = 'none';
+    adminModal.style.display = 'none';
+    teamModal.style.display = 'none';
+    teamManageModal.style.display = 'none';
+};
+
+// Start
+checkUser();
