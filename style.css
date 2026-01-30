@@ -1464,3 +1464,29 @@ html {
 html {
     scroll-behavior: smooth;
 }
+
+/* --- Text Utilities --- */
+.sidebar-title {
+    font-size: 0.85rem;
+    /* Slightly larger/bolder title */
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+    max-height: 2.6em;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 10.5px;
+    /* Distinctly smaller content */
+    margin-top: 0;
+}
