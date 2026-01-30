@@ -595,6 +595,8 @@ header {
     color: var(--text-main);
     padding: 10px 14px;
     border-radius: 8px;
+    font-size: 0.95rem;
+    /* Unified font size */
     outline: none;
     transition: border-color 0.2s, background 0.2s;
 }
