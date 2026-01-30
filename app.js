@@ -1785,45 +1785,6 @@ settingsBtn.onclick = () => {
     adminModal.style.display = 'none';
 };
 
-adminBtn.onclick = () => {
-    modalOverlay.style.display = 'flex';
-    adminModal.style.display = 'block';
-    settingsModal.style.display = 'none';
-    if (teamModal) teamModal.style.display = 'none';
-
-    // Refresh admin data
-    loadMasterData();
-    fetchWhitelist();
-};
-
-if (btnAddTeam) {
-    btnAddTeam.onclick = () => {
-        modalOverlay.style.display = 'flex';
-        teamModal.style.display = 'block';
-        adminModal.style.display = 'none';
-        settingsModal.style.display = 'none';
-    };
-}
-
-// --- Microsoft Login Logic ---
-
-async function handleMicrosoftLogin() {
-    try {
-        const { error } = await supabaseClient.auth.signInWithOAuth({
-            provider: 'azure',
-            options: {
-                scopes: 'email profile User.Read',
-                redirectTo: window.location.origin + window.location.pathname
-            }
-        });
-        if (error) throw error;
-    } catch (error) {
-        authErrorEl.textContent = "Microsoftログインエラー: " + error.message;
-        authErrorEl.style.display = 'block';
-    }
-}
-
-
 // --- Event Listeners ---
 loginBtn.onclick = handleLogin;
 signupBtn.onclick = handleSignup;
@@ -1856,6 +1817,7 @@ if (btnAddTeam) {
         teamModal.style.display = 'block';
         adminModal.style.display = 'none';
         settingsModal.style.display = 'none';
+        if (teamManageModal) teamManageModal.style.display = 'none';
     }
 }
 
@@ -1922,6 +1884,20 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 if (addTagBtn) addTagBtn.onclick = window.addTag;
+
+// --- Interaction Logic (Admin Btn) ---
+// Defined after DOM elements are confirmed loaded
+adminBtn.onclick = () => {
+    modalOverlay.style.display = 'flex';
+    adminModal.style.display = 'block';
+    settingsModal.style.display = 'none';
+    if (teamModal) teamModal.style.display = 'none';
+    if (teamManageModal) teamManageModal.style.display = 'none';
+
+    // Refresh admin data
+    loadMasterData();
+    fetchWhitelist();
+};
 
 // --- Expand/Collapse Content ---
 // Defined at top but safety check here
