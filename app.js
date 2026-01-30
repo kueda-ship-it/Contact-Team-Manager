@@ -217,6 +217,7 @@ async function fetchTeams() {
     if (data) {
         allTeams = data;
         renderTeamsSidebar();
+        renderSecondarySidebar(); // Sync secondary sidebar with allTeams data
     }
 }
 
@@ -244,14 +245,22 @@ function renderTeamsSidebar() {
 
 window.switchGlobalNav = function (nav) {
     currentGlobalNav = nav;
+    currentTeamId = null; // Reset team selection when switching global nav
     document.querySelectorAll('.teams-sidebar .team-icon').forEach(icon => {
         icon.classList.toggle('active', icon.id === `nav-${nav}`);
     });
+    renderTeamsSidebar(); // Update team icons active state
     renderSecondarySidebar();
+    renderThreads();
 };
 
 window.switchTeam = function (teamId) {
     currentTeamId = teamId;
+    currentGlobalNav = 'teams';
+    // Hide active state from nav-teams icon
+    const navTeams = document.getElementById('nav-teams');
+    if (navTeams) navTeams.classList.remove('active');
+
     renderTeamsSidebar();
     renderSecondarySidebar();
     renderThreads();
@@ -264,10 +273,10 @@ function renderSecondarySidebar() {
     const team = allTeams.find(t => t.id === currentTeamId);
     currentTeamNameSidebar.textContent = team ? team.name : 'すべてのスレッド';
 
-    const createItem = (label, filterValue, icon = '') => {
+    const createItem = (label, filterValue, icon = '', count = null) => {
         const div = document.createElement('div');
         div.className = `channel-item ${feedFilter === filterValue ? 'active' : ''}`;
-        div.innerHTML = `<span>${icon}</span> <span>${label}</span>`;
+        div.innerHTML = `<span>${icon}</span> <span style="flex:1">${label}</span> ${count !== null ? `<span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">${count}</span>` : ''}`;
         div.onclick = () => {
             feedFilter = filterValue;
             renderSecondarySidebar();
@@ -276,9 +285,28 @@ function renderSecondarySidebar() {
         return div;
     };
 
+    const pendingCount = threads.filter(t => t.status === 'pending' && (!currentTeamId || t.team_id === currentTeamId)).length;
+    const myName = currentProfile.display_name || currentUser.email;
+    const myTagIds = allTagMembers.filter(m => m.profile_id === currentProfile.id).map(m => m.tag_id);
+    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => t.name);
+
+    const hasMention = (content) => {
+        if (!content) return false;
+        const mentions = content.match(/@\S+/g) || [];
+        return mentions.some(m => {
+            const name = m.substring(1);
+            return name === myName || myTagNames.includes(name);
+        });
+    };
+
+    const assignedCount = threads.filter(t => {
+        if (t.status === 'completed') return false;
+        if (currentTeamId && t.team_id !== currentTeamId) return false;
+        if (hasMention(t.content)) return true;
+        return (t.replies || []).some(r => hasMention(r.content));
+    }).length;
+
     channelListEl.appendChild(createItem('すべて', 'all', '#'));
-    channelListEl.appendChild(createItem('未完了スレッド', 'pending', '#'));
-    channelListEl.appendChild(createItem('自分宛メンション', 'assigned', '@'));
 
     if (team) {
         const isOwner = team.created_by === currentUser.id || currentProfile.role === 'Admin';
@@ -291,7 +319,7 @@ function renderSecondarySidebar() {
 
             const settingsItem = document.createElement('div');
             settingsItem.className = 'channel-item';
-            settingsItem.innerHTML = '⚙️ チーム設定';
+            settingsItem.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> チーム設定`;
             settingsItem.onclick = () => window.openTeamSettings();
             channelListEl.appendChild(settingsItem);
         }
@@ -322,13 +350,8 @@ async function createTeam() {
     fetchTeams();
 }
 
-// --- Team Member Management ---
-
 window.openTeamSettings = async function () {
     if (!currentTeamId) return;
-
-    // Check if user is owner or admin (Optional implementation, currently allowing any member to view)
-    // You might want to restrict 'add/remove' to owners only.
 
     modalOverlay.style.display = 'flex';
     teamManageModal.style.display = 'block';
@@ -336,7 +359,70 @@ window.openTeamSettings = async function () {
     settingsModal.style.display = 'none';
     if (teamModal) teamModal.style.display = 'none';
 
+    // Show current team info in modal
+    const team = allTeams.find(t => t.id === currentTeamId);
+    const modalTitle = teamManageModal.querySelector('h2');
+    if (modalTitle) modalTitle.textContent = `${team.name} 管理`;
+
+    const avatarPreview = document.getElementById('team-avatar-preview');
+    if (avatarPreview) {
+        if (team.avatar_url) {
+            avatarPreview.innerHTML = `<img src="${team.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+        } else {
+            avatarPreview.textContent = team.name[0].toUpperCase();
+        }
+    }
+
     fetchTeamMembers(currentTeamId);
+};
+
+window.closeTeamManageModal = function () {
+    teamManageModal.style.display = 'none';
+    modalOverlay.style.display = 'none';
+};
+
+window.handleTeamAvatarSelect = async function (event) {
+    const file = event.target.files[0];
+    if (!file || !currentTeamId) return;
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `team-avatars/${fileName}`;
+
+    try {
+        const { error: uploadError } = await supabaseClient.storage
+            .from('avatars')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabaseClient.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+
+        const { error: updateError } = await supabaseClient
+            .from('teams')
+            .update({ avatar_url: publicUrl })
+            .eq('id', currentTeamId);
+
+        if (updateError) throw updateError;
+
+        // Update local state
+        const team = allTeams.find(t => t.id === currentTeamId);
+        if (team) team.avatar_url = publicUrl;
+
+        // UI Feedback
+        const avatarPreview = document.getElementById('team-avatar-preview');
+        if (avatarPreview) {
+            avatarPreview.innerHTML = `<img src="${publicUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+        }
+        renderTeamsSidebar();
+        renderSecondarySidebar();
+
+    } catch (e) {
+        console.error("Avatar upload error:", e);
+        alert("アバター更新失敗: " + e.message);
+    }
 };
 
 async function fetchTeamMembers(teamId) {
@@ -403,6 +489,18 @@ async function fetchTeamMembers(teamId) {
 
 window.updateTeamMemberRole = async function (userId, newRole) {
     if (!currentTeamId) return;
+
+    // Check if the current user has permission (Team Owner or Overall Admin)
+    const team = allTeams.find(t => t.id === currentTeamId);
+    const isOwner = team && team.created_by === currentUser.id;
+    const isAdmin = currentProfile.role === 'Admin';
+
+    if (!isOwner && !isAdmin) {
+        alert("権限がありません（所有者または全体管理者のみ変更可能です）");
+        fetchTeamMembers(currentTeamId);
+        return;
+    }
+
     const { error } = await supabaseClient
         .from('team_members')
         .update({ role: newRole })
@@ -1340,24 +1438,22 @@ function renderThreads() {
         }, 50);
     });
 
-    // サイドバーの描画 (Not Finished)
-    const getPlainText = (html) => {
+    sidebarListEl.innerHTML = '';
+    assignedSidebarListEl.innerHTML = '';
+
+    // --- Right Sidebar Rendering (Not Finished / Mentions) ---
+    const getPlainTextForSidebar = (html) => {
         const tmp = document.createElement('div');
         tmp.innerHTML = html || '';
         return tmp.textContent || tmp.innerText || '';
     };
 
+    const pendingThreads = threads.filter(t => t.status === 'pending').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     pendingThreads.forEach(thread => {
         const item = document.createElement('div');
         item.className = 'sidebar-item';
-
-        // メンションの抽出 (Ensure variable is defined)
-        const mentions = (thread.content || "").match(/@\S+/g) || [];
-        const uniqueMentions = [...new Set(mentions)].join(' ');
-        const plainContent = getPlainText(thread.content);
-        // Re-highlight mentions in the plain text snippet
+        const plainContent = getPlainTextForSidebar(thread.content);
         const styledContent = highlightMentions(escapeHtml(plainContent));
-
         const authorName = thread.author_name || thread.author || 'Unknown';
         item.innerHTML = `
             <div class="sidebar-title">${escapeHtml(thread.title)}</div>
@@ -1369,23 +1465,37 @@ function renderThreads() {
         `;
         item.onclick = () => {
             const target = document.getElementById(`thread-${thread.id}`);
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
         sidebarListEl.appendChild(item);
     });
 
-    // Assigned to Me の描画
+    const myName = currentProfile.display_name || currentUser.email;
+    const myTagIds = allTagMembers.filter(m => m.profile_id === currentProfile.id).map(m => m.tag_id);
+    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => t.name);
+
+    const hasMentionForSidebar = (content) => {
+        if (!content) return false;
+        const mentions = content.match(/@\S+/g) || [];
+        return mentions.some(m => {
+            const name = m.substring(1);
+            return name === myName || myTagNames.includes(name);
+        });
+    };
+
+    const assignedThreads = threads.filter(t => {
+        if (t.status === 'completed') return false;
+        if (hasMentionForSidebar(t.content)) return true;
+        return (t.replies || []).some(r => hasMentionForSidebar(r.content));
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
     assignedThreads.forEach(thread => {
         const item = document.createElement('div');
         item.className = 'sidebar-item personalized-sidebar-item';
         item.style.borderLeft = '3px solid var(--accent)';
-
         const authorName = thread.author_name || thread.author || 'Unknown';
-        const plainContent = getPlainText(thread.content);
+        const plainContent = getPlainTextForSidebar(thread.content);
         const styledContent = highlightMentions(escapeHtml(plainContent));
-
         item.innerHTML = `
             <div class="sidebar-title">${escapeHtml(thread.title)}</div>
             <div class="line-clamp-2">${styledContent}</div>
@@ -1396,9 +1506,7 @@ function renderThreads() {
         `;
         item.onclick = () => {
             const target = document.getElementById(`thread-${thread.id}`);
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
         assignedSidebarListEl.appendChild(item);
     });

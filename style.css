@@ -1580,4 +1580,52 @@ html {
 .btn-revert {
     background: var(--primary-light) !important;
     color: var(--bg-dark) !important;
+}/* --- Side Panel (Right) --- */
+.side-panel {
+    width: 300px;
+    background: transparent;
+    display: flex !important;
+    flex-direction: column;
+    gap: 20px;
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    height: calc(100vh - 80px);
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.side-panel-section {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.side-panel-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary-light);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 8px;
+}
+
+/* Settings Icon Enhancement */
+.btn-outline[title="繝√・繝險ｭ螳・],
+.btn-outline[title="險ｭ螳・],
+#admin-btn {
+    color: #4bf2ad !important;
+    /* Bright Mint */
+    opacity: 0.85;
+}
+
+.btn-outline[title="繝√・繝險ｭ螳・]:hover,
+.btn-outline[title="險ｭ螳・]:hover,
+#admin-btn:hover {
+    opacity: 1;
+    background: rgba(75, 242, 173, 0.1);
+    transform: rotate(30deg);
 }
