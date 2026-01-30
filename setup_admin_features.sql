@@ -52,3 +52,15 @@ CREATE POLICY "Everyone can read tag_members" ON tag_members FOR SELECT USING (a
 -- 3-2. タグメンバー: 管理は Admin/Manager のみ
 CREATE POLICY "Admin manage tag_members" ON tag_members FOR ALL
 USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'Admin' OR role = 'Manager' OR role = 'admin' OR role = 'manager')));
+
+
+-- ==========================================
+-- 2024-01-30 追加: 添付ファイル用カラム
+-- ==========================================
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE replies ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
+
+-- Storage バケット 'uploads' は Supabase のダッシュボードから作成してください。
+-- 公開ポリシー (Public) に設定するか、以下のポリシーを参考に設定してください。
+-- CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'uploads' );
+-- CREATE POLICY "Authenticated Upload" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'uploads' AND auth.role() = 'authenticated' );

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 連絡概要マネージャー - Supabase リアルタイム版
  * Phase 3: 高度な権限管理・表示名・リアクション (Admin, Manager, User, Viewer)
  */
@@ -60,7 +60,10 @@ const taskCountEl = document.getElementById('task-count');
 const addThreadSection = document.getElementById('add-thread-section'); // UI制御用
 const addThreadBtn = document.getElementById('add-thread-btn');
 const newTitleInp = document.getElementById('new-title');
-const newContentInp = document.getElementById('new-content');
+const newContentInp = document.getElementById('new-content'); // Now contenteditable div
+const fileInput = document.getElementById('file-input');
+const attachFileBtn = document.getElementById('attach-file-btn');
+const attachmentPreviewArea = document.getElementById('attachment-preview-area');
 const globalSearchInp = document.getElementById('global-search');
 const filterStatus = document.getElementById('filter-status'); // This might be null if not in HTML
 window.filterThreads = function (value) {
@@ -100,6 +103,11 @@ const btnAddTeam = document.getElementById('btn-add-team');
 const teamModal = document.getElementById('team-modal');
 const newTeamNameInp = document.getElementById('new-team-name');
 const saveTeamBtn = document.getElementById('save-team-btn');
+
+// --- Team Management Elements ---
+const teamManageModal = document.getElementById('team-manage-modal');
+const teamMemberEmailInp = document.getElementById('team-member-email');
+const teamMemberList = document.getElementById('team-member-list');
 
 // --- Auth & Profile ---
 
@@ -267,6 +275,117 @@ async function createTeam() {
     fetchTeams();
 }
 
+// --- Team Member Management ---
+
+window.openTeamSettings = async function () {
+    if (!currentTeamId) return;
+
+    // Check if user is owner or admin (Optional implementation, currently allowing any member to view)
+    // You might want to restrict 'add/remove' to owners only.
+
+    modalOverlay.style.display = 'flex';
+    teamManageModal.style.display = 'block';
+    adminModal.style.display = 'none';
+    settingsModal.style.display = 'none';
+    if (teamModal) teamModal.style.display = 'none';
+
+    fetchTeamMembers(currentTeamId);
+};
+
+async function fetchTeamMembers(teamId) {
+    teamMemberList.innerHTML = '<tr><td colspan="2">読み込み中...</td></tr>';
+
+    // Get team members
+    const { data: members, error } = await supabaseClient
+        .from('team_members')
+        .select(`
+            user_id,
+            added_at,
+            profiles:user_id (email, display_name, avatar_url)
+        `)
+        .eq('team_id', teamId);
+
+    if (error) {
+        teamMemberList.innerHTML = `<tr><td colspan="2" style="color:var(--danger)">エラー: ${error.message}</td></tr>`;
+        return;
+    }
+
+    if (members.length === 0) {
+        teamMemberList.innerHTML = '<tr><td colspan="2">メンバーがいません</td></tr>';
+        return;
+    }
+
+    teamMemberList.innerHTML = members.map(m => {
+        const p = m.profiles;
+        const name = p ? (p.display_name || p.email) : '不明なユーザー';
+        const email = p ? p.email : '';
+        const isMe = currentUser && currentUser.id === m.user_id;
+
+        return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 10px;">
+                    <div style="font-weight:bold;">${escapeHtml(name)}</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(email)}</div>
+                </td>
+                <td style="padding: 10px;">
+                    ${!isMe ? `<button class="btn btn-sm" style="background:var(--danger);" onclick="window.removeTeamMember('${m.user_id}')">削除</button>` : '<span style="font-size:0.8rem; color:var(--text-muted);">自分</span>'}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.addTeamMember = async function () {
+    const email = teamMemberEmailInp.value.trim();
+    if (!email || !currentTeamId) return;
+
+    // Find user ID by email
+    const { data: user, error: userError } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+    if (userError || !user) {
+        alert("ユーザーが見つかりません。正確なメールアドレスを入力してください。");
+        return;
+    }
+
+    // Add to team_members
+    const { error: insertError } = await supabaseClient
+        .from('team_members')
+        .insert([{ team_id: currentTeamId, user_id: user.id }]);
+
+    if (insertError) {
+        // Unique constraint violation usually means already added
+        if (insertError.code === '23505') {
+            alert("すでにメンバーに追加されています。");
+        } else {
+            alert("追加に失敗しました: " + insertError.message);
+        }
+    } else {
+        teamMemberEmailInp.value = '';
+        fetchTeamMembers(currentTeamId);
+    }
+};
+
+window.removeTeamMember = async function (userId) {
+    if (!currentTeamId) return;
+    if (!confirm("このメンバーをチームから削除しますか？")) return;
+
+    const { error } = await supabaseClient
+        .from('team_members')
+        .delete()
+        .eq('team_id', currentTeamId)
+        .eq('user_id', userId);
+
+    if (error) {
+        alert("削除に失敗しました: " + error.message);
+    } else {
+        fetchTeamMembers(currentTeamId);
+    }
+};
+
 function handleAuthState() {
     // ヘッダーのユーザー情報更新
     userDisplayEl.textContent = currentProfile.display_name || currentUser.email;
@@ -394,6 +513,7 @@ async function handleLogout() {
 }
 
 // --- Notification Logic ---
+
 
 function requestNotificationPermission() {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -707,7 +827,7 @@ async function loadData() {
 
 async function addThread() {
     const title = newTitleInp.value.trim();
-    const content = newContentInp.value.trim();
+    const content = newContentInp.innerText.trim(); // Use innerText for contenteditable
 
     if (currentProfile.role === 'Viewer') return alert("閲覧専用権限（Viewer）のため、投稿できません。");
     if (!title || !content) return alert("タイトルと内容を入力してください。");
@@ -718,30 +838,46 @@ async function addThread() {
     const { error } = await supabaseClient.from('threads').insert([
         {
             title,
-            content,
+            content: newContentInp.innerHTML, // Save HTML to preserve mention styling
             author: authorName,
-            team_id: currentTeamId
+            team_id: currentTeamId,
+            attachments: currentAttachments // Add attachments
         }
     ]);
     if (error) {
         alert("投稿失敗: " + error.message);
     } else {
         newTitleInp.value = '';
-        newContentInp.value = '';
+        newContentInp.innerHTML = ''; // Clear HTML
+        currentAttachments = []; // Clear attachments
+        renderAttachmentPreview();
     }
     addThreadBtn.disabled = false;
 }
 
 window.addReply = async function (threadId) {
     const input = document.getElementById(`reply-input-${threadId}`);
-    const content = input.value.trim();
+    const content = input.innerText.trim();
     if (!content || currentProfile.role === 'Viewer') return;
     const authorName = currentProfile.display_name || currentUser.email;
-    const { error } = await supabaseClient.from('replies').insert([{ thread_id: threadId, content, author: authorName }]);
+
+    // Attachments for this thread's reply
+    const atts = replyAttachments[threadId] || [];
+
+    const { error } = await supabaseClient.from('replies').insert([{
+        thread_id: threadId,
+        content: input.innerHTML,
+        author: authorName,
+        attachments: atts
+    }]);
+
     if (error) {
         alert("返信失敗: " + error.message);
     } else {
-        input.value = '';
+        input.innerHTML = '';
+        replyAttachments[threadId] = []; // Clear
+        renderReplyAttachmentPreview(threadId);
+
         // Scroll to bottom after adding a reply
         setTimeout(() => {
             const scrollArea = document.querySelector(`#thread-${threadId} .reply-scroll-area`);
@@ -752,6 +888,7 @@ window.addReply = async function (threadId) {
     }
 }
 
+
 window.toggleStatus = async function (threadId) {
     if (currentProfile.role === 'Viewer') return;
     const thread = threads.find(t => t.id === threadId);
@@ -759,18 +896,39 @@ window.toggleStatus = async function (threadId) {
 
     // --- Optimistic Update ---
     const originalStatus = thread.status;
+    const originalCompletedBy = thread.completed_by; // Keep backup
+    const originalCompletedAt = thread.completed_at;
+
     thread.status = thread.status === 'completed' ? 'pending' : 'completed';
 
+    // Update local state for immediate UI feedback
     if (thread.status === 'completed') {
+        thread.completed_by = currentUser.id;
+        thread.completed_at = new Date().toISOString();
         showCompleteEffect(threadId);
+    } else {
+        thread.completed_by = null;
+        thread.completed_at = null;
     }
 
     renderThreads();
     // -------------------------
 
-    const { error } = await supabaseClient.from('threads').update({ status: thread.status }).eq('id', threadId);
+    const updatePayload = { status: thread.status };
+    if (thread.status === 'completed') {
+        updatePayload.completed_by = currentUser.id;
+        updatePayload.completed_at = new Date().toISOString();
+    } else {
+        updatePayload.completed_by = null;
+        updatePayload.completed_at = null;
+    }
+
+    const { error } = await supabaseClient.from('threads').update(updatePayload).eq('id', threadId);
     if (error) {
+        // Revert on error
         thread.status = originalStatus;
+        thread.completed_by = originalCompletedBy;
+        thread.completed_at = originalCompletedAt;
         renderThreads();
         alert("更新に失敗しました。");
     }
@@ -883,9 +1041,16 @@ function renderThreads() {
     if (taskCountEl) taskCountEl.textContent = feedThreads.length;
 
     // List Sticky Header
+    const currentTeamName = currentTeamId
+        ? (allTeams.find(t => t.id === currentTeamId)?.name || 'Team')
+        : 'List';
+
     threadListEl.innerHTML = `
         <div class="feed-header-sticky">
-            <h2 style="font-size: 1.2rem; font-weight: 700;">List <span id="task-count-sticky" style="color: var(--primary-light); margin-left:10px;">${feedThreads.length}</span> 件</h2>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <h2 style="font-size: 1.2rem; font-weight: 700;">${escapeHtml(currentTeamName)} <span id="task-count-sticky" style="color: var(--primary-light); margin-left:10px;">${feedThreads.length}</span> 件</h2>
+                ${currentTeamId ? `<button class="btn btn-sm btn-outline" onclick="window.openTeamSettings()" title="チーム設定">⚙️</button>` : ''}
+            </div>
             <div style="display: flex; gap: 8px; align-items: center;">
                 <select id="filter-status-sticky" class="input-field" style="width: auto; padding: 2px 10px; font-size: 0.8rem;" onchange="filterThreads(this.value)">
                     <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>すべて表示</option>
@@ -964,6 +1129,18 @@ function renderThreads() {
             const isReplyOwner = reply.author === (currentProfile.display_name || currentUser.email);
             const canDeleteReply = isReplyOwner || ['Admin', 'Manager'].includes(currentProfile.role);
 
+            // 添付ファイルの描画
+            let attachmentsHtml = '';
+            if (reply.attachments && reply.attachments.length > 0) {
+                attachmentsHtml = `<div class="attachment-display">` + reply.attachments.map(att => {
+                    if (att.type.startsWith('image/')) {
+                        return `<img src="${att.url}" class="attachment-thumb-large" onclick="window.open('${att.url}', '_blank')">`;
+                    } else {
+                        return `<a href="${att.url}" target="_blank" class="file-link"><span style="font-size:1.2em;">📄</span> ${att.name}</a>`;
+                    }
+                }).join('') + `</div>`;
+            }
+
             return `
             <div class="reply-item" style="position: relative;">
                 <div class="dot-menu-container" style="top: 2px; right: 2px; transform: scale(0.8);">
@@ -981,6 +1158,7 @@ function renderThreads() {
             </div>
             <div class="reply-header"><span>${reply.author}</span><span>${new Date(reply.created_at).toLocaleString()}</span></div>
             <div class="reply-content" id="reply-content-${reply.id}">${highlightMentions(reply.content)}</div>
+            ${attachmentsHtml}
                 
                 <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
                     <div class="reaction-bar" style="font-size: 0.8em;">${replyReactionsHtml}</div>
@@ -1002,6 +1180,15 @@ function renderThreads() {
         const canDelete = isOwner || ['Admin', 'Manager'].includes(currentProfile.role);
         // 編集は本人のみ
         const canEdit = isOwner;
+
+        // 完了者情報の取得
+        let completerName = '';
+        if (thread.status === 'completed' && thread.completed_by) {
+            const completer = allProfiles.find(p => p.id === thread.completed_by);
+            if (completer) {
+                completerName = completer.display_name || completer.email;
+            }
+        }
 
         card.innerHTML = `
             ${thread.is_pinned ? '<div class="pinned-badge">重要</div>' : ''}
@@ -1036,12 +1223,25 @@ function renderThreads() {
             <div class="task-title-line" id="title-${thread.id}">${thread.title}</div>
             <div class="task-content" id="content-${thread.id}" style="white-space: pre-wrap;">${highlightMentions(thread.content)}</div>
             
+            ${(() => {
+                if (thread.attachments && thread.attachments.length > 0) {
+                    return `<div class="attachment-display">` + thread.attachments.map(att => {
+                        if (att.type.startsWith('image/')) {
+                            return `<img src="${att.url}" class="attachment-thumb-large" onclick="window.open('${att.url}', '_blank')">`;
+                        } else {
+                            return `<a href="${att.url}" target="_blank" class="file-link"><span style="font-size:1.2em;">📄</span> ${att.name}</a>`;
+                        }
+                    }).join('') + `</div>`;
+                }
+                return '';
+            })()}
+
             <div class="reaction-container-bottom">
                 <div class="plus-trigger">+</div>
                 <div class="reaction-menu">
                     ${reactionTypes.map(emoji =>
-            `<span onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji}</span>`
-        ).join('')}
+                `<span onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji}</span>`
+            ).join('')}
                 </div>
             </div>
 
@@ -1049,9 +1249,15 @@ function renderThreads() {
                     <div class="reply-scroll-area">${repliesHtml}</div>
                     ${(currentProfile.role !== 'Viewer' && thread.status !== 'completed') ? `
                     <div class="reply-form" style="position:relative; display: flex; align-items: center; gap: 4px;">
-                        <input type="text" id="reply-input-${thread.id}" class="input-field btn-sm" placeholder="返信 (メンションは@を入力)..." 
-                               style="flex: 1;"
-                               oninput="handleReplyInput(this, '${thread.id}')">
+                        <div id="reply-input-${thread.id}" contenteditable="true" class="input-field btn-sm rich-editor" placeholder="返信 (メンションは@を入力)..." 
+                               style="flex: 1; max-height: 80px;"
+                               oninput="handleReplyInput(this, '${thread.id}')"></div>
+                        <button class="btn-sm btn-outline" onclick="triggerReplyFile('${thread.id}')" title="ファイル添付" style="padding: 4px 8px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                            </svg>
+                            <input type="file" id="reply-file-${thread.id}" style="display:none;" multiple onchange="handleReplyFileSelect(this, '${thread.id}')">
+                        </button>
                         <button class="btn-send-reply" onclick="addReply('${thread.id}')" title="返信">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -1059,7 +1265,9 @@ function renderThreads() {
                             </svg>
                         </button>
                         <div id="mention-list-${thread.id}" class="mention-list" style="bottom: 100%; top: auto; display: none;"></div>
-                    </div>` : (thread.status === 'completed' ? '' : '')}
+                    </div>
+                    <div id="reply-attachment-preview-${thread.id}" class="attachment-preview-area" style="padding-left: 10px;"></div>`
+                : (thread.status === 'completed' ? '' : '')}
                 </div>
 
 
@@ -1067,7 +1275,10 @@ function renderThreads() {
                 <div class="reaction-bar">
                     ${reactionsHtml}
                 </div>
-                <div class="actions">
+                <div class="actions" style="display: flex; align-items: center; gap: 10px;">
+                    ${thread.status === 'completed' && completerName ?
+                `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
+                : ''}
                     ${currentProfile.role !== 'Viewer' ? `
                     <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
                     ` : ''}
@@ -1236,21 +1447,22 @@ function showMentionSuggestions(query, isThread = true, threadId = null) {
     }
 
     let html = '';
-    html += filteredProfiles.map(p => `
-        <div class="mention-item" onclick="insertMention('${p.display_name || p.email}', ${isThread}, '${threadId}')">
+    html += filteredProfiles.map((p, index) => `
+        <div class="mention-item" onmousedown="event.preventDefault()" onclick="selectMentionCandidate(${index}, ${isThread}, '${threadId}')">
             <div class="avatar">${p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : (p.display_name || p.email)[0].toUpperCase()}</div>
             <div class="mention-info">
-                <span class="mention-name">${p.display_name || 'No Name'}</span>
-                <span class="mention-email">${p.email}</span>
+                <span class="mention-name">${escapeHtml(p.display_name || 'No Name')}</span>
+                <span class="mention-email">${escapeHtml(p.email)}</span>
             </div>
         </div>
     `).join('');
 
-    html += filteredTags.map(t => `
-        <div class="mention-item" onclick="insertMention('${t.name}', ${isThread}, '${threadId}')">
+    const profileCount = filteredProfiles.length;
+    html += filteredTags.map((t, index) => `
+        <div class="mention-item" onmousedown="event.preventDefault()" onclick="selectMentionCandidate(${profileCount + index}, ${isThread}, '${threadId}')">
             <div class="avatar tag-avatar">#</div>
             <div class="mention-info">
-                <span class="mention-name">${t.name}</span>
+                <span class="mention-name">${escapeHtml(t.name)}</span>
                 <span class="mention-email">タグ</span>
             </div>
         </div>
@@ -1299,42 +1511,260 @@ function handleMentionKeydown(e, isThread, threadId = null) {
     }
 }
 
+// --- Rich Text & File Attachment Helpers ---
+
+let currentAttachments = [];
+let replyAttachments = {}; // threadId -> [files]
+
+// --- Thread Attachments ---
+
+if (attachFileBtn) {
+    attachFileBtn.onclick = () => fileInput.click();
+}
+
+if (fileInput) {
+    fileInput.onchange = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        for (const file of files) {
+            try {
+                const uploaded = await uploadFile(file);
+                if (uploaded) {
+                    currentAttachments.push(uploaded);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("アップロード失敗: " + file.name);
+            }
+        }
+        renderAttachmentPreview();
+        fileInput.value = ''; // Reset
+    };
+}
+
+async function uploadFile(file) {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `${currentUser.id}/${fileName}`;
+
+    const { data, error } = await supabaseClient.storage.from('uploads').upload(filePath, file);
+    if (error) throw error;
+
+    const { data: publicUrlData } = supabaseClient.storage.from('uploads').getPublicUrl(filePath);
+
+    return {
+        name: file.name,
+        path: filePath,
+        url: publicUrlData.publicUrl,
+        type: file.type,
+        size: file.size
+    };
+}
+
+function renderAttachmentPreview() {
+    if (!attachmentPreviewArea) return;
+    attachmentPreviewArea.innerHTML = currentAttachments.map((att, index) => `
+        <div class="attachment-item">
+            ${att.type.startsWith('image/') ? `<img src="${att.url}">` : '<span class="file-icon">📄</span>'}
+            <div class="attachment-remove" onclick="removeAttachment(${index})">×</div>
+        </div>
+    `).join('');
+}
+
+window.removeAttachment = function (index) {
+    currentAttachments.splice(index, 1);
+    renderAttachmentPreview();
+};
+
+// --- Reply Attachments ---
+
+window.triggerReplyFile = function (threadId) {
+    const inp = document.getElementById(`reply-file-${threadId}`);
+    if (inp) inp.click();
+};
+
+window.handleReplyFileSelect = async function (inp, threadId) {
+    const files = Array.from(inp.files);
+    if (files.length === 0) return;
+
+    if (!replyAttachments[threadId]) replyAttachments[threadId] = [];
+
+    for (const file of files) {
+        try {
+            const uploaded = await uploadFile(file);
+            if (uploaded) {
+                replyAttachments[threadId].push(uploaded);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("アップロード失敗: " + file.name);
+        }
+    }
+    renderReplyAttachmentPreview(threadId);
+    inp.value = '';
+};
+
+function renderReplyAttachmentPreview(threadId) {
+    const area = document.getElementById(`reply-attachment-preview-${threadId}`);
+    if (!area) return;
+    const atts = replyAttachments[threadId] || [];
+    area.innerHTML = atts.map((att, index) => `
+        <div class="attachment-item">
+            ${att.type.startsWith('image/') ? `<img src="${att.url}">` : '<span class="file-icon">📄</span>'}
+            <div class="attachment-remove" onclick="removeReplyAttachment('${threadId}', ${index})">×</div>
+        </div>
+    `).join('');
+}
+
+window.removeReplyAttachment = function (threadId, index) {
+    if (replyAttachments[threadId]) {
+        replyAttachments[threadId].splice(index, 1);
+        renderReplyAttachmentPreview(threadId);
+    }
+};
+
+// --- Rich Text Logic ---
+
+// New helper to handle selection by index
+window.selectMentionCandidate = function (index, isThread, threadId) {
+    if (index >= 0 && index < currentMentionCandidates.length) {
+        const candidate = currentMentionCandidates[index];
+        const name = candidate.display_name || candidate.email || candidate.name;
+        insertMention(name, isThread, threadId);
+    }
+};
+
 function insertMention(name, isThread, threadId = null) {
     const input = isThread ? newContentInp : document.getElementById(`reply-input-${threadId}`);
     if (!input) return;
 
-    const text = input.value;
-    const cursor = input.selectionStart;
-    const lastAt = text.lastIndexOf('@', cursor - 1);
+    input.focus();
 
-    if (lastAt !== -1) {
-        input.value = text.slice(0, lastAt) + '@' + name + ' ' + text.slice(cursor);
-        input.focus();
-        const newPos = lastAt + name.length + 2;
-        input.setSelectionRange(newPos, newPos);
+    // Unified contenteditable handling
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+
+    const textNode = range.startContainer;
+    if (textNode.nodeType === Node.TEXT_NODE) {
+        const text = textNode.textContent;
+        const cursor = range.startOffset;
+        const lastAt = text.lastIndexOf('@', cursor - 1);
+
+        if (lastAt !== -1) {
+            const before = text.slice(0, lastAt);
+            const after = text.slice(cursor);
+
+            const beforeNode = document.createTextNode(before);
+            const spacerNode = document.createTextNode('\u200B'); // Zero-width space for backspace handling
+            const mentionSpan = document.createElement('span');
+            mentionSpan.className = 'mention';
+            mentionSpan.contentEditable = "false";
+            mentionSpan.textContent = '@' + name;
+            const spaceNode = document.createTextNode('\u00A0');
+            const afterNode = document.createTextNode(after);
+
+            const parent = textNode.parentNode;
+            parent.insertBefore(beforeNode, textNode);
+            parent.insertBefore(spacerNode, textNode); // Insert Zero-width space
+            parent.insertBefore(mentionSpan, textNode);
+            parent.insertBefore(spaceNode, textNode);
+            parent.insertBefore(afterNode, textNode);
+            parent.removeChild(textNode);
+
+            const newRange = document.createRange();
+            newRange.setStart(spaceNode, 1);
+            newRange.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+        }
+    } else {
+        const spacerNode = document.createTextNode('\u200B');
+        input.appendChild(spacerNode);
+        const mentionSpan = document.createElement('span');
+        mentionSpan.className = 'mention';
+        mentionSpan.contentEditable = "false";
+        mentionSpan.textContent = '@' + name;
+        input.appendChild(mentionSpan);
+        const spaceNode = document.createTextNode('\u00A0');
+        input.appendChild(spaceNode);
+
+        const newRange = document.createRange();
+        newRange.setStart(spaceNode, 1);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
     }
 
     if (isThread) mentionListEl.style.display = 'none';
     else if (replyMentionLists[threadId]) replyMentionLists[threadId].style.display = 'none';
 }
 
+// Contenteditable Input Event
 newContentInp.addEventListener('input', (e) => {
-    const text = e.target.value;
-    const cursor = e.target.selectionStart;
-    const lastAt = text.lastIndexOf('@', cursor - 1);
+    // For contenteditable, we must find the cursor position in text nodes
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    const node = range.startContainer;
 
-    if (lastAt !== -1 && !text.slice(lastAt, cursor).includes(' ')) {
-        const query = text.slice(lastAt + 1, cursor);
-        showMentionSuggestions(query, true);
+    // Check if we are in a text node
+    if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent;
+        const cursor = range.startOffset;
+        const lastAt = text.lastIndexOf('@', cursor - 1);
+
+        // Simple check: @ exists and no spaces between @ and cursor
+        if (lastAt !== -1 && !text.slice(lastAt, cursor).includes(' ')) {
+            const query = text.slice(lastAt + 1, cursor);
+            showMentionSuggestions(query, true);
+
+            // Re-position mention list logic if needed (optional)
+        } else {
+            mentionListEl.style.display = 'none';
+            mentionSelectedIndex = -1;
+        }
     } else {
         mentionListEl.style.display = 'none';
-        mentionSelectedIndex = -1;
     }
 });
 
 newContentInp.addEventListener('keydown', (e) => {
     handleMentionKeydown(e, true);
 });
+
+// Unified Reply Input handler (now contenteditable)
+window.handleReplyInput = function (el, threadId) {
+    // For contenteditable, check text node
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    const node = range.startContainer;
+
+    if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent;
+        const cursor = range.startOffset;
+        const lastAt = text.lastIndexOf('@', cursor - 1);
+
+        if (lastAt !== -1 && !text.slice(lastAt, cursor).includes(' ')) {
+            const query = text.slice(lastAt + 1, cursor);
+            showMentionSuggestions(query, false, threadId);
+        } else {
+            if (replyMentionLists[threadId]) replyMentionLists[threadId].style.display = 'none';
+            mentionSelectedIndex = -1;
+        }
+    } else {
+        if (replyMentionLists[threadId]) replyMentionLists[threadId].style.display = 'none';
+    }
+
+    if (!el.hasMentionListener) {
+        el.addEventListener('keydown', (e) => handleMentionKeydown(e, false, threadId));
+        el.hasMentionListener = true;
+    }
+};
+
+
 
 // --- Interaction Logic ---
 
@@ -1494,19 +1924,22 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 if (addTagBtn) addTagBtn.onclick = window.addTag;
 
 // --- Expand/Collapse Content ---
-window.toggleExpand = function (id) {
-    const content = document.getElementById('expand-' + id);
-    const btn = document.getElementById('btn-' + id);
-    if (!content || !btn) return;
+// Defined at top but safety check here
+if (!window.toggleExpand) {
+    window.toggleExpand = function (id) {
+        const content = document.getElementById('expand-' + id);
+        const btn = document.getElementById('btn-' + id);
+        if (!content || !btn) return;
 
-    if (content.classList.contains('is-expanded')) {
-        content.classList.remove('is-expanded');
-        btn.textContent = '詳細を表示';
-    } else {
-        content.classList.add('is-expanded');
-        btn.textContent = '表示を閉じる';
-    }
-};
+        if (content.classList.contains('is-expanded')) {
+            content.classList.remove('is-expanded');
+            btn.textContent = '詳細を表示';
+        } else {
+            content.classList.add('is-expanded');
+            btn.textContent = '表示を閉じる';
+        }
+    };
+}
 
 // --- Initialization ---
 
@@ -1534,19 +1967,3 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-
-window.handleReplyInput = function (el, threadId) {
-    const val = el.value;
-    const atPos = val.lastIndexOf('@');
-    if (atPos !== -1) {
-        showMentionSuggestions(val.slice(atPos + 1), false, threadId);
-    } else {
-        if (replyMentionLists[threadId]) replyMentionLists[threadId].style.display = 'none';
-        mentionSelectedIndex = -1;
-    }
-
-    if (!el.hasMentionListener) {
-        el.addEventListener('keydown', (e) => handleMentionKeydown(e, false, threadId));
-        el.hasMentionListener = true;
-    }
-};

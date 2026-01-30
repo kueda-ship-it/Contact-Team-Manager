@@ -148,19 +148,32 @@
                                 <input type="text" id="new-title" class="input-field" placeholder="件名..."
                                     style="margin-top: 10px !important;">
                                 <div style="position: relative; margin-top: 10px !important;">
-                                    <textarea id="new-content" class="input-field" placeholder="内容... @メンション"
-                                        style="margin-top: 0 !important;"></textarea>
+                                    <div id="new-content" contenteditable="true" class="input-field rich-editor"
+                                        placeholder="内容... @メンション" style="margin-top: 0 !important;"></div>
+                                    <div id="attachment-preview-area" class="attachment-preview-area"></div>
                                     <div id="mention-list" class="mention-list"
                                         style="bottom: 100%; top: auto; display: none;"></div>
                                 </div>
                             </div>
-                            <button id="add-thread-btn" class="btn btn-primary" style="position: relative; top: -10px;">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white"
-                                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                </svg>
-                            </button>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <button id="attach-file-btn" class="btn btn-outline"
+                                    style="position: relative; padding: 6px 10px;" title="ファイルを添付">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path
+                                            d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48">
+                                        </path>
+                                    </svg>
+                                    <input type="file" id="file-input" style="display: none;" multiple>
+                                </button>
+                                <button id="add-thread-btn" class="btn btn-primary" style="position: relative;">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white"
+                                        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </section>
                 </div>
@@ -275,6 +288,39 @@
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 2rem;">
                 <button class="btn btn-close-modal">キャンセル</button>
                 <button id="save-team-btn" class="btn btn-primary">作成</button>
+            </div>
+        </div>
+
+        <!-- Team Manage Modal -->
+        <div id="team-manage-modal" class="modal" style="max-width: 600px;">
+            <h3>チームメンバー管理</h3>
+            <div
+                style="margin-top: 1rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">メンバーを追加</h4>
+                <div style="display: flex; gap: 10px;">
+                    <input type="email" id="team-member-email" class="input-field" placeholder="メールアドレスを入力"
+                        style="margin-bottom: 0;">
+                    <button class="btn btn-primary" onclick="window.addTeamMember()">追加</button>
+                </div>
+            </div>
+            <div>
+                <h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">参加メンバー</h4>
+                <div class="admin-table-container" style="max-height: 300px; overflow-y: auto;">
+                    <table class="admin-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                <th style="padding: 8px;">名前/メール</th>
+                                <th style="padding: 8px; width: 80px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="team-member-list">
+                            <!-- Injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
+                <button class="btn btn-close-modal">閉じる</button>
             </div>
         </div>
     </div>
