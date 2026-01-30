@@ -655,11 +655,14 @@ textarea.input-field {
     background: rgba(255, 255, 255, 0.03);
     border: none;
     border-radius: 8px;
-    padding: 10px 14px;
+    padding: 8px 10px;
+    /* Reduced padding for top-left alignment */
     color: var(--text-main);
     outline: none;
     white-space: pre-wrap;
     word-break: break-word;
+    line-height: 1.4;
+    /* Ensure good line height */
 }
 
 .rich-editor:focus {
