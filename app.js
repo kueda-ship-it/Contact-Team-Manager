@@ -840,6 +840,7 @@ async function addThread() {
             title,
             content: newContentInp.innerHTML, // Save HTML to preserve mention styling
             author: authorName,
+            user_id: currentUser.id, // Explicitly link to auth user
             team_id: currentTeamId,
             attachments: currentAttachments // Add attachments
         }

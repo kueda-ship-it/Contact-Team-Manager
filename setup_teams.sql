@@ -61,10 +61,56 @@ USING (
 --   または、INSERT トリガーで自動追加するか。
 --   Teams-api の実装では、チーム作成後に insert しているので、ここでは「チーム作成者」権限も加味します。
 
+DROP POLICY IF EXISTS "Creator can manage members" ON team_members;
 CREATE POLICY "Creator can manage members" ON team_members FOR ALL
 USING (
     auth.role() = 'authenticated' AND
     EXISTS (SELECT 1 FROM teams WHERE id = team_members.team_id AND created_by = auth.uid())
+);
+
+
+-- ==========================================
+-- 2024-01-30 追加: Threads テーブルへのチーム連携とユーザー紐付け
+-- ==========================================
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+
+-- Threads の RLS 更新
+ALTER TABLE threads ENABLE ROW LEVEL SECURITY;
+
+-- 既存の Thread ポリシーを削除して再定義
+DROP POLICY IF EXISTS "Thread view policy" ON threads;
+DROP POLICY IF EXISTS "Thread insert policy" ON threads;
+DROP POLICY IF EXISTS "Thread update policy" ON threads;
+DROP POLICY IF EXISTS "Thread delete policy" ON threads;
+
+-- 1. 閲覧: 
+--    a) チームに紐付かない(team_id IS NULL) -> 全員
+--    b) チームに紐付く -> そのチームのメンバー または 投稿者(user_id)
+CREATE POLICY "Thread view policy" ON threads FOR SELECT
+USING (
+    (team_id IS NULL) OR 
+    (EXISTS (SELECT 1 FROM team_members WHERE team_id = threads.team_id AND user_id = auth.uid())) OR
+    (auth.uid() = user_id)
+);
+
+-- 2. 投稿: ログインユーザーならOK
+CREATE POLICY "Thread insert policy" ON threads FOR INSERT
+WITH CHECK (auth.role() = 'authenticated');
+
+-- 3. 更新/削除: 自分の投稿(user_id) または Admin/Manager
+CREATE POLICY "Thread update policy" ON threads FOR UPDATE
+USING (
+    (user_id = auth.uid()) OR
+    (auth.uid() = (SELECT id FROM profiles WHERE email = author OR display_name = author LIMIT 1)) OR 
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'Admin' OR role = 'Manager'))
+);
+
+CREATE POLICY "Thread delete policy" ON threads FOR DELETE
+USING (
+    (user_id = auth.uid()) OR
+    (auth.uid() = (SELECT id FROM profiles WHERE email = author OR display_name = author LIMIT 1)) OR 
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'Admin' OR role = 'Manager'))
 );
 
 
