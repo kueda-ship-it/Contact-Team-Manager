@@ -6,11 +6,15 @@ CREATE TABLE IF NOT EXISTS teams (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     icon_color TEXT DEFAULT '#313338',
+    avatar_url TEXT, -- Added for team icons
     created_by UUID REFERENCES auth.users(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. チームメンバーテーブル (ここが重要: user_id と profiles のリレーション)
+-- 既存テーブルへのカラム追加
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
+-- 2. チームメンバーテーブル
 CREATE TABLE IF NOT EXISTS team_members (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,

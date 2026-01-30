@@ -40,6 +40,9 @@ let allTeams = [];
 let whitelist = [];
 let allReactions = [];
 let currentSortOrder = 'asc'; // 'asc' = oldest activity first, 'desc' = newest activity first
+let currentGlobalNav = 'teams'; // 'teams', 'activity', etc.
+let feedFilter = 'all'; // 'all', 'pending', 'assigned' (custom filter within team)
+
 
 // --- UI Elements ---
 const authContainer = document.getElementById('auth-container');
@@ -98,7 +101,7 @@ const prefAvatarPreview = document.getElementById('pref-avatar-preview');
 const whitelistEmailInp = document.getElementById('whitelist-email-inp');
 const addWhitelistBtn = document.getElementById('add-whitelist-btn');
 const adminWhitelistList = document.getElementById('admin-whitelist-list');
-const teamsListEl = document.getElementById('teams-list');
+const teamsSidebarEl = document.getElementById('teams-sidebar');
 const btnAddTeam = document.getElementById('btn-add-team');
 const teamModal = document.getElementById('team-modal');
 const newTeamNameInp = document.getElementById('new-team-name');
@@ -132,11 +135,8 @@ async function fetchProfile(user) {
 }
 
 async function fetchThreads() {
-    let query = supabaseClient.from('threads').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
-
-    if (currentTeamId) {
-        query = query.eq('team_id', currentTeamId);
-    }
+    // 常に全スレッドを取得するように変更（チーム切り替え時の状態保持のため）
+    const query = supabaseClient.from('threads').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
 
     const { data, error } = await query;
     return data || [];
@@ -216,40 +216,82 @@ async function fetchTeams() {
 }
 
 function renderTeamsSidebar() {
+    if (!teamsListEl) return;
     teamsListEl.innerHTML = '';
-    // Add "All Teams" option
-    const allTeamsDiv = document.createElement('div');
-    allTeamsDiv.className = `team-icon ${currentTeamId === null ? 'active' : ''}`;
-    allTeamsDiv.title = 'すべてのチーム';
-    allTeamsDiv.style.backgroundColor = '#313338';
-    allTeamsDiv.innerHTML = 'ALL';
-    allTeamsDiv.onclick = () => switchTeam(null);
-    teamsListEl.appendChild(allTeamsDiv);
 
     allTeams.forEach(team => {
         const div = document.createElement('div');
         div.className = `team-icon ${currentTeamId === team.id ? 'active' : ''}`;
         div.title = team.name;
-        div.style.backgroundColor = team.icon_color || '#313338';
-        div.innerHTML = team.name.charAt(0).toUpperCase();
+
+        if (team.avatar_url) {
+            div.innerHTML = `<img src="${team.avatar_url}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+            div.style.backgroundColor = 'transparent';
+        } else {
+            div.style.backgroundColor = team.icon_color || '#313338';
+            div.innerHTML = team.name.charAt(0).toUpperCase();
+        }
+
         div.onclick = () => switchTeam(team.id);
         teamsListEl.appendChild(div);
     });
 }
 
+window.switchGlobalNav = function (nav) {
+    currentGlobalNav = nav;
+    document.querySelectorAll('.teams-sidebar .team-icon').forEach(icon => {
+        icon.classList.toggle('active', icon.id === `nav-${nav}`);
+    });
+    renderSecondarySidebar();
+};
+
 window.switchTeam = function (teamId) {
     currentTeamId = teamId;
-    // Update active state in sidebar
-    document.querySelectorAll('.team-icon').forEach(icon => icon.classList.remove('active'));
-    if (teamId === null) {
-        document.querySelector('.teams-sidebar .team-icon:first-child').classList.add('active');
-    } else {
-        // Find the specific team icon and add active class
-        const teamIcon = Array.from(teamsListEl.children).find(el => el.title === allTeams.find(t => t.id === teamId)?.name);
-        if (teamIcon) teamIcon.classList.add('active');
-    }
-    loadData(); // Re-fetch threads for the selected team
+    renderTeamsSidebar();
+    renderSecondarySidebar();
+    renderThreads();
 };
+
+function renderSecondarySidebar() {
+    if (!channelListEl) return;
+    channelListEl.innerHTML = '';
+
+    const team = allTeams.find(t => t.id === currentTeamId);
+    currentTeamNameSidebar.textContent = team ? team.name : 'すべてのスレッド';
+
+    const createItem = (label, filterValue, icon = '') => {
+        const div = document.createElement('div');
+        div.className = `channel-item ${feedFilter === filterValue ? 'active' : ''}`;
+        div.innerHTML = `<span>${icon}</span> <span>${label}</span>`;
+        div.onclick = () => {
+            feedFilter = filterValue;
+            renderSecondarySidebar();
+            renderThreads();
+        };
+        return div;
+    };
+
+    channelListEl.appendChild(createItem('すべて', 'all', '#'));
+    channelListEl.appendChild(createItem('未完了スレッド', 'pending', '#'));
+    channelListEl.appendChild(createItem('自分宛メンション', 'assigned', '@'));
+
+    if (team) {
+        const isOwner = team.created_by === currentUser.id || currentProfile.role === 'Admin';
+        if (isOwner) {
+            const divider = document.createElement('div');
+            divider.style.height = '1px';
+            divider.style.background = 'rgba(255,255,255,0.05)';
+            divider.style.margin = '12px 16px';
+            channelListEl.appendChild(divider);
+
+            const settingsItem = document.createElement('div');
+            settingsItem.className = 'channel-item';
+            settingsItem.innerHTML = '⚙️ チーム設定';
+            settingsItem.onclick = () => window.openTeamSettings();
+            channelListEl.appendChild(settingsItem);
+        }
+    }
+}
 
 async function createTeam() {
     const name = newTeamNameInp.value.trim();
@@ -976,11 +1018,39 @@ function renderThreads() {
         return latest;
     };
 
+    const myName = currentProfile.display_name || currentUser.email;
+    const myTagIds = allTagMembers.filter(m => m.profile_id === currentProfile.id).map(m => m.tag_id);
+    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => t.name);
+
+    const hasMention = (content) => {
+        if (!content) return false;
+        const mentions = content.match(/@\S+/g) || [];
+        return mentions.some(m => {
+            const name = m.substring(1);
+            return name === myName || myTagNames.includes(name);
+        });
+    };
+
     let feedThreads = [...threads].sort((a, b) => {
         const timeA = getLatestActivity(a);
         const timeB = getLatestActivity(b);
         return currentSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
-    }).filter(t => (filter === 'all' || t.status === filter));
+    }).filter(t => {
+        // Status Filter (Top Select)
+        if (filter !== 'all' && t.status !== filter) return false;
+
+        // Sidebar Navigation Filter (feedFilter)
+        if (feedFilter === 'pending') {
+            return t.status === 'pending';
+        }
+        if (feedFilter === 'assigned') {
+            if (t.status === 'completed') return false;
+            if (hasMention(t.content)) return true;
+            return (t.replies || []).some(r => hasMention(r.content));
+        }
+        return true; // feedFilter === 'all'
+    });
+
 
     if (searchQuery) {
         feedThreads = feedThreads.filter(t =>
