@@ -297,10 +297,13 @@
             <div
                 style="margin-top: 1rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
                 <h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">メンバーを追加</h4>
-                <div style="display: flex; gap: 10px;">
-                    <input type="email" id="team-member-email" class="input-field" placeholder="メールアドレスを入力"
-                        style="margin-bottom: 0;">
-                    <button class="btn btn-primary" onclick="window.addTeamMember()">追加</button>
+                <div style="display: flex; gap: 10px; position: relative;">
+                    <div style="flex: 1; position: relative;">
+                        <input type="text" id="team-member-input" class="input-field" placeholder="名前またはメールアドレスを入力"
+                            style="margin-bottom: 0;" autocomplete="off">
+                        <div id="team-member-suggestions" class="mention-list"
+                            style="top: 100%; bottom: auto; display: none; max-height: 200px; overflow-y: auto;"></div>
+                    </div>
                 </div>
             </div>
             <div>
@@ -310,7 +313,8 @@
                         <thead>
                             <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1);">
                                 <th style="padding: 8px;">名前/メール</th>
-                                <th style="padding: 8px; width: 80px;">操作</th>
+                                <th style="padding: 8px; width: 100px;">ロール</th>
+                                <th style="padding: 8px; width: 60px;">操作</th>
                             </tr>
                         </thead>
                         <tbody id="team-member-list">

@@ -14,10 +14,15 @@ CREATE TABLE IF NOT EXISTS teams (
 CREATE TABLE IF NOT EXISTS team_members (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE, -- これで profiles と結合可能になります
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    role TEXT DEFAULT 'member', -- 'owner', 'admin', 'member', 'viewer' など
     added_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(team_id, user_id)
 );
+
+-- 既存テーブルへのカラム追加（IF NOT EXISTSが効かない場合用）
+ALTER TABLE team_members ADD COLUMN IF NOT EXISTS added_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE team_members ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'member';
 
 -- 3. RLS (Row Level Security) の設定
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
@@ -54,10 +59,16 @@ DROP POLICY IF EXISTS "Member manage access" ON team_members;
 DROP POLICY IF EXISTS "Member add access" ON team_members;
 DROP POLICY IF EXISTS "Member delete access" ON team_members;
 
--- 追加・削除は「そのチームのメンバー」なら可能
+-- 追加・削除・更新は「そのチームのメンバー」なら可能
 -- (SELECTには適用しないことで無限再帰を防ぐ)
 CREATE POLICY "Member add access" ON team_members FOR INSERT
 WITH CHECK (
+    auth.role() = 'authenticated' AND
+    EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.team_id = team_members.team_id AND tm.user_id = auth.uid())
+);
+
+CREATE POLICY "Member update access" ON team_members FOR UPDATE
+USING (
     auth.role() = 'authenticated' AND
     EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.team_id = team_members.team_id AND tm.user_id = auth.uid())
 );

@@ -301,17 +301,18 @@ async function fetchTeamMembers(teamId) {
         .select(`
             user_id,
             added_at,
+            role,
             profiles:user_id (email, display_name, avatar_url)
         `)
         .eq('team_id', teamId);
 
     if (error) {
-        teamMemberList.innerHTML = `<tr><td colspan="2" style="color:var(--danger)">エラー: ${error.message}</td></tr>`;
+        teamMemberList.innerHTML = `<tr><td colspan="3" style="color:var(--danger)">エラー: ${error.message}</td></tr>`;
         return;
     }
 
     if (members.length === 0) {
-        teamMemberList.innerHTML = '<tr><td colspan="2">メンバーがいません</td></tr>';
+        teamMemberList.innerHTML = '<tr><td colspan="3">メンバーがいません</td></tr>';
         return;
     }
 
@@ -320,12 +321,30 @@ async function fetchTeamMembers(teamId) {
         const name = p ? (p.display_name || p.email) : '不明なユーザー';
         const email = p ? p.email : '';
         const isMe = currentUser && currentUser.id === m.user_id;
+        const currentRole = m.role || 'member';
+
+        const roles = [
+            { val: 'owner', label: '所有者' },
+            { val: 'admin', label: '管理者' },
+            { val: 'member', label: 'メンバー' },
+            { val: 'viewer', label: '閲覧のみ' }
+        ];
+
+        const roleSelect = `
+            <select class="input-field btn-sm" style="width:auto; padding: 2px 4px;" 
+                onchange="window.updateTeamMemberRole('${m.user_id}', this.value)" ${isMe ? 'disabled' : ''}>
+                ${roles.map(r => `<option value="${r.val}" ${currentRole === r.val ? 'selected' : ''}>${r.label}</option>`).join('')}
+            </select>
+        `;
 
         return `
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <td style="padding: 10px;">
                     <div style="font-weight:bold;">${escapeHtml(name)}</div>
                     <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(email)}</div>
+                </td>
+                <td style="padding: 10px;">
+                    ${isMe ? `<span style="font-size:0.8rem;">${roles.find(r => r.val === currentRole)?.label || currentRole}</span>` : roleSelect}
                 </td>
                 <td style="padding: 10px;">
                     ${!isMe ? `<button class="btn btn-sm" style="background:var(--danger);" onclick="window.removeTeamMember('${m.user_id}')">削除</button>` : '<span style="font-size:0.8rem; color:var(--text-muted);">自分</span>'}
@@ -335,36 +354,121 @@ async function fetchTeamMembers(teamId) {
     }).join('');
 }
 
+window.updateTeamMemberRole = async function (userId, newRole) {
+    if (!currentTeamId) return;
+    const { error } = await supabaseClient
+        .from('team_members')
+        .update({ role: newRole })
+        .eq('team_id', currentTeamId)
+        .eq('user_id', userId);
+
+    if (error) {
+        alert("権限変更失敗: " + error.message);
+        fetchTeamMembers(currentTeamId); // Revert UI
+    }
+};
+
+// --- Add Member Autocomplete Logic ---
+const teamMemberInput = document.getElementById('team-member-input');
+const teamMemberSuggestions = document.getElementById('team-member-suggestions');
+let selectedMemberCandidate = null;
+
+if (teamMemberInput) {
+    teamMemberInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        selectedMemberCandidate = null;
+
+        if (!query) {
+            teamMemberSuggestions.style.display = 'none';
+            return;
+        }
+
+        // Filter profiles excluding those already in the list (handled loosely here, can be stricter)
+        // Need to know current members? For now just show all profiles matching.
+        // Ideally we filter out those who are already members.
+        // We can fetch current members IDs from the rendered list or fetch them properly.
+        // For simplicity, just search allProfiles.
+        const matches = allProfiles.filter(p => {
+            const name = (p.display_name || '').toLowerCase();
+            const mail = (p.email || '').toLowerCase();
+            return name.includes(query) || mail.includes(query);
+        }).slice(0, 10);
+
+        if (matches.length === 0) {
+            teamMemberSuggestions.style.display = 'none';
+            return;
+        }
+
+        teamMemberSuggestions.innerHTML = matches.map(p => `
+            <div class="mention-candidate" onclick="selectMemberCandidate('${p.id}', '${escapeHtml(p.display_name || p.email)}')">
+                <div style="font-weight:bold;">${escapeHtml(p.display_name || 'No Name')}</div>
+                <div style="font-size:0.7em; color:#888;">${escapeHtml(p.email)}</div>
+            </div>
+        `).join('');
+        teamMemberSuggestions.style.display = 'block';
+    });
+
+    // Close suggestions on click outside
+    document.addEventListener('click', (e) => {
+        if (!teamMemberInput.contains(e.target) && !teamMemberSuggestions.contains(e.target)) {
+            teamMemberSuggestions.style.display = 'none';
+        }
+    });
+
+    // Allow Enter key to commit if exact match or selected (simplified: just try exact email match if Enter)
+    teamMemberInput.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter') {
+            await window.addTeamMember();
+        }
+    });
+}
+
+window.selectMemberCandidate = function (id, name) {
+    selectedMemberCandidate = id;
+    teamMemberInput.value = name; // Update input for visual confirmation
+    teamMemberSuggestions.style.display = 'none';
+    window.addTeamMember(); // Auto add on select? or wait for button? Let's auto add for smooth UX or just fill.
+    // User requested "Like mention", usually that means select -> fill -> enter/add.
+    // Let's call add directly for speed.
+};
+
 window.addTeamMember = async function () {
-    const email = teamMemberEmailInp.value.trim();
-    if (!email || !currentTeamId) return;
+    const inputVal = teamMemberInput.value.trim();
+    if (!inputVal || !currentTeamId) return;
 
-    // Find user ID by email
-    const { data: user, error: userError } = await supabaseClient
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .single();
+    let targetUserId = selectedMemberCandidate;
 
-    if (userError || !user) {
-        alert("ユーザーが見つかりません。正確なメールアドレスを入力してください。");
+    // If no candidate selected from list, try to find by exact email
+    if (!targetUserId) {
+        // Local search first
+        const p = allProfiles.find(p => p.email === inputVal);
+        if (p) {
+            targetUserId = p.id;
+        } else {
+            // DB search fallback
+            const { data: user } = await supabaseClient.from('profiles').select('id').eq('email', inputVal).single();
+            if (user) targetUserId = user.id;
+        }
+    }
+
+    if (!targetUserId) {
+        alert("ユーザーが見つかりません。リストから選択するか、正確なメールアドレスを入力してください。");
         return;
     }
 
-    // Add to team_members
-    const { error: insertError } = await supabaseClient
+    const { error } = await supabaseClient
         .from('team_members')
-        .insert([{ team_id: currentTeamId, user_id: user.id }]);
+        .insert([{ team_id: currentTeamId, user_id: targetUserId }]);
 
-    if (insertError) {
-        // Unique constraint violation usually means already added
-        if (insertError.code === '23505') {
+    if (error) {
+        if (error.code === '23505') {
             alert("すでにメンバーに追加されています。");
         } else {
-            alert("追加に失敗しました: " + insertError.message);
+            alert("追加失敗: " + error.message);
         }
     } else {
-        teamMemberEmailInp.value = '';
+        teamMemberInput.value = '';
+        selectedMemberCandidate = null;
         fetchTeamMembers(currentTeamId);
     }
 };
