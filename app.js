@@ -1147,14 +1147,16 @@ function renderThreads() {
 
         // Sidebar Navigation Filter (feedFilter)
         if (feedFilter === 'pending') {
-            return t.status === 'pending';
+            return t.status === 'pending' && (!currentTeamId || t.team_id === currentTeamId);
         }
         if (feedFilter === 'assigned') {
             if (t.status === 'completed') return false;
-            if (hasMention(t.content)) return true;
-            return (t.replies || []).some(r => hasMention(r.content));
+            const match = hasMention(t.content) || (t.replies || []).some(r => hasMention(r.content));
+            return match && (!currentTeamId || t.team_id === currentTeamId);
         }
-        return true; // feedFilter === 'all'
+
+        // Default: filter by currentTeamId if selected
+        return !currentTeamId || t.team_id === currentTeamId;
     });
 
 
@@ -1178,21 +1180,29 @@ function renderThreads() {
 
     threadListEl.innerHTML = `
         <div class="feed-header-sticky">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <h2 style="font-size: 1.2rem; font-weight: 700;">${escapeHtml(currentTeamName)} <span id="task-count-sticky" style="color: var(--primary-light); margin-left:10px;">${feedThreads.length}</span> 件</h2>
-                ${currentTeamId ? `<button class="btn btn-sm btn-outline" onclick="window.openTeamSettings()" title="チーム設定">
+            <div class="feed-header-left">
+                <select id="filter-status-sticky" class="input-field" style="width: auto; padding: 2px 10px; font-size: 0.8rem;" onchange="filterThreads(this.value)">
+                    <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>すべて表示</option>
+                    <option value="pending" ${currentFilter === 'pending' ? 'selected' : ''}>未完了</option>
+                    <option value="completed" ${currentFilter === 'completed' ? 'selected' : ''}>完了済み</option>
+                </select>
+            </div>
+            
+            <div class="feed-header-center">
+                <h2 style="font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    ${escapeHtml(currentTeamName)} 
+                    <span id="task-count-sticky" style="color: var(--primary-light); font-size: 0.9rem; font-weight: normal;">${feedThreads.length} 件</span>
+                </h2>
+                ${currentTeamId ? `
+                <button class="btn btn-sm btn-outline btn-icon-only gear-btn-unified" onclick="window.openTeamSettings()" title="チーム設定" style="margin-left: 8px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
                 </button>` : ''}
             </div>
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <select id="filter-status-sticky" class="input-field" style="width: auto; padding: 2px 10px; font-size: 0.8rem;" onchange="filterThreads(this.value)">
-                    <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>すべて表示</option>
-                    <option value="pending" ${currentFilter === 'pending' ? 'selected' : ''}>未完了</option>
-                    <option value="completed" ${currentFilter === 'completed' ? 'selected' : ''}>完了済み</option>
-                </select>
+
+            <div class="feed-header-right">
                 <button class="btn-sort-toggle" onclick="toggleSortOrder()" title="並び替え順を切り替え">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="7 15 12 20 17 15"></polyline>

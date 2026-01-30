@@ -234,18 +234,50 @@ header {
 .feed-header-sticky {
     position: sticky;
     top: 50px;
-    background: var(--bg-dark);
-    z-index: 100;
-    padding: 15px 0;
-    margin-bottom: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    display: flex;
-    justify-content: space-between;
+    z-index: 1001;
+    /* Higher than task dots to prevent overlap on scroll */
+    background: var(--bg-main);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    width: 900px;
-    /* Locked absolute width for stability */
-    box-sizing: border-box;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 15px;
 }
+
+.feed-header-left {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.feed-header-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.feed-header-right {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.gear-btn-unified {
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-light);
+    border-color: rgba(98, 100, 167, 0.3);
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.gear-btn-unified:hover {
+    background: rgba(98, 100, 167, 0.1);
+    transform: rotate(30deg);
+}
+
+
 
 .side-panel {
     position: sticky;
@@ -319,7 +351,7 @@ header {
 
 .is-pinned {
     box-shadow: 0 0 0 1.5px #FFD700;
-    /* 黄色の外枠 */
+    /* 鮟�牡縺ｮ螟匁棧 */
 }
 
 .task-header-meta {
@@ -1058,8 +1090,11 @@ html {
     position: absolute;
     top: 15px;
     right: 15px;
-    z-index: 1000;
+    cursor: pointer;
+    z-index: 10;
 }
+
+
 
 .dot-menu-trigger {
     width: 28px;
@@ -1103,20 +1138,20 @@ html {
     pointer-events: none;
 }
 
-/* 透明なブリッジ (Dot Menu) */
+/* 騾乗�縺ｪ繝悶Μ繝�ず (Dot Menu) */
 .dot-menu::before {
     content: '';
     position: absolute;
     bottom: 100%;
     right: 0;
     width: 60px;
-    /* トリガー周辺をカバー */
+    /* 繝医Μ繧ｬ繝ｼ蜻ｨ霎ｺ繧偵き繝舌� */
     height: 20px;
-    /* 隙間を埋める */
+    /* 髫咎俣繧貞沂繧√ｋ */
     background: transparent;
 }
 
-/* コンテナにホバーまたはメニュー自体にホバーしたときに表示 */
+/* 繧ｳ繝ｳ繝�リ縺ｫ繝帙ヰ繝ｼ縺ｾ縺溘�繝｡繝九Η繝ｼ閾ｪ菴薙↓繝帙ヰ繝ｼ縺励◆縺ｨ縺阪↓陦ｨ遉ｺ */
 .dot-menu-container:hover .dot-menu,
 .dot-menu:hover {
     opacity: 1;
@@ -1230,7 +1265,7 @@ html {
     position: relative;
     width: fit-content;
     z-index: 20;
-    /* 表示優先度を上げる */
+    /* 陦ｨ遉ｺ蜆ｪ蜈亥ｺｦ繧剃ｸ翫￡繧� */
 }
 
 .reaction-container-bottom .plus-trigger {
@@ -1276,7 +1311,7 @@ html {
     width: max-content;
 }
 
-/* 透明なブリッジ (Reaction Menu) */
+/* 騾乗�縺ｪ繝悶Μ繝�ず (Reaction Menu) */
 .reaction-container-bottom .reaction-menu::before {
     content: '';
     position: absolute;
@@ -1284,11 +1319,11 @@ html {
     left: 0;
     width: 100%;
     height: 20px;
-    /* 隙間を埋める */
+    /* 髫咎俣繧貞沂繧√ｋ */
     background: transparent;
 }
 
-/* メニュー自体にホバーした場合も表示を維持 */
+/* 繝｡繝九Η繝ｼ閾ｪ菴薙↓繝帙ヰ繝ｼ縺励◆蝣ｴ蜷医ｂ陦ｨ遉ｺ繧堤ｶｭ謖� */
 .reaction-container-bottom:hover .reaction-menu,
 .reaction-container-bottom .reaction-menu:hover {
     opacity: 1;
@@ -1307,7 +1342,7 @@ html {
     align-items: center;
     justify-content: center;
     width: 36px;
-    /* 固定幅でクリックしやすく */
+    /* 蝗ｺ螳壼ｹ�〒繧ｯ繝ｪ繝�け縺励ｄ縺吶￥ */
     height: 36px;
     line-height: 1;
 }
@@ -1424,7 +1459,7 @@ html {
 }
 
 #add-thread-btn:active {
-    /* No animation per user request */
+    opacity: 0.8;
 }
 
 #add-thread-btn svg {
@@ -1580,7 +1615,9 @@ html {
 .btn-revert {
     background: var(--primary-light) !important;
     color: var(--bg-dark) !important;
-}/* --- Side Panel (Right) --- */
+}
+
+/* --- Side Panel (Right) --- */
 .side-panel {
     width: 300px;
     background: transparent;
@@ -1614,17 +1651,17 @@ html {
 }
 
 /* Settings Icon Enhancement */
-.btn-outline[title="チ�Eム設宁E],
-.btn-outline[title="設宁E],
-#admin-btn {
+.btn-outline[title="繝√・繝�險ｭ螳・],
+ .btn-outline[title="險ｭ螳・],
+ #admin-btn {
     color: #4bf2ad !important;
     /* Bright Mint */
     opacity: 0.85;
 }
 
-.btn-outline[title="チ�Eム設宁E]:hover,
-.btn-outline[title="設宁E]:hover,
-#admin-btn:hover {
+.btn-outline[title="繝√・繝�險ｭ螳・]:hover,
+ .btn-outline[title="險ｭ螳・]:hover,
+ #admin-btn:hover {
     opacity: 1;
     background: rgba(75, 242, 173, 0.1);
     transform: rotate(30deg);
