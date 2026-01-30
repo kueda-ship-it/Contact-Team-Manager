@@ -1786,6 +1786,24 @@ settingsBtn.onclick = () => {
     adminModal.style.display = 'none';
 };
 
+// --- Microsoft Login Logic ---
+
+async function handleMicrosoftLogin() {
+    try {
+        const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: 'azure',
+            options: {
+                scopes: 'email profile User.Read',
+                redirectTo: window.location.origin + window.location.pathname
+            }
+        });
+        if (error) throw error;
+    } catch (error) {
+        authErrorEl.textContent = "Microsoftログインエラー: " + error.message;
+        authErrorEl.style.display = 'block';
+    }
+}
+
 // --- Event Listeners ---
 loginBtn.onclick = handleLogin;
 signupBtn.onclick = handleSignup;
