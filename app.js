@@ -1325,7 +1325,7 @@ function renderThreads() {
         item.onclick = () => {
             const target = document.getElementById(`thread-${thread.id}`);
             if (target) {
-                const headerHeight = 100;
+                const headerHeight = 140;
                 const elementPosition = target.getBoundingClientRect().top;
                 const offsetPosition = elementPosition + window.pageYOffset - headerHeight;
                 window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
