@@ -1233,7 +1233,7 @@ function renderThreads() {
                 <div class="reply-section ${currentReplies.length === 0 ? 'is-empty' : ''}">
                     <div class="reply-scroll-area">${repliesHtml}</div>
                     ${(currentProfile.role !== 'Viewer' && thread.status !== 'completed') ? `
-                    <div class="reply-form" style="display: flex; gap: 10px; align-items: flex-start; margin-top: 10px;">
+                    <div class="reply-form" style="display: flex; gap: 15px; align-items: flex-start; margin-top: 10px;">
                         <div style="flex: 1; position: relative;">
                             <div id="reply-input-${thread.id}" contenteditable="true" class="input-field btn-sm rich-editor" placeholder="返信 (メンションは@を入力)..." 
                                    style="min-height: 80px; margin-top: 0;"
@@ -1241,16 +1241,16 @@ function renderThreads() {
                              <div id="mention-list-${thread.id}" class="mention-list" style="bottom: 100%; top: auto; display: none;"></div>
                              <div id="reply-attachment-preview-${thread.id}" class="attachment-preview-area" style="padding-left: 0; margin-top: 5px;"></div>
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 0px;">
+                        <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 0px;">
                              <button class="btn-sm btn-outline" onclick="triggerReplyFile('${thread.id}')" title="ファイル添付" 
-                                style="padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                                style="padding: 0; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
                                 </svg>
                                 <input type="file" id="reply-file-${thread.id}" style="display:none;" multiple onchange="handleReplyFileSelect(this, '${thread.id}')">
                             </button>
                             <button class="btn-send-reply" onclick="addReply('${thread.id}')" title="返信" 
-                                style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0;">
+                                style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; padding: 0;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="22" y1="2" x2="11" y2="13"></line>
                                     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -1325,10 +1325,7 @@ function renderThreads() {
         item.onclick = () => {
             const target = document.getElementById(`thread-${thread.id}`);
             if (target) {
-                const headerHeight = 140;
-                const elementPosition = target.getBoundingClientRect().top;
-                const offsetPosition = elementPosition + window.pageYOffset - headerHeight;
-                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         };
         sidebarListEl.appendChild(item);
@@ -1355,7 +1352,7 @@ function renderThreads() {
         item.onclick = () => {
             const target = document.getElementById(`thread-${thread.id}`);
             if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         };
         assignedSidebarListEl.appendChild(item);
