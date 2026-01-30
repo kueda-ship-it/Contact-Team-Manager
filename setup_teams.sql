@@ -50,19 +50,40 @@ USING (
 );
 
 -- D. メンバーの追加・削除: 
--- シンプルにするため、「そのチームのメンバーなら、他のメンバーを追加・削除できる」とします。
--- (より厳密にするなら、teams.created_by = auth.uid() のチェックなどを入れます)
-CREATE POLICY "Member manage access" ON team_members FOR ALL
+DROP POLICY IF EXISTS "Member manage access" ON team_members;
+DROP POLICY IF EXISTS "Member add access" ON team_members;
+DROP POLICY IF EXISTS "Member delete access" ON team_members;
+
+-- 追加・削除は「そのチームのメンバー」なら可能
+-- (SELECTには適用しないことで無限再帰を防ぐ)
+CREATE POLICY "Member add access" ON team_members FOR INSERT
+WITH CHECK (
+    auth.role() = 'authenticated' AND
+    EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.team_id = team_members.team_id AND tm.user_id = auth.uid())
+);
+
+CREATE POLICY "Member delete access" ON team_members FOR DELETE
 USING (
     auth.role() = 'authenticated' AND
-    EXISTS (SELECT 1 FROM team_members WHERE team_id = team_members.team_id AND user_id = auth.uid())
+    EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.team_id = team_members.team_id AND tm.user_id = auth.uid())
 );
+
 -- ※ 初回作成時は自分がまだメンバーにいないため、自分自身の追加は許可する特例が必要かもしれません。
 --   または、INSERT トリガーで自動追加するか。
 --   Teams-api の実装では、チーム作成後に insert しているので、ここでは「チーム作成者」権限も加味します。
 
 DROP POLICY IF EXISTS "Creator can manage members" ON team_members;
-CREATE POLICY "Creator can manage members" ON team_members FOR ALL
+DROP POLICY IF EXISTS "Creator add members" ON team_members;
+DROP POLICY IF EXISTS "Creator delete members" ON team_members;
+
+-- 作成者はメンバーを追加・削除できる (SELECTには適用しない)
+CREATE POLICY "Creator add members" ON team_members FOR INSERT
+WITH CHECK (
+    auth.role() = 'authenticated' AND
+    EXISTS (SELECT 1 FROM teams WHERE id = team_members.team_id AND created_by = auth.uid())
+);
+
+CREATE POLICY "Creator delete members" ON team_members FOR DELETE
 USING (
     auth.role() = 'authenticated' AND
     EXISTS (SELECT 1 FROM teams WHERE id = team_members.team_id AND created_by = auth.uid())
@@ -74,6 +95,8 @@ USING (
 -- ==========================================
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE replies ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
 
 -- Threads の RLS 更新
 ALTER TABLE threads ENABLE ROW LEVEL SECURITY;

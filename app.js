@@ -794,7 +794,7 @@ function subscribeToChanges() {
             const state = presenceChannel.presenceState();
             onlineUsers = new Set(Object.keys(state));
             renderThreads();
-            handleAuthState(); // ヘッダーの状態も同期
+            // handleAuthState(); // REMOVED: Caused infinite recursion loop
         })
         .subscribe(async (status) => {
             if (status === 'SUBSCRIBED') {
