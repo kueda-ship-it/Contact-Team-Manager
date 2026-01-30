@@ -129,7 +129,8 @@ header {
     display: flex;
     justify-content: flex-start;
     gap: 30px;
-    padding-bottom: 120px;
+    padding-bottom: 300px;
+    /* Increased to prevent overlap */
 }
 
 /* --- Teams Sidebar --- */

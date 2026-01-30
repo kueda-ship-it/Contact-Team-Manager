@@ -1353,26 +1353,35 @@ function renderThreads() {
                 <div class="reply-section ${currentReplies.length === 0 ? 'is-empty' : ''}">
                     <div class="reply-scroll-area">${repliesHtml}</div>
                     ${(currentProfile.role !== 'Viewer' && thread.status !== 'completed') ? `
-                    <div class="reply-form" style="position:relative; display: flex; align-items: center; gap: 4px;">
-                        <div id="reply-input-${thread.id}" contenteditable="true" class="input-field btn-sm rich-editor" placeholder="返信 (メンションは@を入力)..." 
-                               style="flex: 1; max-height: 80px;"
-                               oninput="handleReplyInput(this, '${thread.id}')"></div>
-                        <button class="btn-sm btn-outline" onclick="triggerReplyFile('${thread.id}')" title="ファイル添付" style="padding: 4px 8px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                            </svg>
-                            <input type="file" id="reply-file-${thread.id}" style="display:none;" multiple onchange="handleReplyFileSelect(this, '${thread.id}')">
-                        </button>
-                        <button class="btn-send-reply" onclick="addReply('${thread.id}')" title="返信">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                            </svg>
-                        </button>
-                        <div id="mention-list-${thread.id}" class="mention-list" style="bottom: 100%; top: auto; display: none;"></div>
-                    </div>
-                    <div id="reply-attachment-preview-${thread.id}" class="attachment-preview-area" style="padding-left: 10px;"></div>`
-                : (thread.status === 'completed' ? '' : '')}
+                <div class="reply-section ${currentReplies.length === 0 ? 'is-empty' : ''}">
+                    <div class="reply-scroll-area">${repliesHtml}</div>
+                    ${(currentProfile.role !== 'Viewer' && thread.status !== 'completed') ? `
+                    <div class="reply-form" style="display: flex; gap: 10px; align-items: flex-start; margin-top: 10px;">
+                        <div style="flex: 1; position: relative;">
+                            <div id="reply-input-${thread.id}" contenteditable="true" class="input-field btn-sm rich-editor" placeholder="返信 (メンションは@を入力)..." 
+                                   style="min-height: 80px; margin-top: 0;"
+                                   oninput="handleReplyInput(this, '${thread.id}')"></div>
+                             <div id="mention-list-${thread.id}" class="mention-list" style="bottom: 100%; top: auto; display: none;"></div>
+                             <div id="reply-attachment-preview-${thread.id}" class="attachment-preview-area" style="padding-left: 0; margin-top: 5px;"></div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 0px;">
+                             <button class="btn-sm btn-outline" onclick="triggerReplyFile('${thread.id}')" title="ファイル添付" 
+                                style="padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                </svg>
+                                <input type="file" id="reply-file-${thread.id}" style="display:none;" multiple onchange="handleReplyFileSelect(this, '${thread.id}')">
+                            </button>
+                            <button class="btn-send-reply" onclick="addReply('${thread.id}')" title="返信" 
+                                style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>`
+                    : (thread.status === 'completed' ? '' : '')}
                 </div>
 
 
@@ -1382,8 +1391,8 @@ function renderThreads() {
                 </div>
                 <div class="actions" style="display: flex; align-items: center; gap: 10px;">
                     ${thread.status === 'completed' && completerName ?
-                `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
-                : ''}
+                    `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
+                    : ''}
                     ${currentProfile.role !== 'Viewer' ? `
                     <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
                     ` : ''}
@@ -2079,3 +2088,158 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
+// --- Team Management Logic ---
+
+window.openTeamSettings = function () {
+    if (!currentTeamId) return;
+    const team = allTeams.find(t => t.id === currentTeamId);
+    if (!team) return;
+
+    modalOverlay.style.display = 'flex';
+    teamManageModal.style.display = 'block';
+    adminModal.style.display = 'none';
+    settingsModal.style.display = 'none';
+    teamModal.style.display = 'none';
+
+    renderTeamMembers(currentTeamId);
+};
+
+// チームメンバー一覧の描画
+async function renderTeamMembers(teamId) {
+    const listEl = document.getElementById('team-member-list');
+    listEl.innerHTML = '<tr><td colspan="3" style="text-align:center;">読み込み中...</td></tr>';
+
+    // チームメンバーの取得
+    const { data: members, error } = await supabaseClient
+        .from('team_members')
+        .select('*')
+        .eq('team_id', teamId);
+
+    if (error) {
+        console.error('Error fetching team members:', error);
+        listEl.innerHTML = '<tr><td colspan="3" style="color:var(--danger);">エラーが発生しました</td></tr>';
+        return;
+    }
+
+    // 描画
+    if (members.length === 0) {
+        listEl.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-muted);">メンバーがいません</td></tr>';
+    } else {
+        listEl.innerHTML = members.map(m => {
+            const profile = allProfiles.find(p => p.id === m.user_id);
+            if (!profile) return '';
+
+            // ロール操作は現状UIのみ（バックエンドでの保存機能は今回範囲外だが、表示はしておく）
+            const role = m.role || 'member'; // default
+            const isSelf = profile.id === currentUser.id;
+
+            return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 8px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div class="avatar" style="width:24px; height:24px; font-size:0.7rem;">
+                                ${profile.avatar_url ? `<img src="${profile.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (profile.display_name || profile.email)[0].toUpperCase()}
+                            </div>
+                            <div>
+                                <div style="font-size:0.9rem;">${escapeHtml(profile.display_name || 'No Name')}</div>
+                                <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(profile.email)}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="padding: 8px;">
+                        <span style="font-size:0.8rem; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.1);">${role}</span>
+                    </td>
+                    <td style="padding: 8px;">
+                        ${!isSelf ? `<button class="btn btn-sm" style="background:#C4314B; padding:2px 6px; font-size:0.7rem;" onclick="removeTeamMember('${teamId}', '${profile.id}')">削除</button>` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+}
+
+// メンバー検索＆追加用
+const teamMemberInput = document.getElementById('team-member-input');
+const teamMemberSuggestions = document.getElementById('team-member-suggestions');
+
+if (teamMemberInput) {
+    teamMemberInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        if (!query) {
+            teamMemberSuggestions.style.display = 'none';
+            return;
+        }
+
+        // 既にチームにいるメンバーを除外すべきだが、まずは全件検索
+        // (簡易実装: 全ユーザーから検索)
+        const candidates = allProfiles.filter(p =>
+            (p.display_name && p.display_name.toLowerCase().includes(query)) ||
+            (p.email && p.email.toLowerCase().includes(query))
+        );
+
+        if (candidates.length === 0) {
+            teamMemberSuggestions.style.display = 'none';
+            return;
+        }
+
+        teamMemberSuggestions.innerHTML = candidates.map(p => `
+            <div class="mention-item" onclick="addMemberToTeam('${currentTeamId}', '${p.id}')">
+                <div class="avatar">${p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : (p.display_name || p.email)[0].toUpperCase()}</div>
+                <div class="mention-info">
+                    <span class="mention-name">${escapeHtml(p.display_name || 'No Name')}</span>
+                    <span class="mention-email">${escapeHtml(p.email)}</span>
+                </div>
+            </div>
+        `).join('');
+        teamMemberSuggestions.style.display = 'block';
+    });
+}
+
+window.addMemberToTeam = async (teamId, userId) => {
+    if (!teamId || !userId) return;
+
+    // 重複チェック
+    const { data: existing } = await supabaseClient
+        .from('team_members')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('user_id', userId)
+        .single();
+
+    if (existing) {
+        alert('このユーザーは既に追加されています。');
+        teamMemberSuggestions.style.display = 'none';
+        teamMemberInput.value = '';
+        return;
+    }
+
+    const { error } = await supabaseClient
+        .from('team_members')
+        .insert({ team_id: teamId, user_id: userId, role: 'member' });
+
+    if (error) {
+        console.error('Error adding member:', error);
+        alert('メンバー追加に失敗しました: ' + error.message);
+    } else {
+        renderTeamMembers(teamId);
+        teamMemberSuggestions.style.display = 'none';
+        teamMemberInput.value = '';
+    }
+};
+
+window.removeTeamMember = async (teamId, userId) => {
+    if (!confirm('本当にこのメンバーをチームから削除しますか？')) return;
+
+    const { error } = await supabaseClient
+        .from('team_members')
+        .delete()
+        .eq('team_id', teamId)
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error('Error removing member:', error);
+        alert('メンバー削除に失敗しました');
+    } else {
+        renderTeamMembers(teamId);
+    }
+};
