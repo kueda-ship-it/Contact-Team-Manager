@@ -2501,6 +2501,9 @@ window.saveTeamIcon = async () => {
 
         if (error) throw error;
 
+        // Force cache update
+        globalAvatarVersion = Date.now();
+
         alert('チームアイコンを更新しました');
         document.getElementById('save-team-icon-btn').style.display = 'none';
 

@@ -225,7 +225,8 @@ body {
     flex-direction: column;
     gap: 8px;
     width: 100%;
-    padding: 0 12px;
+    padding: 0 8px;
+    /* Adjusted padding: 72 - 16 = 56px available */
     /* Add padding for content */
 }
 
@@ -233,7 +234,8 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 6px;
+    padding: 8px;
+    /* 40px icon + 16px padding = 56px width. Fits perfectly in 56px container */
     border-radius: 8px;
     cursor: pointer;
     transition: background 0.2s;
@@ -242,6 +244,8 @@ body {
     /* Prevent text wrapping */
     overflow: hidden;
     /* safety */
+    justify-content: flex-start;
+    /* Icon on left */
 }
 
 .team-list-item:hover {
@@ -271,6 +275,8 @@ body {
 
 /* Text label - Hidden when narrow, visible on hover */
 .team-name-label {
+    display: none;
+    /* remove from flow so gap is ignored */
     opacity: 0;
     transition: opacity 0.2s ease 0.1s;
     /* Slight delay */
@@ -280,6 +286,8 @@ body {
 }
 
 .teams-sidebar:hover .team-name-label {
+    display: block;
+    /* show on hover */
     opacity: 1;
 }
 
