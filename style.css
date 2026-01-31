@@ -125,23 +125,35 @@ header {
 }
 
 /* --- Dashboard Layout ---*/
+html,
+body {
+    height: 100%;
+    overflow: hidden;
+    /* Disable page scroll for seamless app feel */
+}
+
 .main-wrapper {
     display: flex;
-    min-height: calc(100vh - 50px);
+    height: calc(100vh - 50px);
     margin-top: 50px;
     padding-left: 322px;
     /* 72 + 250 */
-    padding-right: 20px;
+    padding-right: 0;
     transition: all 0.3s ease;
+    overflow: hidden;
+    /* Prevent page-level scrolling */
 }
 
 .dashboard-layout {
     display: flex;
     justify-content: flex-start;
-    gap: 30px;
-    padding-bottom: 20px;
+    gap: 20px;
     width: 100%;
+    height: 100%;
     position: relative;
+    overflow: hidden;
+    padding-right: 20px;
+    /* Right-side padding for the layout itself */
 }
 
 /* --- Teams Sidebar --- */
@@ -294,40 +306,78 @@ header {
 .main-feed-area {
     flex: 1;
     min-width: 0;
-    max-width: 900px;
+    max-width: 1000px;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0 10px 200px 10px;
+    /* Header stays at top */
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
     position: relative;
-    padding-bottom: 100px;
-    /* Buffer for scrolling */
 }
 
 .side-panel {
     width: 320px;
     flex-shrink: 0;
-    position: fixed;
-    /* Independent scroll */
-    top: 60px;
-    right: 20px;
-    height: calc(100vh - 160px);
-    /* Height enough for scrolling but above post form */
-    overflow-y: scroll !important;
-    /* Force scrollbar visibility */
-    padding-right: 8px;
+    flex-shrink: 0;
+    height: auto;
+    max-height: calc(100vh - 60px);
+    /* Use max-height as requested, with buffer */
+    align-self: flex-start;
+    overflow-y: auto !important;
+    /* Force scroll capability */
+    display: flex;
+    flex-direction: column;
     scrollbar-width: thin;
-    background: rgba(17, 16, 15, 0.4);
-    border-radius: 8px;
-    padding: 10px;
+    scrollbar-color: var(--accent) rgba(255, 255, 255, 0.05);
+    background: rgba(17, 16, 15, 0.85);
+    border-radius: 8px 8px 0 0;
+    padding: 0;
     z-index: 10;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    position: relative;
+    top: -82px;
+    /* Stronger lift to align "Not Finished" with "Contact" header */
+    margin-top: 0;
+}
+
+/* Ensure the sections inside don't collapse */
+.side-panel-section {
+    flex-shrink: 0;
+    padding: 0 15px 20px 15px;
+    /* Section単位でパディングを管理 */
+}
+
+.side-panel-title {
+    position: sticky;
+    top: 0;
+    background: #11100F;
+    /* 透けない背景色で重なり防止 */
+    margin: 0 -15px 10px -15px;
+    /* パディングを打ち消して端まで表示 */
+    padding: 10px 15px;
+    z-index: 20;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.9rem;
+    color: var(--accent);
 }
 
 .side-panel::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
+}
+
+.side-panel::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
 }
 
 .side-panel::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--accent);
     border-radius: 10px;
+    border: 2px solid rgba(17, 16, 15, 0.6);
+}
+
+.side-panel::-webkit-scrollbar-thumb:hover {
+    background: white;
 }
 
 /* --- Responsive Adjustments --- */
@@ -364,20 +414,16 @@ header {
 
 .feed-header-sticky {
     position: sticky;
-    top: 50px;
+    top: 0;
     z-index: 1001;
-    /* Higher than task dots */
     background: var(--bg-dark);
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    padding: 12px 14px;
+    padding: 12px 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    margin-bottom: 15px;
-    max-width: 880px;
-    margin-left: auto;
-    margin-right: auto;
     width: 100%;
+    margin-bottom: 10px;
 }
 
 .feed-header-left {
@@ -409,6 +455,9 @@ header {
 
 .gear-btn-unified:hover {
     background: rgba(98, 100, 167, 0.1);
+}
+
+.gear-btn-unified:hover svg {
     transform: rotate(30deg);
 }
 
@@ -955,28 +1004,42 @@ textarea.input-field {
 .floating-form-container {
     position: fixed;
     bottom: 0;
-    left: 322px;
-    /* Matches sidebar widths (72 + 250) */
-    right: 340px;
-    /* Matches right side panel width + some margin */
-    background: linear-gradient(to top, #11100F 80%, transparent);
+    left: 50%;
+    /* Center horizontally independent of sidebars */
+    transform: translateX(-50%);
+    width: 100%;
+    /* Full width wrapper */
+    max-width: 1000px;
+    /* Match main-feed-area max-width */
+    pointer-events: none;
+    /* Let clicks pass through transparent areas */
+    background: transparent;
     padding: 0;
     z-index: 1500;
     transition: all 0.3s ease;
+    display: flex;
+    display: flex;
+    justify-content: center;
+    padding: 0 10px;
+    /* Add padding to prevent edge touching */
+    box-sizing: border-box;
 }
 
 .compact-form {
+    pointer-events: auto;
+    /* Re-enable clicks */
     background: rgba(31, 30, 29, 0.95) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 12px;
     backdrop-filter: blur(10px);
     margin: 10px 0 !important;
     width: 100% !important;
-    max-width: 900px !important;
-    /* Matches main-feed-area */
-    padding: 12px 16px !important;
+    /* Force full width */
+    max-width: 1000px !important;
+    /* Match max width of container */
+    padding: 16px 20px !important;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
-    overflow: visible !important;
+    box-sizing: border-box;
 }
 
 /* --- Sidebar Items --- */
@@ -984,15 +1047,24 @@ textarea.input-field {
     cursor: pointer;
     padding: 12px;
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.02);
-    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    /* Slightly brighter */
+    margin-bottom: 12px;
+    /* Increase spacing */
     transition: 0.2s;
-    border: 1px solid transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    /* Stronger border */
 }
 
 .sidebar-item:hover {
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-item .line-clamp-2 {
+    font-size: 0.7rem;
+    /* Reduce font size by approx 2px as requested */
+    color: var(--text-main);
 }
 
 /* --- Others --- */

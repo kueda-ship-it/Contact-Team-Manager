@@ -39,7 +39,7 @@ let currentTeamId = null; // Currently selected team (null = All)
 let allTeams = [];
 let whitelist = [];
 let allReactions = [];
-let currentSortOrder = 'desc'; // 'desc' = newest activity first, 'asc' = oldest activity first
+let currentSortOrder = 'asc'; // 'asc' = newest activity at bottom (standard chat style), 'desc' = newest activity first
 let currentGlobalNav = 'teams'; // 'teams', 'activity', etc.
 let feedFilter = 'all'; // 'all', 'pending', 'assigned' (custom filter within team)
 
@@ -140,10 +140,8 @@ async function fetchProfile(user) {
 }
 
 async function fetchThreads() {
-    // 常に全スレッドを取得するように変更（チーム切り替え時の状態保持のため）
-    const query = supabaseClient.from('threads').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
-
-    const { data, error } = await query;
+    // 瞬時反映のため、全スレッドをフェッチする方式に再度統一
+    const { data, error } = await supabaseClient.from('threads').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
     return data || [];
 }
 
@@ -227,7 +225,8 @@ function renderTeamsSidebar() {
 
     allTeams.forEach(team => {
         const div = document.createElement('div');
-        div.className = `team-icon ${currentTeamId === team.id ? 'active' : ''}`;
+        // Use loose comparison for ID match
+        div.className = `team-icon ${currentTeamId == team.id ? 'active' : ''}`;
         div.title = team.name;
 
         if (team.avatar_url) {
@@ -238,7 +237,13 @@ function renderTeamsSidebar() {
             div.innerHTML = team.name.charAt(0).toUpperCase();
         }
 
-        div.onclick = () => switchTeam(team.id);
+        // Use dataset to store ID safely
+        div.dataset.teamId = team.id;
+        div.onclick = function () {
+            const tId = this.dataset.teamId;
+            // Ensure ID is treated as correct type (string/number check not strictly needed with loose comparison but good practice)
+            switchTeam(tId);
+        };
         teamsListEl.appendChild(div);
     });
 }
@@ -252,27 +257,42 @@ window.switchGlobalNav = function (nav) {
     renderTeamsSidebar(); // Update team icons active state
     renderSecondarySidebar();
     window.scrollTo({ top: 0, behavior: 'instant' });
-    loadData(); // Call loadData to refresh with proper filtering
+    renderThreads(); // Immediate feedback
+    loadData(); // Refresh in background
 };
 
 window.switchTeam = function (teamId) {
     currentTeamId = teamId;
     currentGlobalNav = 'teams';
-    // Hide active state from nav-teams icon
     const navTeams = document.getElementById('nav-teams');
     if (navTeams) navTeams.classList.remove('active');
 
+    // フィルターをリセットして全件表示を保証
+    feedFilter = 'all';
+    currentFilter = 'all';
+
     renderTeamsSidebar();
     renderSecondarySidebar();
-    loadData(); // Call loadData to refresh with proper filtering
+
+    // メイン領域をトップに戻す
+    const feedArea = document.querySelector('.main-feed-area');
+    if (feedArea) feedArea.scrollTo({ top: 0, behavior: 'instant' });
+
+    renderThreads();
+
+    // バックグラウンドで最新情報を取得し、完了後に再度描画
+    loadData().then(() => {
+        renderThreads();
+    });
 };
 
 function renderSecondarySidebar() {
     if (!channelListEl) return;
     channelListEl.innerHTML = '';
 
-    const team = allTeams.find(t => t.id === currentTeamId);
-    currentTeamNameSidebar.textContent = team ? team.name : 'すべてのスレッド';
+    // Use explicit null/undefined check to allow 0 or valid strings
+    const team = allTeams.find(t => t.id == currentTeamId);
+    currentTeamNameSidebar.textContent = (currentTeamId !== null && team) ? team.name : 'すべてのスレッド';
 
     const createItem = (label, filterValue, icon = '', count = null) => {
         const div = document.createElement('div');
@@ -286,7 +306,7 @@ function renderSecondarySidebar() {
         return div;
     };
 
-    const pendingCount = threads.filter(t => t.status === 'pending' && (!currentTeamId || t.team_id === currentTeamId)).length;
+    const pendingCount = threads.filter(t => t.status === 'pending' && (currentTeamId === null || t.team_id == currentTeamId)).length;
     const myName = currentProfile.display_name || currentUser.email;
     const myTagIds = allTagMembers.filter(m => m.profile_id === currentProfile.id).map(m => m.tag_id);
     const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => t.name);
@@ -302,7 +322,7 @@ function renderSecondarySidebar() {
 
     const assignedCount = threads.filter(t => {
         if (t.status === 'completed') return false;
-        if (currentTeamId && t.team_id !== currentTeamId) return false;
+        if (currentTeamId && t.team_id != currentTeamId) return false;
         if (hasMention(t.content)) return true;
         return (t.replies || []).some(r => hasMention(r.content));
     }).length;
@@ -317,6 +337,10 @@ function renderSecondarySidebar() {
             divider.style.background = 'rgba(255,255,255,0.05)';
             divider.style.margin = '12px 16px';
             channelListEl.appendChild(divider);
+
+            const settingsItem = document.createElement('div');
+            settingsItem.className = 'channel-item';
+            settingsItem.style.marginTop = 'auto'; // Push to bottom if needed, or just standard item
 
             settingsItem.innerHTML = `
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;">
@@ -364,7 +388,7 @@ window.openTeamSettings = async function () {
     if (teamModal) teamModal.style.display = 'none';
 
     // Show current team info in modal
-    const team = allTeams.find(t => t.id === currentTeamId);
+    const team = allTeams.find(t => t.id == currentTeamId);
     const modalTitle = teamManageModal.querySelector('h2');
     if (modalTitle) modalTitle.textContent = `${team.name} 管理`;
 
@@ -412,7 +436,7 @@ window.handleTeamAvatarSelect = async function (event) {
         if (updateError) throw updateError;
 
         // Update local state
-        const team = allTeams.find(t => t.id === currentTeamId);
+        const team = allTeams.find(t => t.id == currentTeamId);
         if (team) team.avatar_url = publicUrl;
 
         // UI Feedback
@@ -495,7 +519,7 @@ window.updateTeamMemberRole = async function (userId, newRole) {
     if (!currentTeamId) return;
 
     // Check if the current user has permission (Team Owner or Overall Admin)
-    const team = allTeams.find(t => t.id === currentTeamId);
+    const team = allTeams.find(t => t.id == currentTeamId);
     const isOwner = team && team.created_by === currentUser.id;
     const isAdmin = (currentProfile.role || '').toLowerCase() === 'admin';
 
@@ -944,11 +968,12 @@ function subscribeToChanges() {
 async function loadData() {
     if (!currentUser) return;
     try {
+        // 全データを一括取得（切り替えのバグを回避するため）
         const threadData = await fetchThreads();
         const { data: replyData, error: replyError } = await supabaseClient.from('replies').select('*').order('created_at', { ascending: true });
+
         if (replyError) throw replyError;
 
-        // Create a map of replies by thread_id for O(N) performance
         const repliesByThread = {};
         (replyData || []).forEach(r => {
             if (!repliesByThread[r.thread_id]) repliesByThread[r.thread_id] = [];
@@ -959,9 +984,11 @@ async function loadData() {
             ...t,
             replies: repliesByThread[t.id] || []
         }));
+
         renderThreads();
     } catch (e) {
         console.error("loadData error:", e);
+        renderThreads();
     }
 }
 
@@ -1145,29 +1172,21 @@ function renderThreads() {
         });
     };
 
-    // List Sticky Header Title Calculation (Moved up for filtering usage)
-    const currentTeamName = currentTeamId
-        ? (allTeams.find(t => t.id === currentTeamId)?.name || 'Team')
+    // List Sticky Header Title Calculation
+    const currentTeamName = (currentTeamId !== null)
+        ? (allTeams.find(t => t.id == currentTeamId)?.name || 'Team')
         : 'List';
 
-    let feedThreads = [...threads].sort((a, b) => {
-        const timeA = getLatestActivity(a);
-        const timeB = getLatestActivity(b);
-        return currentSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
-    }).filter(t => {
-        // --- Strict Team Filter ---
-        // If currentTeamId is set, ONLY show threads for that team.
-        // Special case: if currentGlobalNav is NOT 'teams' (e.g. activity feed), we might show all.
-        // But the user specifically said posts from other teams are visible.
-        if (currentTeamId && t.team_id !== currentTeamId) return false;
+    let feedThreads = [...threads].filter(t => {
+        // 1. Team Filtering (Explicitly handle Global Nav and Team selection)
+        if (currentTeamId !== null) {
+            if (String(t.team_id) !== String(currentTeamId)) return false;
+        }
 
-        // If currentGlobalNav is 'teams' but no team is selected (currentTeamId is null),
-        // we show all threads the user has access to.
+        // 2. Status Filter (Top Select)
+        if (currentFilter !== 'all' && t.status !== currentFilter) return false;
 
-        // Status Filter (Top Select)
-        if (filter !== 'all' && t.status !== filter) return false;
-
-        // Sidebar Navigation Filter (feedFilter)
+        // 3. Sidebar Navigation Filter (feedFilter: pending / mentions)
         if (feedFilter === 'pending') {
             return t.status === 'pending';
         }
@@ -1177,8 +1196,15 @@ function renderThreads() {
         }
 
         return true;
-    });
+    }).sort((a, b) => {
+        // --- Sort Logic: Pins always on top, then by currentSortOrder ---
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
 
+        const timeA = getLatestActivity(a);
+        const timeB = getLatestActivity(b);
+        return currentSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+    });
 
     if (searchQuery) {
         feedThreads = feedThreads.filter(t =>
@@ -1191,13 +1217,9 @@ function renderThreads() {
     threadListEl.innerHTML = '';
     sidebarListEl.innerHTML = '';
     assignedSidebarListEl.innerHTML = '';
-    if (taskCountEl) taskCountEl.textContent = feedThreads.length;
 
     // List Sticky Header
-    // List Sticky Header
-
-
-    threadListEl.innerHTML = `
+    const headerHtml = `
         <div class="feed-header-sticky">
             <div class="feed-header-left">
                 <select id="filter-status-sticky" class="input-field" style="width: auto; padding: 2px 10px; font-size: 0.8rem;" onchange="filterThreads(this.value)">
@@ -1212,7 +1234,7 @@ function renderThreads() {
                     ${escapeHtml(currentTeamName)} 
                     <span id="task-count-sticky" style="color: var(--primary-light); font-size: 0.9rem; font-weight: normal;">${feedThreads.length} 件</span>
                 </h2>
-                ${currentTeamId ? `
+                ${currentTeamId !== null ? `
                 <button class="btn btn-sm btn-outline btn-icon-only gear-btn-unified" onclick="window.openTeamSettings()" title="チーム設定" style="margin-left: 8px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
                         <circle cx="12" cy="12" r="3"></circle>
@@ -1232,6 +1254,9 @@ function renderThreads() {
             </div>
         </div>
     `;
+
+    if (taskCountEl) taskCountEl.textContent = feedThreads.length;
+    threadListEl.insertAdjacentHTML('afterbegin', headerHtml);
 
     // Render Central Feed Threads
     feedThreads.forEach(thread => {
@@ -1487,7 +1512,7 @@ function renderThreads() {
         return tmp.textContent || tmp.innerText || '';
     };
 
-    const pendingThreads = threads.filter(t => t.status === 'pending' && (!currentTeamId || t.team_id === currentTeamId)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const pendingThreads = threads.filter(t => t.status === 'pending' && (currentTeamId === null || t.team_id == currentTeamId)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     pendingThreads.forEach(thread => {
         const item = document.createElement('div');
         item.className = 'sidebar-item';
@@ -1510,7 +1535,7 @@ function renderThreads() {
     });
 
     const assignedThreads = threads.filter(t => {
-        if (currentTeamId && t.team_id !== currentTeamId) return false;
+        if (currentTeamId !== null && t.team_id != currentTeamId) return false;
         if (t.status === 'completed') return false;
         if (hasMention(t.content)) return true;
         return (t.replies || []).some(r => hasMention(r.content));
@@ -1541,7 +1566,7 @@ function renderThreads() {
     // Scroll to bottom (newest posts) after rendering
     setTimeout(() => {
         const searchQuery = globalSearchInp.value.trim();
-        if (!searchQuery && feedThreads.length > 0) {
+        if (!searchQuery && feedThreads.length > 0 && currentSortOrder === 'asc') {
             const lastThread = threadListEl.lastElementChild;
             if (lastThread) {
                 lastThread.scrollIntoView({ behavior: 'smooth', block: 'end' });
