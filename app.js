@@ -2524,7 +2524,7 @@ document.getElementById('save-admin-user-edit-btn').addEventListener('click', as
         const p = allProfiles.find(x => x.id === userId);
         if (p) p.display_name = newName;
 
-        renderAdminMembersTable(); // Refresh admin list
+        renderAdminUsers(); // Refresh admin list
 
         document.getElementById('admin-user-edit-modal').classList.remove('active');
         document.getElementById('modal-overlay').classList.remove('active');
@@ -2563,16 +2563,16 @@ window.saveTeamIcon = async () => {
         const fileName = `${Math.random()}.${fileExt}`;
         const filePath = `team-avatars/${fileName}`;
 
-        // Upload to Storage (Using 'uploads' bucket)
+        // Upload to Storage (Using 'avatars' bucket)
         const { error: uploadError } = await supabaseClient.storage
-            .from('uploads')
+            .from('avatars')
             .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
         // Get Public URL
         const { data: { publicUrl } } = supabaseClient.storage
-            .from('uploads')
+            .from('avatars')
             .getPublicUrl(filePath);
 
         // Update DB with URL
