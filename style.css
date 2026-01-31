@@ -136,12 +136,13 @@ body {
     /* Disable page scroll for seamless app feel */
 }
 
+/* --- Dashboard Layout --- */
 .main-wrapper {
     display: flex;
     height: calc(100vh - 50px);
     margin-top: 50px;
-    padding-left: 256px;
-    /* 240px (Teams) + 16px (Collapsed Secondary) */
+    padding-left: 88px;
+    /* 72px (Sidebar) + 16px (Gap) - Reduced from 256px to widen main area */
     padding-right: 0;
     transition: all 0.3s ease;
     overflow: hidden;
@@ -185,14 +186,16 @@ body {
 
 /* --- Teams Sidebar --- */
 .teams-sidebar {
-    width: 240px;
-    /* Expanded from 72px */
+    width: 72px;
+    /* Default narrow width (Icons only) */
     background: #1E1F22;
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* Center icons */
     padding: 12px 0;
     gap: 8px;
+    /* Gap between items */
     flex-shrink: 0;
     border-right: 1px solid rgba(0, 0, 0, 0.2);
     position: fixed;
@@ -200,6 +203,21 @@ body {
     left: 0;
     bottom: 0;
     z-index: 1000;
+    transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    /* Smooth expansion */
+    overflow-x: hidden;
+    /* Hide overflowing text when narrow */
+    overflow-y: auto;
+    /* Scrollable if many teams */
+}
+
+/* Expand on Hover */
+.teams-sidebar:hover {
+    width: 260px;
+    /* Expanded width */
+    align-items: stretch;
+    /* Stretch items to fill width */
+    padding-left: 0;
 }
 
 .teams-list {
@@ -220,6 +238,10 @@ body {
     cursor: pointer;
     transition: background 0.2s;
     width: 100%;
+    white-space: nowrap;
+    /* Prevent text wrapping */
+    overflow: hidden;
+    /* safety */
 }
 
 .team-list-item:hover {
@@ -232,7 +254,6 @@ body {
 
 .team-icon {
     width: 40px;
-    /* Slightly smaller to fit nicely */
     height: 40px;
     background: #313338;
     border-radius: 50%;
@@ -246,6 +267,36 @@ body {
     user-select: none;
     overflow: hidden;
     /* Ensure image fits */
+}
+
+/* Text label - Hidden when narrow, visible on hover */
+.team-name-label {
+    opacity: 0;
+    transition: opacity 0.2s ease 0.1s;
+    /* Slight delay */
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.teams-sidebar:hover .team-name-label {
+    opacity: 1;
+}
+
+/* Submenu - Only visible on hover */
+.sidebar-submenu {
+    display: none;
+    /* Completely hide when collapsed to save space/layout */
+    margin-left: 52px;
+    /* Indent under text */
+    margin-bottom: 8px;
+}
+
+.teams-sidebar:hover .sidebar-submenu {
+    display: flex;
+    /* Show flex on hover */
+    flex-direction: column;
+    gap: 4px;
 }
 
 .team-icon img {

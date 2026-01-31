@@ -284,7 +284,8 @@ function renderTeamsSidebar() {
 
         let iconHtml = '';
         if (team.avatar_url) {
-            iconHtml = `<div class="team-icon" style="background: transparent;"><img src="${team.avatar_url}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;"></div>`;
+            // Use globalAvatarVersion for cache busting
+            iconHtml = `<div class="team-icon" style="background: transparent;"><img src="${team.avatar_url}?v=${globalAvatarVersion}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;"></div>`;
         } else {
             iconHtml = `<div class="team-icon" style="background: ${team.icon_color || '#313338'}; color: var(--text-muted);">${team.name.charAt(0).toUpperCase()}</div>`;
         }
@@ -465,21 +466,31 @@ window.handleTeamAvatarSelect = async function (event) {
 
         if (updateError) throw updateError;
 
-        // Update local state
-        const team = allTeams.find(t => t.id == currentTeamId);
-        if (team) team.avatar_url = publicUrl;
+        // Update local state - Wait, let's just re-fetch to be safe and ensure DB consistency
+        // const team = allTeams.find(t => t.id == currentTeamId);
+        // if (team) {
+        //     team.avatar_url = publicUrl;
+        // }
 
-        // UI Feedback
+        // Cache busting URL for immediate display
+        const now = Date.now();
+        globalAvatarVersion = now; // Update global version for sidebar
+        const displayUrl = `${publicUrl}?t=${now}`;
+
+        // UI Feedback - Update Modal Preview
         const avatarPreview = document.getElementById('team-avatar-preview');
         if (avatarPreview) {
-            avatarPreview.innerHTML = `<img src="${publicUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+            avatarPreview.innerHTML = `<img src="${displayUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
         }
-        renderTeamsSidebar();
 
+        showToast("チームアイコンを更新しました。再読み込み中...");
+
+        // Re-fetch all teams to ensure sidebar and everything is in sync with Server
+        await fetchTeams();
 
     } catch (e) {
-        console.error("Avatar upload error:", e);
-        alert("アバター更新失敗: " + e.message);
+        console.error(e);
+        alert("アイコン更新エラー: " + e.message);
     }
 };
 
