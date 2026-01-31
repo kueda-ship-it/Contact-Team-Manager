@@ -39,7 +39,7 @@ let currentTeamId = null; // Currently selected team (null = All)
 let allTeams = [];
 let whitelist = [];
 let allReactions = [];
-let currentSortOrder = 'asc'; // 'asc' = oldest activity first, 'desc' = newest activity first
+let currentSortOrder = 'desc'; // 'desc' = newest activity first, 'asc' = oldest activity first
 let currentGlobalNav = 'teams'; // 'teams', 'activity', etc.
 let feedFilter = 'all'; // 'all', 'pending', 'assigned' (custom filter within team)
 
@@ -251,7 +251,8 @@ window.switchGlobalNav = function (nav) {
     });
     renderTeamsSidebar(); // Update team icons active state
     renderSecondarySidebar();
-    renderThreads();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    loadData(); // Call loadData to refresh with proper filtering
 };
 
 window.switchTeam = function (teamId) {
@@ -263,7 +264,7 @@ window.switchTeam = function (teamId) {
 
     renderTeamsSidebar();
     renderSecondarySidebar();
-    renderThreads();
+    loadData(); // Call loadData to refresh with proper filtering
 };
 
 function renderSecondarySidebar() {
@@ -947,9 +948,16 @@ async function loadData() {
         const { data: replyData, error: replyError } = await supabaseClient.from('replies').select('*').order('created_at', { ascending: true });
         if (replyError) throw replyError;
 
+        // Create a map of replies by thread_id for O(N) performance
+        const repliesByThread = {};
+        (replyData || []).forEach(r => {
+            if (!repliesByThread[r.thread_id]) repliesByThread[r.thread_id] = [];
+            repliesByThread[r.thread_id].push(r);
+        });
+
         threads = (threadData || []).map(t => ({
             ...t,
-            replies: (replyData || []).filter(r => r.thread_id === t.id)
+            replies: repliesByThread[t.id] || []
         }));
         renderThreads();
     } catch (e) {
@@ -1147,23 +1155,28 @@ function renderThreads() {
         const timeB = getLatestActivity(b);
         return currentSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
     }).filter(t => {
+        // --- Strict Team Filter ---
+        // If currentTeamId is set, ONLY show threads for that team.
+        // Special case: if currentGlobalNav is NOT 'teams' (e.g. activity feed), we might show all.
+        // But the user specifically said posts from other teams are visible.
+        if (currentTeamId && t.team_id !== currentTeamId) return false;
+
+        // If currentGlobalNav is 'teams' but no team is selected (currentTeamId is null),
+        // we show all threads the user has access to.
+
         // Status Filter (Top Select)
         if (filter !== 'all' && t.status !== filter) return false;
 
         // Sidebar Navigation Filter (feedFilter)
         if (feedFilter === 'pending') {
-            return t.status === 'pending' && (!currentTeamId || t.team_id === currentTeamId);
+            return t.status === 'pending';
         }
         if (feedFilter === 'assigned') {
             if (t.status === 'completed') return false;
-            const match = hasMention(t.content) || (t.replies || []).some(r => hasMention(r.content));
-            return match && (!currentTeamId || t.team_id === currentTeamId);
+            return hasMention(t.content) || (t.replies || []).some(r => hasMention(r.content));
         }
 
-        // Default: filter by currentTeamId if selected
-        if (!currentTeamId) return true;
-
-        return t.team_id === currentTeamId;
+        return true;
     });
 
 
@@ -1474,7 +1487,7 @@ function renderThreads() {
         return tmp.textContent || tmp.innerText || '';
     };
 
-    const pendingThreads = threads.filter(t => t.status === 'pending').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const pendingThreads = threads.filter(t => t.status === 'pending' && (!currentTeamId || t.team_id === currentTeamId)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     pendingThreads.forEach(thread => {
         const item = document.createElement('div');
         item.className = 'sidebar-item';
@@ -1497,6 +1510,7 @@ function renderThreads() {
     });
 
     const assignedThreads = threads.filter(t => {
+        if (currentTeamId && t.team_id !== currentTeamId) return false;
         if (t.status === 'completed') return false;
         if (hasMention(t.content)) return true;
         return (t.replies || []).some(r => hasMention(r.content));
