@@ -2488,24 +2488,36 @@ window.saveTeamIcon = async () => {
     if (!file || !currentTeamId) return;
 
     try {
-        const reader = new FileReader();
-        const base64Icon = await new Promise((resolve) => {
-            reader.onload = (e) => resolve(e.target.result);
-            reader.readAsDataURL(file);
-        });
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `team-avatars/${fileName}`;
 
-        const { error } = await supabaseClient
+        // Upload to Storage
+        const { error: uploadError } = await supabaseClient.storage
+            .from('avatars')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        // Get Public URL
+        const { data: { publicUrl } } = supabaseClient.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+
+        // Update DB with URL
+        const { error: updateError } = await supabaseClient
             .from('teams')
-            .update({ avatar_url: base64Icon })
+            .update({ avatar_url: publicUrl })
             .eq('id', currentTeamId);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
 
         // Force cache update
         globalAvatarVersion = Date.now();
 
         alert('チームアイコンを更新しました');
-        document.getElementById('save-team-icon-btn').style.display = 'none';
+        const saveBtn = document.getElementById('save-team-icon-btn');
+        if (saveBtn) saveBtn.style.display = 'none';
 
         // Refresh teams list
         await loadMasterData();
