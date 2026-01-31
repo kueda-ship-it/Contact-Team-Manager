@@ -351,12 +351,12 @@ body {
     position: sticky;
     top: 0;
     background: #11100F;
-    /* 透けない背景色で重なり防止 */
     margin: 0 -15px 10px -15px;
-    /* パディングを打ち消して端まで表示 */
-    padding: 10px 15px;
+    padding: 12px 20px;
+    /* Match feed-header-sticky padding exactly */
     z-index: 20;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    /* Match feed header border */
     font-size: 0.9rem;
     color: var(--accent);
 }

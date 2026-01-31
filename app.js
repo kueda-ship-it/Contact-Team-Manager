@@ -1002,7 +1002,7 @@ async function addThread() {
     addThreadBtn.disabled = true;
     // Don't change textContent to keep the paper airplane SVG
     const authorName = currentProfile.display_name || currentUser.email;
-    const { error } = await supabaseClient.from('threads').insert([
+    const { data, error } = await supabaseClient.from('threads').insert([
         {
             title,
             content: newContentInp.innerHTML, // Save HTML to preserve mention styling
@@ -1011,10 +1011,15 @@ async function addThread() {
             team_id: currentTeamId,
             attachments: currentAttachments // Add attachments
         }
-    ]);
+    ]).select();
+
     if (error) {
         alert("投稿失敗: " + error.message);
     } else {
+        if (data && data[0]) {
+            allThreads.unshift(data[0]); // Optimistic update
+            renderThreads();
+        }
         newTitleInp.value = '';
         newContentInp.innerHTML = ''; // Clear HTML
         currentAttachments = []; // Clear attachments
@@ -1137,7 +1142,12 @@ window.deleteThread = async function (threadId) {
 
     if (confirm("この項目を削除しますか？")) {
         const { error } = await supabaseClient.from('threads').delete().eq('id', threadId);
-        if (error) alert("削除失敗: " + error.message);
+        if (error) {
+            alert("削除失敗: " + error.message);
+        } else {
+            allThreads = allThreads.filter(t => t.id !== threadId); // Optimistic update
+            renderThreads();
+        }
     }
 }
 
