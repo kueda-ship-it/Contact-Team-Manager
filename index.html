@@ -98,31 +98,40 @@
 
         <div class="main-wrapper">
             <aside id="teams-sidebar" class="teams-sidebar">
-                <div class="team-icon active" title="Teams" id="nav-teams" onclick="switchGlobalNav('teams')">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
+                <!-- All Teams / Dashboard -->
+                <div class="team-list-item active" id="nav-teams" onclick="switchGlobalNav('teams')">
+                    <div class="team-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <span class="team-name-label">All Teams</span>
                 </div>
+
+                <div class="sidebar-divider"></div>
+
                 <div id="teams-list" class="teams-list"></div>
-                <button id="btn-add-team" class="team-icon add-team-btn" title="Create Team">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                </button>
+
+                <div class="sidebar-divider"></div>
+
+                <!-- Add Team -->
+                <div class="team-list-item" id="btn-add-team" onclick="window.btnAddTeam.onclick()">
+                    <div class="team-icon add-team-btn"
+                        style="background: transparent; color: #23A559; border: 1px dashed #23A559;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </div>
+                    <span class="team-name-label" style="color: #23A559;">チームを追加</span>
+                </div>
             </aside>
 
-            <aside id="secondary-sidebar" class="secondary-sidebar">
-                <div class="secondary-sidebar-header">
-                    <h2 id="current-team-name-sidebar">Teams</h2>
-                </div>
-                <div id="channel-list" class="channel-list"></div>
-            </aside>
 
             <div class="container" style="flex: 1; height: 100%; padding-left: 20px;">
                 <div class="dashboard-layout">

@@ -140,8 +140,8 @@ body {
     display: flex;
     height: calc(100vh - 50px);
     margin-top: 50px;
-    padding-left: 88px;
-    /* 72px (Teams) + 16px (Collapsed Secondary) */
+    padding-left: 256px;
+    /* 240px (Teams) + 16px (Collapsed Secondary) */
     padding-right: 0;
     transition: all 0.3s ease;
     overflow: hidden;
@@ -160,9 +160,33 @@ body {
     /* Right-side padding for the layout itself */
 }
 
+/* ---/* Right Sidebar (Pending / Mentions) */
+.side-panel {
+    width: 260px;
+    /* Fixed width */
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-top: 0 !important;
+    /* Force to top as per user request */
+}
+
+.side-panel-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+    font-weight: 600;
+    margin-top: 0;
+    /* Remove top margin completely */
+}
+
 /* --- Teams Sidebar --- */
 .teams-sidebar {
-    width: 72px;
+    width: 240px;
+    /* Expanded from 72px */
     background: #1E1F22;
     display: flex;
     flex-direction: column;
@@ -172,153 +196,133 @@ body {
     flex-shrink: 0;
     border-right: 1px solid rgba(0, 0, 0, 0.2);
     position: fixed;
-    /* Fixed to left */
     top: 50px;
     left: 0;
     bottom: 0;
     z-index: 1000;
 }
 
+.teams-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    padding: 0 12px;
+    /* Add padding for content */
+}
+
+.team-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+}
+
+.team-list-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.team-list-item.active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
 .team-icon {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    /* Slightly smaller to fit nicely */
+    height: 40px;
     background: #313338;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     color: var(--text-muted);
+    font-weight: bold;
+    flex-shrink: 0;
     position: relative;
     user-select: none;
-}
-
-.team-icon:hover {
-    border-radius: 16px;
-    background: var(--primary);
-    color: white;
-}
-
-.team-icon.active {
-    border-radius: 16px;
-    background: var(--primary);
-    color: white;
-}
-
-.team-icon.active::before {
-    content: '';
-    position: absolute;
-    left: -12px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 40px;
-    background: white;
-    border-radius: 0 4px 4px 0;
-}
-
-.team-icon.add-team-btn {
-    color: #23A559;
-    /* Discord green */
-}
-
-.team-icon.add-team-btn:hover {
-    background: #23A559;
-    color: white;
-}
-
-.sidebar-divider {
-    width: 32px;
-    height: 2px;
-    background: rgba(255, 255, 255, 0.05);
-    margin: 4px 0;
-}
-
-.teams-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-/* --- Secondary Sidebar (Channels/Filters) --- */
-.secondary-sidebar {
-    width: 16px;
-    /* Collapsed width */
-    background: #2B2D31;
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    top: 50px;
-    left: 72px;
-    /* Next to teams sidebar */
-    bottom: 0;
-    z-index: 2200;
-    /* Ensure it overlays everything including headers */
-    border-right: 1px solid rgba(0, 0, 0, 0.2);
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    /* Smooth expansion */
     overflow: hidden;
-    /* Hide content when collapsed */
-    white-space: nowrap;
-    /* Prevent text wrap during transition */
+    /* Ensure image fits */
 }
 
-.secondary-sidebar:hover {
-    width: 250px;
-    /* Expanded width on hover */
-    box-shadow: 10px 0 20px rgba(0, 0, 0, 0.5);
-    /* Drop shadow when expanded over content */
+.team-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
-.secondary-sidebar-header {
-    padding: 12px 16px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.secondary-sidebar-header h2 {
+.team-name-label {
+    color: #DBDEE1;
+    font-weight: 500;
     font-size: 0.95rem;
-    font-weight: 700;
-    color: white;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.channel-list {
     flex: 1;
-    overflow-y: auto;
-    padding: 8px 0;
 }
 
-.channel-item {
-    padding: 6px 16px;
-    margin: 2px 8px;
-    border-radius: 4px;
+/* Active indicator for list item */
+.team-list-item.active .team-icon {
+    border-radius: 12px;
+    background: var(--primary);
+    color: white;
+}
+
+.team-list-item:hover .team-icon {
+    border-radius: 12px;
+    background: var(--primary);
+    color: white;
+}
+
+
+.sidebar-divider {
+    width: 90%;
+    /* Adjust width */
+    height: 1px;
+    background: rgba(255, 255, 255, 0.05);
+    margin: 4px auto;
+}
+
+
+/* --- Sidebar Submenu (Nested in Team Item) --- */
+.main-feed-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    padding: 20px;
+    padding-bottom: 0;
+    padding-top: 20px;
+    /* Explicitly ensure 20px top padding matches side-panel */
+}
+
+.sidebar-submenu-item {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 6px 12px;
+    border-radius: 4px;
     cursor: pointer;
+    transition: background 0.2s;
     color: var(--text-muted);
     font-size: 0.9rem;
-    transition: background 0.1s, color 0.1s;
 }
 
-.channel-item:hover {
+.sidebar-submenu-item:hover {
     background: rgba(255, 255, 255, 0.05);
-    color: var(--text-main);
+    color: var(--text-normal);
 }
 
-.channel-item.active {
+.sidebar-submenu-item.active {
     background: rgba(255, 255, 255, 0.1);
     color: white;
-    font-weight: 600;
 }
 
-.channel-item .badge {
+.sidebar-submenu-item .badge {
     margin-left: auto;
 }
 
@@ -539,6 +543,60 @@ body {
     scrollbar-gutter: stable;
 }
 
+/* Modal Base - slightly tighter */
+.modal {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 24px;
+    width: 90%;
+    max-width: 480px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    max-height: 85vh;
+}
+
+/* Fixed: Added closing brace */
+
+/* Specific adjustment for Team Management Modal to be compact but usable */
+#team-manage-modal {
+    padding: 24px !important;
+    width: 100% !important;
+    max-width: 480px !important;
+    /* Force narrower width */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #1e1e1e;
+    /* Slightly lighter than pure black for depth */
+}
+
+#team-manage-modal h2 {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text-main);
+}
+
+/* Compact input fields in modal */
+#team-manage-modal .input-field {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.05);
+    /* Subtle input bg */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#team-manage-modal .input-field:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary);
+}
+
+/* Compact member list */
+#team-member-list tr td {
+    padding: 8px 8px !important;
+    vertical-align: middle;
+}
+
 .task-card {
     background: var(--card-bg);
     border-radius: 8px;
@@ -600,6 +658,20 @@ body {
     z-index: 50;
     text-shadow: none;
     box-shadow: -2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.team-badge {
+    position: absolute;
+    top: 10px;
+    right: 40px;
+    /* Positioned to the left of the dot menu */
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    pointer-events: none;
 }
 
 .is-pinned {

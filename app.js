@@ -215,64 +215,161 @@ async function fetchTeams() {
     if (data) {
         allTeams = data;
         renderTeamsSidebar();
-        renderSecondarySidebar(); // Sync secondary sidebar with allTeams data
     }
+}
+
+// Helper to extract mentions
+function extractMentions(content) {
+    if (!content) return [];
+    const matches = content.match(/@([^\s]+)/g);
+    if (!matches) return [];
+    return matches.map(m => m.substring(1)); // Remove '@'
 }
 
 function renderTeamsSidebar() {
     if (!teamsListEl) return;
     teamsListEl.innerHTML = '';
 
+    // Update active state for "All Teams"
+    const navTeams = document.getElementById('nav-teams');
+    if (navTeams) {
+        if (!currentTeamId) navTeams.classList.add('active');
+        else navTeams.classList.remove('active');
+    }
+
+    // Generate Filter Menu for "All Teams"
+    if (!currentTeamId && navTeams) {
+        let filterHtml = `
+            <div class="sidebar-submenu">
+                <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
+                    <span># すべて</span>
+                </div>
+                <div class="sidebar-submenu-item ${feedFilter === 'pending' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='pending'; renderTeamsSidebar(); renderThreads();">
+                    <span># 未完了</span>
+                    <span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
+                        ${threads.filter(t => t.status === 'pending').length}
+                    </span>
+                </div>
+                <div class="sidebar-submenu-item ${feedFilter === 'assigned' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='assigned'; renderTeamsSidebar(); renderThreads();">
+                    <span># 自分宛て</span>
+                    <span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
+                         ${threads.filter(t => t.status === 'pending' && extractMentions(t.content).includes((currentProfile.display_name || currentUser.email).replace('@', ''))).length}
+                    </span>
+                </div>
+            </div>
+        `;
+        // Insert after navTeams content or append?
+        // Index.html logic handles the click, but we want to display submenu *under* it.
+        // It's cleaner to inject it here if we can target it.
+        // Since navTeams is static HTML, we might need to modify how we render it or append to a container.
+        // Actually, let's just create a container for it in HTML or append it after.
+        const existingSubmenu = navTeams.nextElementSibling;
+        if (existingSubmenu && existingSubmenu.classList.contains('sidebar-submenu')) {
+            existingSubmenu.remove();
+        }
+        navTeams.insertAdjacentHTML('afterend', filterHtml);
+    } else if (navTeams) {
+        const existingSubmenu = navTeams.nextElementSibling;
+        if (existingSubmenu && existingSubmenu.classList.contains('sidebar-submenu')) {
+            existingSubmenu.remove();
+        }
+    }
+
+
     allTeams.forEach(team => {
         const div = document.createElement('div');
-        // Use loose comparison for ID match
-        div.className = `team-icon ${currentTeamId == team.id ? 'active' : ''}`;
+        const isActive = String(currentTeamId) === String(team.id);
+        div.className = `team-list-item ${isActive ? 'active' : ''}`;
         div.title = team.name;
 
+        let iconHtml = '';
         if (team.avatar_url) {
-            div.innerHTML = `<img src="${team.avatar_url}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
-            div.style.backgroundColor = 'transparent';
+            iconHtml = `<div class="team-icon" style="background: transparent;"><img src="${team.avatar_url}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;"></div>`;
         } else {
-            div.style.backgroundColor = team.icon_color || '#313338';
-            div.innerHTML = team.name.charAt(0).toUpperCase();
+            iconHtml = `<div class="team-icon" style="background: ${team.icon_color || '#313338'}; color: var(--text-muted);">${team.name.charAt(0).toUpperCase()}</div>`;
         }
+
+        div.innerHTML = `
+            ${iconHtml}
+            <span class="team-name-label">${escapeHtml(team.name)}</span>
+        `;
 
         // Use dataset to store ID safely
         div.dataset.teamId = team.id;
         div.onclick = function () {
             const tId = this.dataset.teamId;
-            // Ensure ID is treated as correct type (string/number check not strictly needed with loose comparison but good practice)
             switchTeam(tId);
         };
         teamsListEl.appendChild(div);
+
+        // Render Channels (Submenu) if Active
+        if (isActive) {
+            const submenu = document.createElement('div');
+            submenu.className = 'sidebar-submenu';
+
+            // Dynamic counts
+            const pendingCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id)).length;
+            const myName = currentProfile.display_name || currentUser.email; // Simplify for now
+            const assignedCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id) && extractMentions(t.content).includes(myName)).length || 0;
+
+            submenu.innerHTML = `
+                <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
+                    <span># 一般</span>
+                </div>
+                 <div class="sidebar-submenu-item ${feedFilter === 'pending' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='pending'; renderTeamsSidebar(); renderThreads();">
+                    <span># 未完了</span>
+                    <span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">${pendingCount}</span>
+                </div>
+             `;
+
+            // Team Settings for Admin/Owner/Manager
+            const canManage = currentProfile.role === 'Admin' || currentProfile.role === 'Manager' || team.created_by === currentUser.id;
+            if (canManage) {
+                const settingsHtml = `
+                    <div class="sidebar-submenu-item" onclick="event.stopPropagation(); window.openTeamSettings();">
+                         <span style="display:flex; align-items:center; gap:6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                            チーム管理
+                        </span>
+                    </div>
+                `;
+                submenu.insertAdjacentHTML('beforeend', settingsHtml);
+            }
+
+            teamsListEl.appendChild(submenu);
+        }
     });
 }
 
 window.switchGlobalNav = function (nav) {
     currentGlobalNav = nav;
     currentTeamId = null; // Reset team selection when switching global nav
-    document.querySelectorAll('.teams-sidebar .team-icon').forEach(icon => {
-        icon.classList.toggle('active', icon.id === `nav-${nav}`);
-    });
-    renderTeamsSidebar(); // Update team icons active state
-    renderSecondarySidebar();
+    const navTeams = document.getElementById('nav-teams');
+    if (navTeams && nav === 'teams') navTeams.classList.add('active'); // Force active visual
+
+    feedFilter = 'all'; // Reset filter
+
+    renderTeamsSidebar(); // Re-render to show nested filters for All
     window.scrollTo({ top: 0, behavior: 'instant' });
     renderThreads(); // Immediate feedback
     loadData(); // Refresh in background
 };
 
 window.switchTeam = function (teamId) {
-    currentTeamId = teamId;
+    currentTeamId = teamId; // teamId usually comes as string from dataset but we use String() comparisons anyway
     currentGlobalNav = 'teams';
     const navTeams = document.getElementById('nav-teams');
     if (navTeams) navTeams.classList.remove('active');
 
-    // フィルターをリセットして全件表示を保証
+    // Default to 'all' filter when switching team unless preserved? Let's reset.
     feedFilter = 'all';
     currentFilter = 'all';
 
-    renderTeamsSidebar();
-    renderSecondarySidebar();
+    renderTeamsSidebar(); // Update to show properties of selected team
+    // renderSecondarySidebar(); // Removed
 
     // メイン領域をトップに戻す
     const feedArea = document.querySelector('.main-feed-area');
@@ -286,73 +383,6 @@ window.switchTeam = function (teamId) {
     });
 };
 
-function renderSecondarySidebar() {
-    if (!channelListEl) return;
-    channelListEl.innerHTML = '';
-
-    // Use explicit null/undefined check to allow 0 or valid strings
-    const team = allTeams.find(t => t.id == currentTeamId);
-    currentTeamNameSidebar.textContent = (currentTeamId !== null && team) ? team.name : 'すべてのスレッド';
-
-    const createItem = (label, filterValue, icon = '', count = null) => {
-        const div = document.createElement('div');
-        div.className = `channel-item ${feedFilter === filterValue ? 'active' : ''}`;
-        div.innerHTML = `<span>${icon}</span> <span style="flex:1">${label}</span> ${count !== null ? `<span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">${count}</span>` : ''}`;
-        div.onclick = () => {
-            feedFilter = filterValue;
-            renderSecondarySidebar();
-            renderThreads();
-        };
-        return div;
-    };
-
-    const pendingCount = threads.filter(t => t.status === 'pending' && (currentTeamId === null || t.team_id == currentTeamId)).length;
-    const myName = currentProfile.display_name || currentUser.email;
-    const myTagIds = allTagMembers.filter(m => m.profile_id === currentProfile.id).map(m => m.tag_id);
-    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => t.name);
-
-    const hasMention = (content) => {
-        if (!content) return false;
-        const mentions = content.match(/@\S+/g) || [];
-        return mentions.some(m => {
-            const name = m.substring(1);
-            return name === myName || myTagNames.includes(name);
-        });
-    };
-
-    const assignedCount = threads.filter(t => {
-        if (t.status === 'completed') return false;
-        if (currentTeamId && t.team_id != currentTeamId) return false;
-        if (hasMention(t.content)) return true;
-        return (t.replies || []).some(r => hasMention(r.content));
-    }).length;
-
-    channelListEl.appendChild(createItem('すべて', 'all', '#'));
-
-    if (team) {
-        const isOwner = team.created_by === currentUser.id || currentProfile.role === 'Admin';
-        if (isOwner) {
-            const divider = document.createElement('div');
-            divider.style.height = '1px';
-            divider.style.background = 'rgba(255,255,255,0.05)';
-            divider.style.margin = '12px 16px';
-            channelListEl.appendChild(divider);
-
-            const settingsItem = document.createElement('div');
-            settingsItem.className = 'channel-item';
-            settingsItem.style.marginTop = 'auto'; // Push to bottom if needed, or just standard item
-
-            settingsItem.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg> チーム管理
-            `;
-            settingsItem.onclick = () => window.openTeamSettings();
-            channelListEl.appendChild(settingsItem);
-        }
-    }
-}
 
 async function createTeam() {
     const name = newTeamNameInp.value.trim();
@@ -445,7 +475,7 @@ window.handleTeamAvatarSelect = async function (event) {
             avatarPreview.innerHTML = `<img src="${publicUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
         }
         renderTeamsSidebar();
-        renderSecondarySidebar();
+
 
     } catch (e) {
         console.error("Avatar upload error:", e);
@@ -477,12 +507,27 @@ async function fetchTeamMembers(teamId) {
         return;
     }
 
-    teamMemberList.innerHTML = members.map(m => {
+    // Header Row
+    const headerRow = `
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-size: 0.75rem;">
+            <th style="padding: 10px; text-align: left;">名前 / メール</th>
+            <th style="padding: 10px; text-align: left;">ロール</th>
+            <th style="padding: 10px; text-align: right;">操作</th>
+        </tr>
+    `;
+
+    const rows = members.map(m => {
         const p = m.profiles;
         const name = p ? (p.display_name || p.email) : '不明なユーザー';
         const email = p ? p.email : '';
         const isMe = currentUser && currentUser.id === m.user_id;
         const currentRole = m.role || 'member';
+
+        // Robust Admin check
+        const myRole = (currentProfile.role || '').toLowerCase();
+        const isAdmin = myRole === 'admin';
+
+        const canEdit = !isMe || isAdmin;
 
         const roles = [
             { val: 'owner', label: '所有者' },
@@ -492,8 +537,8 @@ async function fetchTeamMembers(teamId) {
         ];
 
         const roleSelect = `
-            <select class="input-field btn-sm" style="width:auto; padding: 2px 4px;" 
-                onchange="window.updateTeamMemberRole('${m.user_id}', this.value)" ${isMe ? 'disabled' : ''}>
+            <select class="input-field btn-sm" style="width:auto; padding: 4px 8px; font-size: 0.85rem;" 
+                onchange="window.updateTeamMemberRole('${m.user_id}', this.value)" ${canEdit ? '' : 'disabled'}>
                 ${roles.map(r => `<option value="${r.val}" ${currentRole === r.val ? 'selected' : ''}>${r.label}</option>`).join('')}
             </select>
         `;
@@ -501,18 +546,20 @@ async function fetchTeamMembers(teamId) {
         return `
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <td style="padding: 10px;">
-                    <div style="font-weight:bold;">${escapeHtml(name)}</div>
+                    <div style="font-weight:bold; font-size: 0.9rem;">${escapeHtml(name)}</div>
                     <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(email)}</div>
                 </td>
                 <td style="padding: 10px;">
-                    ${isMe ? `<span style="font-size:0.8rem;">${roles.find(r => r.val === currentRole)?.label || currentRole}</span>` : roleSelect}
+                    ${canEdit ? roleSelect : `<span style="font-size:0.85rem; color:var(--text-muted);">${roles.find(r => r.val === currentRole)?.label || currentRole}</span>`}
                 </td>
-                <td style="padding: 10px;">
-                    ${!isMe ? `<button class="btn btn-sm" style="background:var(--danger);" onclick="window.removeTeamMember('${m.user_id}')">削除</button>` : '<span style="font-size:0.8rem; color:var(--text-muted);">自分</span>'}
+                <td style="padding: 10px; text-align: right;">
+                    ${!isMe ? `<button class="btn btn-sm" style="background:var(--danger); font-size: 0.8rem; padding: 4px 10px;" onclick="window.removeTeamMember('${m.user_id}')">削除</button>` : '<span style="font-size:0.8rem; color:var(--text-muted);">自分</span>'}
                 </td>
             </tr>
         `;
     }).join('');
+
+    teamMemberList.innerHTML = headerRow + rows;
 }
 
 window.updateTeamMemberRole = async function (userId, newRole) {
@@ -522,8 +569,9 @@ window.updateTeamMemberRole = async function (userId, newRole) {
     const team = allTeams.find(t => t.id == currentTeamId);
     const isOwner = team && team.created_by === currentUser.id;
     const isAdmin = (currentProfile.role || '').toLowerCase() === 'admin';
+    const isSelf = userId === currentUser.id;
 
-    if (!isOwner && !isAdmin) {
+    if (!isOwner && !isAdmin && !isSelf) {
         alert("権限がありません（所有者または全体管理者のみ変更可能です）");
         fetchTeamMembers(currentTeamId);
         return;
@@ -538,6 +586,10 @@ window.updateTeamMemberRole = async function (userId, newRole) {
     if (error) {
         alert("権限変更失敗: " + error.message);
         fetchTeamMembers(currentTeamId); // Revert UI
+    } else {
+        // SUCCESS Feedback
+        showToast("ロールを更新し、保存しました");
+        // No need to reload list if we trust the UI state, but refreshing ensures consistency
     }
 };
 
@@ -1432,8 +1484,10 @@ function renderThreads() {
             }
         }
 
+
         card.innerHTML = `
             ${thread.is_pinned ? '<div class="pinned-badge">重要</div>' : ''}
+            ${currentTeamId === null ? `<div class="team-badge">${escapeHtml(allTeams.find(t => t.id === thread.team_id)?.name || 'Unknown Team')}</div>` : ''}
             
             <div class="dot-menu-container">
                 <div class="dot-menu-trigger">⋮</div>
@@ -1661,7 +1715,7 @@ function renderAdminUsers() {
                     <br><small>${p.email}</small>
                 </td>
                 <td>
-                    <select onchange="window.updateRole('${p.id}', this.value)" class="input-field btn-sm" style="width: auto;" ${currentProfile.role !== 'Admin' ? 'disabled' : ''}>
+                    <select onchange="window.updateRole('${p.id}', this.value)" class="input-field btn-sm" style="width: auto;">
                         ${roleOptions}
                     </select>
                 </td>
