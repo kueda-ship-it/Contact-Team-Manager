@@ -583,6 +583,17 @@ function handleAuthState() {
     authContainer.style.display = 'none';
     mainDashboard.style.display = 'block';
 
+    // UI Control: Hide "ALL" (nav-teams) for non-admins
+    const navTeams = document.getElementById('nav-teams');
+    if (navTeams) {
+        if (['Admin'].includes(role)) {
+            navTeams.style.display = 'flex';
+        } else {
+            navTeams.style.display = 'none';
+            // If currently on "teams" (ALL) view but not allowed, switch to user's first team later
+        }
+    }
+
     loadMasterData();
     loadData();
     subscribeToChanges();
@@ -719,6 +730,18 @@ async function loadMasterData() {
         renderAdminUsers();
         renderAdminTags();
     }
+
+    // Force redirect non-admin from "ALL" view to first team
+    if (!['Admin'].includes(role) && !currentTeamId) {
+        // We need to ensure we have teams loaded. Usually fetchTeams runs after checkUser.
+        // Wait for fetchTeams logic or check allTeams.
+        // Since loadMasterData is called after checkUser -> fetchTeams chain:
+        if (allTeams && allTeams.length > 0) {
+            switchTeam(allTeams[0].id);
+            return; // switchTeam calls renderThreads
+        }
+    }
+
     renderThreads();
 }
 
@@ -1396,9 +1419,22 @@ function renderThreads() {
             <div class="dot-menu-container">
                 <div class="dot-menu-trigger">⋮</div>
                 <div class="dot-menu">
-                ${canEdit ? `
-                <div class="menu-item" onclick="editThread('${thread.id}')">
-                    <span class="menu-icon">✎</span> 編集
+                ${['Admin', 'Manager'].includes(currentProfile.role) ? `
+                ${['Admin', 'Manager'].includes(currentProfile.role) ? `
+                <div class="menu-item" onclick="openTeamSelectModal('${thread.id}', 'repost')">
+                    <span class="menu-icon">↪️</span> 別チームへ投稿 (コピー)
+                </div>
+                <div class="menu-item" style="cursor: default; position: relative;">
+                    <span class="menu-icon">➡️</span> チーム移動
+                    <!-- Hover Submenu -->
+                    <div class="submenu">
+                        ${allTeams.filter(t => t.id !== thread.team_id).map(t => `
+                            <div class="menu-item" onclick="event.stopPropagation(); window.moveThreadDirectly('${thread.id}', '${t.id}')">
+                                ${escapeHtml(t.name)}
+                            </div>
+                        `).join('')}
+                        ${allTeams.filter(t => t.id !== thread.team_id).length === 0 ? '<div class="menu-item" style="color: grey;">移動先なし</div>' : ''}
+                    </div>
                 </div>` : ''}
                 ${canDelete ? `
                 <div class="menu-item menu-item-delete" onclick="deleteThread('${thread.id}')">
@@ -1424,24 +1460,24 @@ function renderThreads() {
             <div class="task-content line-clamp-2" id="content-${thread.id}" style="white-space: pre-wrap; cursor: pointer;" onclick="this.classList.toggle('line-clamp-2')" title="クリックで全文表示/折りたたみ">${highlightMentions(thread.content)}</div>
             
             ${(() => {
-                if (thread.attachments && thread.attachments.length > 0) {
-                    return `<div class="attachment-display">` + thread.attachments.map(att => {
-                        if (att.type.startsWith('image/')) {
-                            return `<img src="${att.url}" class="attachment-thumb-large" onclick="window.open('${att.url}', '_blank')">`;
-                        } else {
-                            return `<a href="${att.url}" target="_blank" class="file-link"><span style="font-size:1.2em;">📄</span> ${att.name}</a>`;
-                        }
-                    }).join('') + `</div>`;
-                }
-                return '';
-            })()}
+                    if (thread.attachments && thread.attachments.length > 0) {
+                        return `<div class="attachment-display">` + thread.attachments.map(att => {
+                            if (att.type.startsWith('image/')) {
+                                return `<img src="${att.url}" class="attachment-thumb-large" onclick="window.open('${att.url}', '_blank')">`;
+                            } else {
+                                return `<a href="${att.url}" target="_blank" class="file-link"><span style="font-size:1.2em;">📄</span> ${att.name}</a>`;
+                            }
+                        }).join('') + `</div>`;
+                    }
+                    return '';
+                })()}
 
             <div class="reaction-container-bottom">
                 <div class="plus-trigger">+</div>
                 <div class="reaction-menu">
                     ${reactionTypes.map(emoji =>
-                `<span onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji}</span>`
-            ).join('')}
+                    `<span onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji}</span>`
+                ).join('')}
                 </div>
             </div>
 
@@ -1451,21 +1487,21 @@ function renderThreads() {
                     <div class="reply-form" style="display: flex; gap: 15px; align-items: flex-start; margin-top: 10px;">
                         <div style="flex: 1; position: relative;">
                             <div id="reply-input-${thread.id}" contenteditable="true" class="input-field btn-sm rich-editor" placeholder="返信 (メンションは@を入力)..." 
-                                   style="min-height: 50px; margin-top: 0;"
+                                   style="min-height: 38px; margin-top: 0; padding: 8px;"
                                    oninput="handleReplyInput(this, '${thread.id}')"></div>
                              <div id="mention-list-${thread.id}" class="mention-list" style="bottom: 100%; top: auto; display: none;"></div>
                              <div id="reply-attachment-preview-${thread.id}" class="attachment-preview-area" style="padding-left: 0; margin-top: 5px;"></div>
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 0px;">
+                        <div style="display: flex; gap: 5px; margin-top: 0px;">
                              <button class="btn-sm btn-outline" onclick="triggerReplyFile('${thread.id}')" title="ファイル添付" 
-                                style="padding: 0; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+                                style="padding: 0; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
                                 </svg>
                                 <input type="file" id="reply-file-${thread.id}" style="display:none;" multiple onchange="handleReplyFileSelect(this, '${thread.id}')">
                             </button>
                             <button class="btn-send-reply" onclick="addReply('${thread.id}')" title="返信" 
-                                style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; padding: 0;">
+                                style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="22" y1="2" x2="11" y2="13"></line>
                                     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -1473,7 +1509,7 @@ function renderThreads() {
                             </button>
                         </div>
                     </div>`
-                : (thread.status === 'completed' ? '' : '')}
+                    : (thread.status === 'completed' ? '' : '')}
                 </div>
 
 
@@ -1483,8 +1519,8 @@ function renderThreads() {
                 </div>
                 <div class="actions" style="display: flex; align-items: center; gap: 10px;">
                     ${thread.status === 'completed' && completerName ?
-                `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
-                : ''}
+                    `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
+                    : ''}
                     ${currentProfile.role !== 'Viewer' ? `
                     <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
                     ` : ''}
@@ -1601,7 +1637,11 @@ function renderAdminUsers() {
 
         return `
             <tr>
-                <td>${p.display_name || '-'} <br><small>${p.email}</small></td>
+                <td>
+                    ${p.display_name || '-'} 
+                    ${currentProfile.role === 'Admin' ? `<button class="btn-sm btn-outline" style="padding: 2px 6px; margin-left: 5px;" onclick="window.openEditUserNameModal('${p.id}', '${escapeHtml(p.display_name || '')}')">✎</button>` : ''}
+                    <br><small>${p.email}</small>
+                </td>
                 <td>
                     <select onchange="window.updateRole('${p.id}', this.value)" class="input-field btn-sm" style="width: auto;" ${currentProfile.role !== 'Admin' ? 'disabled' : ''}>
                         ${roleOptions}
@@ -2174,6 +2214,171 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
+// --- Team Action (Repost / Move) Functionality ---
+let teamActionThreadId = null;
+let teamactionMode = 'repost'; // 'repost' or 'move'
+
+window.openTeamSelectModal = async (threadId, mode) => {
+    teamActionThreadId = threadId;
+    teamactionMode = mode;
+
+    const modal = document.getElementById('team-select-modal');
+    const title = document.getElementById('team-select-title');
+    const btn = document.getElementById('execute-team-action-btn');
+    const select = document.getElementById('team-select-input');
+
+    title.textContent = mode === 'repost' ? '別チームへ再投稿' : 'チーム移動';
+    btn.textContent = mode === 'repost' ? '投稿する' : '移動する';
+
+    // Populate teams excluding current
+    select.innerHTML = '<option disabled selected>読み込み中...</option>';
+
+    try {
+        // Fetch ALL teams for Admin/Manager
+        const { data: teams, error } = await supabaseClient.from('teams').select('*').order('name');
+
+        if (error) {
+            console.error('Failed to fetch teams:', error);
+            // Fallback to local
+            renderTeamOptions(allTeams || []);
+            return;
+        }
+
+        renderTeamOptions(teams || []);
+    } catch (e) {
+        console.error(e);
+        // Fallback
+        renderTeamOptions(allTeams || []);
+    }
+
+    function renderTeamOptions(teamList) {
+        const filtered = teamList.filter(t => String(t.id) !== String(currentTeamId));
+
+        if (filtered.length === 0) {
+            select.innerHTML = '<option disabled selected>他に選択可能なチームがありません</option>';
+            // 不要なトーストは出さず、UI上でわかるようにする
+            return;
+        }
+
+        select.innerHTML = filtered
+            .map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`)
+            .join('');
+    }
+
+    // Modal show
+    modal.classList.add('active');
+    document.getElementById('modal-overlay').classList.add('active');
+};
+
+document.getElementById('execute-team-action-btn').addEventListener('click', async () => {
+    if (!teamActionThreadId) return;
+    const targetTeamId = document.getElementById('team-select-input').value;
+    if (!targetTeamId) return;
+
+    try {
+        if (teamactionMode === 'repost') {
+            // Fetch source
+            const { data: source } = await supabaseClient.from('threads').select('*').eq('id', teamActionThreadId).single();
+            if (!source) throw new Error('投稿が見つかりません');
+
+            // Insert new
+            const { error } = await supabaseClient.from('threads').insert({
+                team_id: targetTeamId,
+                title: source.title,
+                content: source.content,
+                author: currentProfile.id, // Current user becomes author of repost
+                author_name: currentProfile.display_name || currentProfile.email,
+                attachments: source.attachments || [],
+                status: 'pending',
+                created_at: new Date().toISOString()
+            });
+            if (error) throw error;
+            showToast('別チームへ投稿しました');
+
+        } else if (teamactionMode === 'move') {
+            // Update team_id
+            const { error } = await supabaseClient.from('threads')
+                .update({ team_id: targetTeamId })
+                .eq('id', teamActionThreadId);
+
+            if (error) throw error;
+            showToast('チームを移動しました');
+
+            // Remove from local list immediately (Optimistic-ish)
+            allThreads = allThreads.filter(t => t.id !== teamActionThreadId);
+            renderThreads();
+        }
+
+        closeModals();
+    } catch (e) {
+        console.error(e);
+        showToast('操作に失敗しました: ' + e.message, 'error');
+    }
+});
+
+// Direct Move Function (from Submenu)
+window.moveThreadDirectly = async (threadId, targetTeamId) => {
+    if (!threadId || !targetTeamId) return;
+
+    // Close dot menu (handled by clicking outside usually, but force close UI logic if needed)
+    // Actually clicking an item closes the menu because of re-render or event bubbling catch.
+
+    try {
+        const { error } = await supabaseClient.from('threads')
+            .update({ team_id: targetTeamId })
+            .eq('id', threadId);
+
+        if (error) throw error;
+        showToast('チームを移動しました');
+
+        // Optimistic UI update
+        allThreads = allThreads.filter(t => t.id !== threadId);
+        renderThreads();
+    } catch (e) {
+        console.error(e);
+        showToast('チーム移動に失敗しました: ' + e.message, 'error');
+    }
+};
+
+// --- Admin User Edit Functionality ---
+window.openEditUserNameModal = (userId, currentName) => {
+    document.getElementById('admin-edit-user-id').value = userId;
+    document.getElementById('admin-edit-display-name').value = currentName;
+
+    document.getElementById('admin-user-edit-modal').classList.add('active');
+    document.getElementById('modal-overlay').classList.add('active');
+    document.getElementById('admin-modal').classList.remove('active'); // Temporarily hide admin list
+};
+
+document.getElementById('save-admin-user-edit-btn').addEventListener('click', async () => {
+    const userId = document.getElementById('admin-edit-user-id').value;
+    const newName = document.getElementById('admin-edit-display-name').value.trim();
+
+    if (!newName) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('profiles')
+            .update({ display_name: newName })
+            .eq('id', userId);
+
+        if (error) throw error;
+
+        showToast('ユーザー名を更新しました');
+
+        // Update local data
+        const p = allProfiles.find(p => p.id === userId);
+        if (p) p.display_name = newName;
+
+        renderAdminUsers(); // Refresh table
+
+        document.getElementById('admin-user-edit-modal').classList.remove('active');
+        document.getElementById('admin-modal').classList.add('active'); // Show admin list again
+    } catch (e) {
+        showToast('更新失敗: ' + e.message, 'error');
+    }
+});
+
 // --- Team Icon Management ---
 window.handleTeamIconSelect = (input) => {
     const file = input.files[0];
@@ -2212,6 +2417,7 @@ window.saveTeamIcon = async () => {
 
         // Refresh teams list
         await loadMasterData();
+        await fetchTeams(); // Refresh sidebar icons
     } catch (e) {
         console.error('Error saving team icon:', e);
         alert('チームアイコンの更新に失敗しました: ' + e.message);

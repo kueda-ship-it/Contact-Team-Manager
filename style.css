@@ -982,6 +982,40 @@ textarea.input-field {
     padding: 0 10px;
 }
 
+/* Submenu Styles */
+.menu-item {
+    position: relative;
+    /* Anchor for submenu */
+}
+
+.submenu {
+    display: none;
+    position: absolute;
+    top: 0;
+    right: 100%;
+    /* Show to the left of the menu */
+    width: 200px;
+    background: #2B2D31;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+    z-index: 1010;
+    /* Higher than dot-menu */
+    max-height: 300px;
+    overflow-y: auto;
+    margin-right: 5px;
+    /* Gap between menu and submenu */
+}
+
+.menu-item:hover .submenu {
+    display: block;
+}
+
+.submenu .menu-item {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+}
+
 .attachment-item {
     position: relative;
     width: 60px;
