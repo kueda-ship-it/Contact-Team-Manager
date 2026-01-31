@@ -291,6 +291,70 @@ body {
     opacity: 1;
 }
 
+/* --- Side Panel Specifics --- */
+.side-panel .task-card {
+    position: relative;
+    padding: 10px;
+    /* Reduced vertical padding */
+    /* No padding-bottom reserved */
+    background: #25262B;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    /* Reduced margin */
+}
+
+.side-panel .task-content {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    /* Force 2 lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    /* Override pre-wrap if needed */
+    margin-bottom: 4px;
+    font-size: 12px !important;
+    /* Force smaller font (approx -2px from 14px) */
+    line-height: 1.3;
+    opacity: 0.9;
+}
+
+/* Quick Reply Form on Hover */
+.quick-reply-form {
+    display: none;
+    margin-top: 8px;
+    background: #1E1F22;
+    /* Slightly darker than card */
+    padding: 8px;
+    border-radius: 4px;
+    gap: 5px;
+}
+
+.side-panel .task-card:hover .quick-reply-form {
+    display: flex;
+    /* Expand card to show form */
+}
+
+.quick-reply-input {
+    flex: 1;
+    background: #1E1F22;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.quick-reply-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
 /* Submenu - Only visible on hover */
 .sidebar-submenu {
     display: none;

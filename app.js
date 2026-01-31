@@ -230,51 +230,49 @@ function renderTeamsSidebar() {
     if (!teamsListEl) return;
     teamsListEl.innerHTML = '';
 
-    // Update active state for "All Teams"
-    const navTeams = document.getElementById('nav-teams');
-    if (navTeams) {
-        if (!currentTeamId) navTeams.classList.add('active');
-        else navTeams.classList.remove('active');
-    }
 
-    // Generate Filter Menu for "All Teams"
-    if (!currentTeamId && navTeams) {
-        let filterHtml = `
-            <div class="sidebar-submenu">
+    // "ALL" Icon as the first item in the list
+    const allTeamsDiv = document.createElement('div');
+    allTeamsDiv.id = 'dynamic-all-teams-nav'; // Assign ID for sub-menu targeting
+    allTeamsDiv.className = `team-list-item ${currentTeamId === null ? 'active' : ''}`;
+    allTeamsDiv.onclick = () => selectTeam(null);
+    allTeamsDiv.innerHTML = `
+        <div class="team-icon" style="background: linear-gradient(135deg, #FF6B6B, #FF8E53); color: white; display:flex; align-items:center; justify-content:center;">
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        </div>
+        <span class="team-name-label" style="font-weight:bold; color: #fff;">ALL Teams</span>
+    `;
+    teamsListEl.appendChild(allTeamsDiv);
+
+    // Inject Submenu if ALL Teams is active
+    if (currentTeamId === null) {
+        const threads = allThreads.filter(t => t.status !== 'completed'); // Base count for "All"
+        // Recalculate counts for accurate badges
+        const pendingCount = threads.filter(t => t.status === 'pending').length;
+        const myCount = threads.filter(t => t.status === 'pending' && extractMentions(t.content).includes((currentProfile.display_name || currentUser.email).replace('@', ''))).length;
+
+        const filterHtml = `
+            <div class="sidebar-submenu" style="margin-left: 20px; margin-bottom: 15px; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 10px;">
                 <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
                     <span># すべて</span>
                 </div>
                 <div class="sidebar-submenu-item ${feedFilter === 'pending' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='pending'; renderTeamsSidebar(); renderThreads();">
                     <span># 未完了</span>
-                    <span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
-                        ${threads.filter(t => t.status === 'pending').length}
+                    <span class="badge" style="background: var(--danger); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
+                        ${pendingCount}
                     </span>
                 </div>
                 <div class="sidebar-submenu-item ${feedFilter === 'assigned' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='assigned'; renderTeamsSidebar(); renderThreads();">
                     <span># 自分宛て</span>
                     <span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
-                         ${threads.filter(t => t.status === 'pending' && extractMentions(t.content).includes((currentProfile.display_name || currentUser.email).replace('@', ''))).length}
+                         ${myCount}
                     </span>
                 </div>
             </div>
         `;
-        // Insert after navTeams content or append?
-        // Index.html logic handles the click, but we want to display submenu *under* it.
-        // It's cleaner to inject it here if we can target it.
-        // Since navTeams is static HTML, we might need to modify how we render it or append to a container.
-        // Actually, let's just create a container for it in HTML or append it after.
-        const existingSubmenu = navTeams.nextElementSibling;
-        if (existingSubmenu && existingSubmenu.classList.contains('sidebar-submenu')) {
-            existingSubmenu.remove();
-        }
-        navTeams.insertAdjacentHTML('afterend', filterHtml);
-    } else if (navTeams) {
-        const existingSubmenu = navTeams.nextElementSibling;
-        if (existingSubmenu && existingSubmenu.classList.contains('sidebar-submenu')) {
-            existingSubmenu.remove();
-        }
+        // Append submenu directly after the ALL Teams Item
+        allTeamsDiv.insertAdjacentHTML('afterend', filterHtml);
     }
-
 
     allTeams.forEach(team => {
         const div = document.createElement('div');
@@ -449,14 +447,15 @@ window.handleTeamAvatarSelect = async function (event) {
     const filePath = `team-avatars/${fileName}`;
 
     try {
+        // Upload to Storage (Using 'uploads' bucket since 'avatars' might not exist)
         const { error: uploadError } = await supabaseClient.storage
-            .from('avatars')
+            .from('uploads')
             .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabaseClient.storage
-            .from('avatars')
+            .from('uploads')
             .getPublicUrl(filePath);
 
         const { error: updateError } = await supabaseClient
@@ -505,16 +504,17 @@ async function fetchTeamMembers(teamId) {
             added_at,
             role,
             profiles:user_id (email, display_name, avatar_url)
-        `)
-        .eq('team_id', teamId);
+        `);
 
     if (error) {
-        teamMemberList.innerHTML = `<tr><td colspan="3" style="color:var(--danger)">エラー: ${error.message}</td></tr>`;
+        console.error('Audit Log Error:', error);
+        // Explicitly show error to user for debugging
+        teamMemberList.innerHTML = `<tr><td colspan="4" style="color:var(--danger)">データ取得エラー: ${error.message} (${error.code})</td></tr>`;
         return;
     }
 
-    if (members.length === 0) {
-        teamMemberList.innerHTML = '<tr><td colspan="3">メンバーがいません</td></tr>';
+    if (!members || members.length === 0) {
+        teamMemberList.innerHTML = '<tr><td colspan="4">変更履歴はありません</td></tr>';
         return;
     }
 
@@ -1535,7 +1535,6 @@ function renderThreads() {
                 </div>
                 <div class="task-author-info">
                     <span class="author-name">${authorName}</span>
-                    <span class="timestamp">${new Date(thread.created_at).toLocaleString()}</span>
                 </div>
             </div>
 
@@ -1592,28 +1591,29 @@ function renderThreads() {
                             </button>
                         </div>
                     </div>`
-                : (thread.status === 'completed' ? '' : '')}
-                </div>
+                : (thread.status === 'completed' ? '' : '')
+            }
+                </div >
 
 
-            <div class="task-footer-teams">
-                <div class="reaction-bar">
-                    ${reactionsHtml}
-                </div>
-                <div class="actions" style="display: flex; align-items: center; gap: 10px;">
-                    ${thread.status === 'completed' && completerName ?
+        <div class="task-footer-teams">
+            <div class="reaction-bar">
+                ${reactionsHtml}
+            </div>
+            <div class="actions" style="display: flex; align-items: center; gap: 10px;">
+                ${thread.status === 'completed' && completerName ?
                 `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
                 : ''}
-                    ${currentProfile.role !== 'Viewer' ? `
+                ${currentProfile.role !== 'Viewer' ? `
                     <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
                     ` : ''}
-                </div>
             </div>
+        </div>
         `;
         threadListEl.appendChild(card);
 
         // 返信用のメンションリスト要素を登録
-        const rml = document.getElementById(`mention-list-${thread.id}`);
+        const rml = document.getElementById(`mention - list - ${thread.id}`);
         if (rml) replyMentionLists[thread.id] = rml;
 
         // 初期表示時に最下部までスクロール
@@ -1644,22 +1644,40 @@ function renderThreads() {
     const pendingThreads = threads.filter(t => t.status === 'pending' && (currentTeamId === null || t.team_id == currentTeamId)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     pendingThreads.forEach(thread => {
         const item = document.createElement('div');
-        item.className = 'sidebar-item';
+        item.className = 'task-card'; // Changed to match CSS
         const plainContent = getPlainTextForSidebar(thread.content);
         const styledContent = highlightMentions(escapeHtml(plainContent));
         const authorName = thread.author_name || thread.author || 'Unknown';
+
+        // Prevent clicking the card when clicking the form
+        item.onclick = (e) => {
+            if (e.target.closest('.quick-reply-form') || e.target.closest('.quick-reply-btn') || e.target.closest('.quick-reply-input')) {
+                return;
+            }
+            const target = document.getElementById(`thread - ${thread.id}`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                target.classList.add('highlight-thread');
+                setTimeout(() => target.classList.remove('highlight-thread'), 2000);
+            }
+        };
+
         item.innerHTML = `
             <div class="sidebar-title">${escapeHtml(thread.title)}</div>
-            <div class="line-clamp-2">${styledContent}</div>
+            <div class="task-content">
+                ${styledContent}
+            </div>
             <div style="font-size: 0.65rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 6px; opacity: 0.7;">
                 <span>by ${escapeHtml(authorName)}</span>
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
             </div>
+            
+            <!--Quick Reply Form-->
+            <div class="quick-reply-form" onclick="event.stopPropagation()">
+                <input type="text" class="quick-reply-input" placeholder="返信..." id="quick-reply-input-${thread.id}" onkeydown="if(event.key === 'Enter') window.quickReply('${thread.id}')">
+                <button class="quick-reply-btn" onclick="window.quickReply('${thread.id}')">送信</button>
+            </div>
         `;
-        item.onclick = () => {
-            const target = document.getElementById(`thread-${thread.id}`);
-            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        };
         sidebarListEl.appendChild(item);
     });
 
@@ -1684,7 +1702,7 @@ function renderThreads() {
                 <span>by ${escapeHtml(authorName)}</span>
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
             </div>
-        `;
+`;
         item.onclick = () => {
             const target = document.getElementById(`thread-${thread.id}`);
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1746,7 +1764,7 @@ function renderAdminUsers() {
                     </div>
                 </td>
             </tr>
-        `;
+    `;
     }).join('');
 }
 
@@ -1761,7 +1779,7 @@ function renderAdminTags() {
                     ${currentProfile.role === 'Admin' ? `<button class="btn btn-sm" style="background: var(--danger);" onclick="window.deleteTag('${t.id}')">削除</button>` : '-'}
                 </td>
             </tr>
-        `;
+    `;
     }).join('');
 }
 
@@ -1787,24 +1805,24 @@ function showMentionSuggestions(query, isThread = true, threadId = null) {
 
     let html = '';
     html += filteredProfiles.map((p, index) => `
-        <div class="mention-item" onmousedown="event.preventDefault()" onclick="selectMentionCandidate(${index}, ${isThread}, '${threadId}')">
+    < div class="mention-item" onmousedown = "event.preventDefault()" onclick = "selectMentionCandidate(${index}, ${isThread}, '${threadId}')" >
             <div class="avatar">${p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : (p.display_name || p.email)[0].toUpperCase()}</div>
             <div class="mention-info">
                 <span class="mention-name">${escapeHtml(p.display_name || 'No Name')}</span>
                 <span class="mention-email">${escapeHtml(p.email)}</span>
             </div>
-        </div>
+        </div >
     `).join('');
 
     const profileCount = filteredProfiles.length;
     html += filteredTags.map((t, index) => `
-        <div class="mention-item" onmousedown="event.preventDefault()" onclick="selectMentionCandidate(${profileCount + index}, ${isThread}, '${threadId}')">
+    < div class="mention-item" onmousedown = "event.preventDefault()" onclick = "selectMentionCandidate(${profileCount + index}, ${isThread}, '${threadId}')" >
             <div class="avatar tag-avatar">#</div>
             <div class="mention-info">
                 <span class="mention-name">${escapeHtml(t.name)}</span>
                 <span class="mention-email">タグ</span>
             </div>
-        </div>
+        </div >
     `).join('');
 
     listEl.innerHTML = html;
@@ -1884,7 +1902,7 @@ if (fileInput) {
 
 async function uploadFile(file) {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt} `;
     const filePath = `${currentUser.id}/${fileName}`;
 
     const { data, error } = await supabaseClient.storage.from('uploads').upload(filePath, file);
@@ -2350,6 +2368,10 @@ window.openTeamSelectModal = async (threadId, mode) => {
 
     // Modal show
     modal.classList.add('active');
+    renderAdminUsers(); // Initial load
+};
+
+window.showAdminTab = (tab) => {
     document.getElementById('modal-overlay').classList.add('active');
 };
 
@@ -2453,18 +2475,37 @@ document.getElementById('save-admin-user-edit-btn').addEventListener('click', as
 
         if (error) throw error;
 
-        showToast('ユーザー名を更新しました');
+        // --- Retroactive Update for Threads and Replies ---
+        // Update all threads by this user
+        /* Using user_id if available, otherwise relying on profile link which is better, 
+           but here we need to update the denormalized 'author' column if it exists. 
+           (Assuming threads.author is the display name string) */
 
-        // Update local data
-        const p = allProfiles.find(p => p.id === userId);
+        // Parallel update: threads & replies
+        await Promise.all([
+            supabaseClient.from('threads').update({ author: newName }).eq('user_id', userId),
+            supabaseClient.from('replies').update({ author: newName }).eq('user_id', userId)
+        ]);
+
+        showToast('表示名を変更し、過去の投稿にも反映しました');
+        logAudit('UPDATE_USER_NAME', { user_id: userId, new_name: newName }, userId);
+
+        // Update local state
+        const p = allProfiles.find(x => x.id === userId);
         if (p) p.display_name = newName;
 
-        renderAdminUsers(); // Refresh table
+        renderAdminMembersTable(); // Refresh admin list
 
         document.getElementById('admin-user-edit-modal').classList.remove('active');
-        document.getElementById('admin-modal').classList.add('active'); // Show admin list again
+        document.getElementById('modal-overlay').classList.remove('active');
+        document.getElementById('admin-modal').classList.add('active'); // Re-open admin list
+
+        // Refresh threads to show new names
+        fetchThreads();
+
     } catch (e) {
-        showToast('更新失敗: ' + e.message, 'error');
+        console.error(e);
+        alert('更新失敗: ' + e.message);
     }
 });
 
@@ -2492,16 +2533,16 @@ window.saveTeamIcon = async () => {
         const fileName = `${Math.random()}.${fileExt}`;
         const filePath = `team-avatars/${fileName}`;
 
-        // Upload to Storage
+        // Upload to Storage (Using 'uploads' bucket)
         const { error: uploadError } = await supabaseClient.storage
-            .from('avatars')
+            .from('uploads')
             .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
         // Get Public URL
         const { data: { publicUrl } } = supabaseClient.storage
-            .from('avatars')
+            .from('uploads')
             .getPublicUrl(filePath);
 
         // Update DB with URL
@@ -2527,6 +2568,22 @@ window.saveTeamIcon = async () => {
         alert('チームアイコンの更新に失敗しました: ' + e.message);
     }
 };
+
+// --- Audit Log Helper ---
+async function logAudit(action, details, targetId) {
+    if (!currentUser) return;
+    try {
+        await supabaseClient.from('audit_logs').insert([{
+            user_id: currentUser.id,
+            action: action,
+            details: typeof details === 'object' ? JSON.stringify(details) : details,
+            target_id: targetId,
+            created_at: new Date().toISOString()
+        }]);
+    } catch (e) {
+        console.warn('Audit log failed:', e); // Non-blocking
+    }
+}
 
 // Start initialization
 checkUser();
