@@ -2559,26 +2559,17 @@ window.saveTeamIcon = async () => {
     if (!file || !currentTeamId) return;
 
     try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `team-avatars/${fileName}`;
+        // Use Base64 for team icon (consistent with user avatar) to avoid Bucket Not Found
+        const reader = new FileReader();
+        const base64Url = await new Promise(resolve => {
+            reader.onload = e => resolve(e.target.result);
+            reader.readAsDataURL(file);
+        });
 
-        // Upload to Storage (Using 'avatars' bucket)
-        const { error: uploadError } = await supabaseClient.storage
-            .from('avatars')
-            .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        // Get Public URL
-        const { data: { publicUrl } } = supabaseClient.storage
-            .from('avatars')
-            .getPublicUrl(filePath);
-
-        // Update DB with URL
+        // Update DB with Base64 URL
         const { error: updateError } = await supabaseClient
             .from('teams')
-            .update({ avatar_url: publicUrl })
+            .update({ avatar_url: base64Url })
             .eq('id', currentTeamId);
 
         if (updateError) throw updateError;
