@@ -1130,6 +1130,25 @@ window.toggleStatus = async function (threadId) {
     }
 }
 
+
+window.showToast = function (message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type === 'error' ? 'toast-error' : ''}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => {
+        toast.classList.add('show');
+    });
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 300);
+    }, 3000);
+};
+
 function showCompleteEffect(threadId) {
     const card = document.getElementById(`thread-${threadId}`);
     if (!card) return;
@@ -1168,7 +1187,7 @@ window.deleteThread = async function (threadId) {
         if (error) {
             alert("削除失敗: " + error.message);
         } else {
-            allThreads = allThreads.filter(t => t.id !== threadId); // Optimistic update
+            threads = threads.filter(t => String(t.id) !== String(threadId)); // Optimistic update
             renderThreads();
         }
     }
@@ -1420,7 +1439,6 @@ function renderThreads() {
                 <div class="dot-menu-trigger">⋮</div>
                 <div class="dot-menu">
                 ${['Admin', 'Manager'].includes(currentProfile.role) ? `
-                ${['Admin', 'Manager'].includes(currentProfile.role) ? `
                 <div class="menu-item" onclick="openTeamSelectModal('${thread.id}', 'repost')">
                     <span class="menu-icon">↪️</span> 別チームへ投稿 (コピー)
                 </div>
@@ -1429,7 +1447,7 @@ function renderThreads() {
                     <!-- Hover Submenu -->
                     <div class="submenu">
                         ${allTeams.filter(t => t.id !== thread.team_id).map(t => `
-                            <div class="menu-item" onclick="event.stopPropagation(); window.moveThreadDirectly('${thread.id}', '${t.id}')">
+                            <div class="menu-item" onclick="event.preventDefault(); event.stopPropagation(); window.moveThreadDirectly('${thread.id}', '${t.id}')">
                                 ${escapeHtml(t.name)}
                             </div>
                         `).join('')}
@@ -1460,24 +1478,24 @@ function renderThreads() {
             <div class="task-content line-clamp-2" id="content-${thread.id}" style="white-space: pre-wrap; cursor: pointer;" onclick="this.classList.toggle('line-clamp-2')" title="クリックで全文表示/折りたたみ">${highlightMentions(thread.content)}</div>
             
             ${(() => {
-                    if (thread.attachments && thread.attachments.length > 0) {
-                        return `<div class="attachment-display">` + thread.attachments.map(att => {
-                            if (att.type.startsWith('image/')) {
-                                return `<img src="${att.url}" class="attachment-thumb-large" onclick="window.open('${att.url}', '_blank')">`;
-                            } else {
-                                return `<a href="${att.url}" target="_blank" class="file-link"><span style="font-size:1.2em;">📄</span> ${att.name}</a>`;
-                            }
-                        }).join('') + `</div>`;
-                    }
-                    return '';
-                })()}
+                if (thread.attachments && thread.attachments.length > 0) {
+                    return `<div class="attachment-display">` + thread.attachments.map(att => {
+                        if (att.type.startsWith('image/')) {
+                            return `<img src="${att.url}" class="attachment-thumb-large" onclick="window.open('${att.url}', '_blank')">`;
+                        } else {
+                            return `<a href="${att.url}" target="_blank" class="file-link"><span style="font-size:1.2em;">📄</span> ${att.name}</a>`;
+                        }
+                    }).join('') + `</div>`;
+                }
+                return '';
+            })()}
 
             <div class="reaction-container-bottom">
                 <div class="plus-trigger">+</div>
                 <div class="reaction-menu">
                     ${reactionTypes.map(emoji =>
-                    `<span onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji}</span>`
-                ).join('')}
+                `<span onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji}</span>`
+            ).join('')}
                 </div>
             </div>
 
@@ -1509,7 +1527,7 @@ function renderThreads() {
                             </button>
                         </div>
                     </div>`
-                    : (thread.status === 'completed' ? '' : '')}
+                : (thread.status === 'completed' ? '' : '')}
                 </div>
 
 
@@ -1519,8 +1537,8 @@ function renderThreads() {
                 </div>
                 <div class="actions" style="display: flex; align-items: center; gap: 10px;">
                     ${thread.status === 'completed' && completerName ?
-                    `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
-                    : ''}
+                `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
+                : ''}
                     ${currentProfile.role !== 'Viewer' ? `
                     <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
                     ` : ''}
@@ -2304,8 +2322,11 @@ document.getElementById('execute-team-action-btn').addEventListener('click', asy
             if (error) throw error;
             showToast('チームを移動しました');
 
-            // Remove from local list immediately (Optimistic-ish)
-            allThreads = allThreads.filter(t => t.id !== teamActionThreadId);
+            // Update local list correctly (Optimistic-ish)
+            const thread = threads.find(t => String(t.id) === String(teamActionThreadId));
+            if (thread) {
+                thread.team_id = targetTeamId;
+            }
             renderThreads();
         }
 
@@ -2332,7 +2353,10 @@ window.moveThreadDirectly = async (threadId, targetTeamId) => {
         showToast('チームを移動しました');
 
         // Optimistic UI update
-        allThreads = allThreads.filter(t => t.id !== threadId);
+        const thread = threads.find(t => String(t.id) === String(threadId));
+        if (thread) {
+            thread.team_id = targetTeamId;
+        }
         renderThreads();
     } catch (e) {
         console.error(e);

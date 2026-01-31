@@ -1003,8 +1003,18 @@ textarea.input-field {
     /* Higher than dot-menu */
     max-height: 300px;
     overflow-y: auto;
-    margin-right: 5px;
+    margin-right: 0;
     /* Gap between menu and submenu */
+}
+
+.submenu::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 100%;
+    width: 20px;
+    background: transparent;
 }
 
 .menu-item:hover .submenu {
@@ -1395,6 +1405,33 @@ html {
         transform: translate(-50%, -80%) scale(1.3);
         opacity: 0;
     }
+}
+
+/* --- Generic Toast --- */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #333;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    border-left: 4px solid var(--primary);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast.toast-error {
+    border-left-color: var(--danger);
 }
 
 /* --- Dot Menu (Edit/Delete) --- */
