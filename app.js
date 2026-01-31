@@ -226,32 +226,33 @@ function extractMentions(content) {
     return matches.map(m => m.substring(1)); // Remove '@'
 }
 
-function renderTeamsSidebar() {
-    if (!teamsListEl) return;
-    teamsListEl.innerHTML = '';
+window.renderTeamsSidebar = function () {
+    try {
+        if (!teamsListEl) return;
+        teamsListEl.innerHTML = '';
 
 
-    // "ALL" Icon as the first item in the list
-    const allTeamsDiv = document.createElement('div');
-    allTeamsDiv.id = 'dynamic-all-teams-nav'; // Assign ID for sub-menu targeting
-    allTeamsDiv.className = `team-list-item ${currentTeamId === null ? 'active' : ''}`;
-    allTeamsDiv.onclick = () => selectTeam(null);
-    allTeamsDiv.innerHTML = `
+        // "ALL" Icon as the first item in the list
+        const allTeamsDiv = document.createElement('div');
+        allTeamsDiv.id = 'dynamic-all-teams-nav'; // Assign ID for sub-menu targeting
+        allTeamsDiv.className = `team-list-item ${currentTeamId === null ? 'active' : ''}`;
+        allTeamsDiv.onclick = () => selectTeam(null);
+        allTeamsDiv.innerHTML = `
         <div class="team-icon" style="background: linear-gradient(135deg, #FF6B6B, #FF8E53); color: white; display:flex; align-items:center; justify-content:center;">
              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
         </div>
         <span class="team-name-label" style="font-weight:bold; color: #fff;">ALL Teams</span>
     `;
-    teamsListEl.appendChild(allTeamsDiv);
+        teamsListEl.appendChild(allTeamsDiv);
 
-    // Inject Submenu if ALL Teams is active
-    if (currentTeamId === null) {
-        const threads = allThreads.filter(t => t.status !== 'completed'); // Base count for "All"
-        // Recalculate counts for accurate badges
-        const pendingCount = threads.filter(t => t.status === 'pending').length;
-        const myCount = threads.filter(t => t.status === 'pending' && extractMentions(t.content).includes((currentProfile.display_name || currentUser.email).replace('@', ''))).length;
+        // Inject Submenu if ALL Teams is active
+        if (currentTeamId === null) {
+            const filteredThreads = threads.filter(t => t.status !== 'completed'); // Base count for "All"
+            // Recalculate counts for accurate badges
+            const pendingCount = filteredThreads.filter(t => t.status === 'pending').length;
+            const myCount = filteredThreads.filter(t => t.status === 'pending' && extractMentions(t.content || '').includes((currentProfile.display_name || currentUser.email).replace('@', ''))).length;
 
-        const filterHtml = `
+            const filterHtml = `
             <div class="sidebar-submenu" style="margin-left: 20px; margin-bottom: 15px; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 10px;">
                 <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
                     <span># すべて</span>
@@ -270,48 +271,48 @@ function renderTeamsSidebar() {
                 </div>
             </div>
         `;
-        // Append submenu directly after the ALL Teams Item
-        allTeamsDiv.insertAdjacentHTML('afterend', filterHtml);
-    }
-
-    allTeams.forEach(team => {
-        const div = document.createElement('div');
-        const isActive = String(currentTeamId) === String(team.id);
-        div.className = `team-list-item ${isActive ? 'active' : ''}`;
-        div.title = team.name;
-
-        let iconHtml = '';
-        if (team.avatar_url) {
-            // Use globalAvatarVersion for cache busting
-            iconHtml = `<div class="team-icon" style="background: transparent;"><img src="${team.avatar_url}?v=${globalAvatarVersion}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;"></div>`;
-        } else {
-            iconHtml = `<div class="team-icon" style="background: ${team.icon_color || '#313338'}; color: var(--text-muted);">${team.name.charAt(0).toUpperCase()}</div>`;
+            // Append submenu directly after the ALL Teams Item
+            allTeamsDiv.insertAdjacentHTML('afterend', filterHtml);
         }
 
-        div.innerHTML = `
+        allTeams.forEach(team => {
+            const div = document.createElement('div');
+            const isActive = String(currentTeamId) === String(team.id);
+            div.className = `team-list-item ${isActive ? 'active' : ''}`;
+            div.title = team.name;
+
+            let iconHtml = '';
+            if (team.avatar_url) {
+                // Use globalAvatarVersion for cache busting
+                iconHtml = `<div class="team-icon" style="background: transparent;"><img src="${team.avatar_url}?v=${globalAvatarVersion}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;"></div>`;
+            } else {
+                iconHtml = `<div class="team-icon" style="background: ${team.icon_color || '#313338'}; color: var(--text-muted);">${team.name.charAt(0).toUpperCase()}</div>`;
+            }
+
+            div.innerHTML = `
             ${iconHtml}
             <span class="team-name-label">${escapeHtml(team.name)}</span>
         `;
 
-        // Use dataset to store ID safely
-        div.dataset.teamId = team.id;
-        div.onclick = function () {
-            const tId = this.dataset.teamId;
-            switchTeam(tId);
-        };
-        teamsListEl.appendChild(div);
+            // Use dataset to store ID safely
+            div.dataset.teamId = team.id;
+            div.onclick = function () {
+                const tId = this.dataset.teamId;
+                switchTeam(tId);
+            };
+            teamsListEl.appendChild(div);
 
-        // Render Channels (Submenu) if Active
-        if (isActive) {
-            const submenu = document.createElement('div');
-            submenu.className = 'sidebar-submenu';
+            // Render Channels (Submenu) if Active
+            if (isActive) {
+                const submenu = document.createElement('div');
+                submenu.className = 'sidebar-submenu';
 
-            // Dynamic counts
-            const pendingCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id)).length;
-            const myName = currentProfile.display_name || currentUser.email; // Simplify for now
-            const assignedCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id) && extractMentions(t.content).includes(myName)).length || 0;
+                // Dynamic counts
+                const pendingCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id)).length;
+                const myName = currentProfile.display_name || currentUser.email; // Simplify for now
+                const assignedCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id) && extractMentions(t.content || '').includes(myName)).length || 0;
 
-            submenu.innerHTML = `
+                submenu.innerHTML = `
                 <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
                     <span># 一般</span>
                 </div>
@@ -321,10 +322,10 @@ function renderTeamsSidebar() {
                 </div>
              `;
 
-            // Team Settings for Admin/Owner/Manager
-            const canManage = currentProfile.role === 'Admin' || currentProfile.role === 'Manager' || team.created_by === currentUser.id;
-            if (canManage) {
-                const settingsHtml = `
+                // Team Settings for Admin/Owner/Manager
+                const canManage = currentProfile.role === 'Admin' || currentProfile.role === 'Manager' || team.created_by === currentUser.id;
+                if (canManage) {
+                    const settingsHtml = `
                     <div class="sidebar-submenu-item" onclick="event.stopPropagation(); window.openTeamSettings();">
                          <span style="display:flex; align-items:center; gap:6px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -335,12 +336,35 @@ function renderTeamsSidebar() {
                         </span>
                     </div>
                 `;
-                submenu.insertAdjacentHTML('beforeend', settingsHtml);
-            }
+                    submenu.insertAdjacentHTML('beforeend', settingsHtml);
+                }
 
-            teamsListEl.appendChild(submenu);
-        }
-    });
+                teamsListEl.appendChild(submenu);
+            }
+        });
+
+        // Separator
+        const divider = document.createElement('div');
+        divider.className = 'sidebar-divider';
+        teamsListEl.appendChild(divider);
+
+        // Dynamic "Add Team" Button
+        const addTeamDiv = document.createElement('div');
+        addTeamDiv.className = 'team-list-item';
+        addTeamDiv.onclick = openCreateTeamModal;
+        addTeamDiv.innerHTML = `
+        <div class="team-icon" style="border: 2px dashed rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        </div>
+        <span class="team-name-label" style="color: rgba(255,255,255,0.7);">チームを追加</span>
+    `;
+        teamsListEl.appendChild(addTeamDiv);
+    } catch (e) {
+        console.error("Teams Sidebar Render Error:", e);
+    }
 }
 
 window.switchGlobalNav = function (nav) {
@@ -1103,7 +1127,7 @@ async function addThread() {
         alert("投稿失敗: " + error.message);
     } else {
         if (data && data[0]) {
-            allThreads.unshift(data[0]); // Optimistic update
+            threads.unshift(data[0]); // Optimistic update
             renderThreads();
         }
         newTitleInp.value = '';
@@ -2186,14 +2210,20 @@ if (saveTeamBtn) {
         }
     };
 }
-if (btnAddTeam) {
-    btnAddTeam.onclick = () => {
-        modalOverlay.style.display = 'flex';
-        teamModal.style.display = 'block';
-        adminModal.style.display = 'none';
-        settingsModal.style.display = 'none';
-        if (teamManageModal) teamManageModal.style.display = 'none';
+// --- Team Creation ---
+window.openCreateTeamModal = function () {
+    if (teamModal) {
+        teamModal.classList.add('active');
+        if (modalOverlay) modalOverlay.classList.add('active');
+        if (newTeamNameInp) {
+            newTeamNameInp.value = '';
+            setTimeout(() => newTeamNameInp.focus(), 100);
+        }
     }
+};
+
+if (btnAddTeam) {
+    btnAddTeam.onclick = window.openCreateTeamModal;
 }
 
 if (filterStatus) filterStatus.onchange = loadData;
