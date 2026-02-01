@@ -79,6 +79,17 @@ window.toggleSortOrder = function () {
 };
 const assignedSidebarListEl = document.getElementById('assigned-sidebar-list');
 
+// Utility: Format Date
+function formatDate(isoString) {
+    if (!isoString) return '';
+    try {
+        const d = new Date(isoString);
+        return d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) + ' ' + d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+        return '';
+    }
+}
+
 const adminBtn = document.getElementById('admin-btn');
 const settingsBtn = document.getElementById('settings-btn');
 const modalOverlay = document.getElementById('modal-overlay');
@@ -283,8 +294,13 @@ window.renderTeamsSidebar = function () {
 
             let iconHtml = '';
             if (team.avatar_url) {
-                // Use globalAvatarVersion for cache busting
-                iconHtml = `<div class="team-icon" style="background: transparent;"><img src="${team.avatar_url}?v=${globalAvatarVersion}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;"></div>`;
+                // Debug logging for troubleshooting
+                console.log(`Team: ${team.name}, Avatar Length: ${team.avatar_url.length}, Start: ${team.avatar_url.substring(0, 50)}`);
+
+                // Check if it's Base64 (starts with data:)
+                const isBase64 = team.avatar_url.startsWith('data:');
+                const src = isBase64 ? team.avatar_url : `${team.avatar_url}?v=${globalAvatarVersion}`;
+                iconHtml = `<div class="team-icon" style="background: transparent;"><img src="${src}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;"></div>`;
             } else {
                 iconHtml = `<div class="team-icon" style="background: ${team.icon_color || '#313338'}; color: var(--text-muted);">${team.name.charAt(0).toUpperCase()}</div>`;
             }
@@ -1559,6 +1575,7 @@ function renderThreads() {
                 </div>
                 <div class="task-author-info">
                     <span class="author-name">${authorName}</span>
+                    <span class="thread-date" style="margin-left: 10px; font-size: 0.8rem; color: var(--text-muted);">${formatDate(thread.created_at)}</span>
                 </div>
             </div>
 
@@ -2559,14 +2576,15 @@ window.saveTeamIcon = async () => {
     if (!file || !currentTeamId) return;
 
     try {
-        // Use Base64 for team icon (consistent with user avatar) to avoid Bucket Not Found
+        // Use Base64 for team icon (requires DB column to be TEXT, not VARCHAR)
+        // This avoids Storage RLS issues entirely.
         const reader = new FileReader();
         const base64Url = await new Promise(resolve => {
             reader.onload = e => resolve(e.target.result);
             reader.readAsDataURL(file);
         });
 
-        // Update DB with Base64 URL
+        // Update DB
         const { error: updateError } = await supabaseClient
             .from('teams')
             .update({ avatar_url: base64Url })
