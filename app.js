@@ -2595,6 +2595,15 @@ window.saveTeamIcon = async () => {
         // Force cache update
         globalAvatarVersion = Date.now();
 
+        // Update local state immediately
+        const team = allTeams.find(t => String(t.id) === String(currentTeamId));
+        if (team) {
+            team.avatar_url = base64Url;
+        }
+
+        // Refresh Sidebar
+        renderTeamsSidebar();
+
         alert('チームアイコンを更新しました');
         const saveBtn = document.getElementById('save-team-icon-btn');
         if (saveBtn) saveBtn.style.display = 'none';
