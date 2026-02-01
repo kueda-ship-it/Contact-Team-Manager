@@ -411,17 +411,7 @@ body {
 
 
 /* --- Sidebar Submenu (Nested in Team Item) --- */
-.main-feed-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: relative;
-    padding: 20px;
-    padding-bottom: 0;
-    padding-top: 20px;
-    /* Explicitly ensure 20px top padding matches side-panel */
-}
+/* Redundant - consolidated in L639 */
 
 .sidebar-submenu-item {
     display: flex;
@@ -449,18 +439,7 @@ body {
     margin-left: auto;
 }
 
-.main-feed-area {
-    flex: 1;
-    min-width: 0;
-    max-width: 1000px;
-    height: 100%;
-    overflow-y: auto;
-    padding: 0 10px 200px 10px;
-    /* Header stays at top */
-    scrollbar-gutter: stable;
-    scrollbar-width: thin;
-    position: relative;
-}
+/* Consolidated into later definitions */
 
 .side-panel {
     width: 320px;
@@ -1377,9 +1356,9 @@ textarea.input-field {
 
 /* --- Others --- */
 .mention {
-    color: var(--primary-light);
+    color: var(--primary-light) !important;
     /* #8B8CC7 */
-    font-weight: bold;
+    font-weight: bold !important;
     cursor: pointer;
 }
 
@@ -2016,8 +1995,8 @@ html {
 
 /* --- Content Visibility Fixes --- */
 .feed-list {
-    padding-bottom: 40px;
-    /* Reduced from 150px */
+    padding-bottom: 10px;
+    /* Reduced to move content closer to static form */
     max-width: 880px;
     margin: 0 auto;
     width: 100%;

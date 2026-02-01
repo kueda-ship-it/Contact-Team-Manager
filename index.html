@@ -166,6 +166,44 @@
                 </div>
             </div>
 
+            <style>
+                /* JS-driven expansion */
+                .teams-sidebar.expanded {
+                    width: 260px;
+                }
+
+                .team-list-item.drag-over {
+                    background: rgba(255, 255, 255, 0.1);
+                }
+
+                /* Drag Insertion Indicators */
+                .team-list-item.drag-over-top {
+                    border-top: 2px solid #5865F2 !important;
+                    transition: none;
+                }
+
+                .team-list-item.drag-over-bottom {
+                    border-bottom: 2px solid #5865F2 !important;
+                    transition: none;
+                }
+
+                /* Hide ALL text in collapsed sidebar (default state / not expanded) */
+                .teams-sidebar:not(.expanded) .sidebar-submenu,
+                .teams-sidebar:not(.expanded) .team-name-label,
+                .teams-sidebar:not(.expanded) .badge {
+                    display: none !important;
+                }
+
+                /* Dragging UX: Hide submenus when dragging to reduce clutter */
+                .teams-list.is-dragging .sidebar-submenu {
+                    display: none !important;
+                }
+
+                .teams-list.is-dragging .team-list-item {
+                    height: auto !important;
+                    /* Compact height */
+                }
+            </style>
 
             <!-- Modals -->
             <div id="modal-overlay" class="modal-overlay">
