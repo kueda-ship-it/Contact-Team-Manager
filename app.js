@@ -1123,7 +1123,7 @@ function highlightMentions(text) {
 
     // Match existing mention spans OR bare @mentions
     // We stop bare mentions at a variety of delimiters but NOT spaces initially to allow greedy checking
-    const mentionRegex = /<span class="mention">.*?<\/span>|@([^<>\n\r,.;:!?()[\\]{}'\"]+)/g;
+    const mentionRegex = /<span class="mention">.*?<\/span>|@([^<>\n\r,.;:!?()[\]{}'"]+)/g;
 
     // Helper to check if a name exists (as user or tag)
     const checkName = (name) => {
