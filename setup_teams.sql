@@ -61,6 +61,7 @@ USING (
 -- D. メンバーの追加・削除: 
 DROP POLICY IF EXISTS "Member manage access" ON team_members;
 DROP POLICY IF EXISTS "Member add access" ON team_members;
+DROP POLICY IF EXISTS "Member update access" ON team_members;
 DROP POLICY IF EXISTS "Member delete access" ON team_members;
 
 -- 追加・削除・更新は「そのチームのメンバー」なら可能
@@ -175,19 +176,21 @@ USING (
 CREATE POLICY "Thread insert policy" ON threads FOR INSERT
 WITH CHECK (auth.role() = 'authenticated');
 
--- 3. 更新/削除: 自分の投稿(user_id) または Admin/Manager
+-- 3. 更新: 自分の投稿(user_id) または チームメンバー (誰でも完了処理ができるように) または Admin/Manager
 CREATE POLICY "Thread update policy" ON threads FOR UPDATE
 USING (
     (user_id = auth.uid()) OR
     (auth.uid() = (SELECT id FROM profiles WHERE email = author OR display_name = author LIMIT 1)) OR 
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'Admin' OR role = 'Manager'))
+    EXISTS (SELECT 1 FROM team_members WHERE team_id = threads.team_id AND user_id = auth.uid()) OR
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (LOWER(role) = 'admin' OR LOWER(role) = 'manager'))
 );
 
+-- 4. 削除: 自分の投稿(user_id) または Admin/Manager
 CREATE POLICY "Thread delete policy" ON threads FOR DELETE
 USING (
     (user_id = auth.uid()) OR
     (auth.uid() = (SELECT id FROM profiles WHERE email = author OR display_name = author LIMIT 1)) OR 
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'Admin' OR role = 'Manager'))
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (LOWER(role) = 'admin' OR LOWER(role) = 'manager'))
 );
 
 

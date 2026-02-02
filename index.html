@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contact Team Manager | Standalone</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260202-FINAL-FIX">
     <link rel="manifest" href="manifest.json">
     <!-- Supabase JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -202,6 +202,37 @@
                 .teams-list.is-dragging .team-list-item {
                     height: auto !important;
                     /* Compact height */
+                }
+
+                /* Force Mention List Visibility and Opacity */
+                .mention-list,
+                #mention-list,
+                [id^="mention-list-"] {
+                    background: #000000 !important;
+                    background-color: #000000 !important;
+                    opacity: 1 !important;
+                    filter: none !important;
+                    backdrop-filter: none !important;
+                    mix-blend-mode: normal !important;
+                    z-index: 99999 !important;
+                    box-shadow: 0 0 20px rgba(0, 0, 0, 1) !important;
+                }
+
+                .mention-item {
+                    background: #000000 !important;
+                    background-color: #000000 !important;
+                    opacity: 1 !important;
+                    color: white !important;
+                }
+
+                .mention-item:hover,
+                .mention-item.active {
+                    background: #313338 !important;
+                }
+
+                .compact-form,
+                .reply-form {
+                    opacity: 1 !important;
                 }
             </style>
 

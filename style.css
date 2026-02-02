@@ -1001,8 +1001,10 @@ body {
     display: flex;
     flex-direction: column;
     margin-bottom: 8px;
-    z-index: 5;
+    z-index: 1000;
+    /* Lift the whole section to stay above reaction bars below */
     transition: all 0.2s ease;
+    position: relative;
 }
 
 .reply-section.is-empty {
@@ -1041,6 +1043,9 @@ body {
     margin-bottom: 5px;
     font-size: 0.85rem;
     transition: background 0.2s ease;
+    position: relative;
+    z-index: 1;
+    /* Allow content inside to stack relative to this */
 }
 
 .reply-item:hover {
@@ -1063,6 +1068,9 @@ body {
     display: flex;
     gap: 8px;
     padding-top: 5px;
+    position: relative;
+    z-index: 5001;
+    /* Lift higher than thread reactions */
 }
 
 .input-field {
@@ -1313,7 +1321,9 @@ textarea.input-field {
     /* Space at bottom */
     flex-shrink: 0;
     /* Do not shrink */
-    z-index: 100;
+    position: relative;
+    z-index: 5002;
+    /* Ensure post form is above feed content */
 }
 
 .static-form-container .compact-form {
@@ -1321,7 +1331,7 @@ textarea.input-field {
     max-width: none !important;
     padding: 8px 12px !important;
     /* Reduced padding */
-    background: rgba(31, 30, 29, 0.95) !important;
+    background: #1F1E1D !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 12px;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
@@ -1402,15 +1412,20 @@ textarea.input-field {
 /* --- Mention List (Teams Candidate UI) --- */
 .mention-list {
     position: absolute;
-    background: #252423;
+    background: #1a1a1a !important;
+    /* Extremely solid and dark */
+    background-color: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.8);
     border-radius: 4px;
-    z-index: 9999 !important;
-    /* Top layer */
-    max-height: 300px;
+    z-index: 20000 !important;
+    /* Extremely high to stay above reactions and headers */
+    max-height: 250px;
     overflow-y: auto;
-    width: 280px;
+    width: 100%;
+    min-width: 280px;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
 }
 
 .mention-item {
@@ -1502,7 +1517,6 @@ html {
     font-size: 1.2rem;
     transition: all 0.2s;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    z-index: 50;
 }
 
 .plus-trigger:active {
@@ -2193,18 +2207,7 @@ html {
     display: block;
 }
 
-/* Mention List Styling (Ensure Visibility) */
-.mention-list {
-    position: absolute;
-    background: #2B2D31;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    max-height: 200px;
-    overflow-y: auto;
-    width: 100%;
-    z-index: 1000;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-}
+/* Mention List Styling consolidated above */
 
 .mention-item {
     padding: 8px;

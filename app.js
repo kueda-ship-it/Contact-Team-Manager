@@ -81,6 +81,17 @@ window.toggleSortOrder = function () {
 };
 const assignedSidebarListEl = document.getElementById('assigned-sidebar-list');
 
+// Utility: Clean text for mentions
+function cleanText(s) {
+    if (!s) return "";
+    return String(s)
+        .normalize('NFC')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '') // Strip Zero-Width Spaces and similar
+        .replace(/[\u3000\u00A0]/g, ' ')       // Normalize Japanese and non-breaking spaces
+        .trim()
+        .toLowerCase();
+}
+
 // Utility: Format Date
 function formatDate(isoString) {
     if (!isoString) return '';
@@ -250,12 +261,48 @@ async function fetchTeams() {
     }
 }
 
+// Helper to get plain text from HTML
+function getPlainTextForSidebar(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = (html || '').replace(/<br\s*\/?>/gi, ' ');
+    const text = tmp.textContent || tmp.innerText || '';
+    return text.replace(/\u00A0/g, ' '); // Normalize NBSP to space
+}
+
 // Helper to extract mentions
 function extractMentions(content) {
     if (!content) return [];
-    const matches = content.match(/@([^\s]+)/g);
+    // Ensure we are working with plain text before matching
+    const plainText = content.normalize('NFC').includes('<') ? getPlainTextForSidebar(content) : content.normalize('NFC');
+    // More liberal regex to capture virtually everything after @ until a delimiter
+    const matches = plainText.match(/@([^\s<>,.;:!?()[\]{}'"]+)/g);
     if (!matches) return [];
-    return matches.map(m => m.substring(1)); // Remove '@'
+    return matches.map(m => m.substring(1));
+}
+
+window.hasMention = function (content) {
+    if (!content) return false;
+    if (!currentProfile || !currentUser) return false;
+
+    const myName = cleanText(currentProfile.display_name);
+    const myNameNoSpace = myName.replace(/\s+/g, '');
+    const myEmail = cleanText(currentUser.email);
+
+    const myTagIds = allTagMembers.filter(m => m.profile_id === currentUser.id).map(m => m.tag_id);
+    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => cleanText(t.name));
+    const myTagNamesNoSpace = myTagNames.map(tn => tn.replace(/\s+/g, ''));
+
+    const mentions = extractMentions(content);
+
+    return mentions.some(m => {
+        const mClean = cleanText(m);
+        const mNoSpace = mClean.replace(/\s+/g, '');
+        return (myName && mClean === myName) ||
+            (myNameNoSpace && mNoSpace === myNameNoSpace) ||
+            (myEmail && mClean === myEmail) ||
+            myTagNames.includes(mClean) ||
+            myTagNamesNoSpace.includes(mNoSpace);
+    });
 }
 
 window.renderTeamsSidebar = function () {
@@ -311,7 +358,7 @@ window.renderTeamsSidebar = function () {
             const filteredThreads = threads.filter(t => t.status !== 'completed'); // Base count for "All"
             // Recalculate counts for accurate badges
             const pendingCount = filteredThreads.filter(t => t.status === 'pending').length;
-            const myCount = filteredThreads.filter(t => t.status === 'pending' && extractMentions(t.content || '').includes((currentProfile.display_name || currentUser.email).replace('@', ''))).length;
+            const myCount = filteredThreads.filter(t => t.status === 'pending' && window.hasMention(t.content)).length;
 
             const filterHtml = `
             <div class="sidebar-submenu" style="margin-left: 20px; margin-bottom: 15px; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 10px;">
@@ -469,8 +516,7 @@ window.renderTeamsSidebar = function () {
 
                 // Dynamic counts
                 const pendingCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id)).length;
-                const myName = currentProfile.display_name || currentUser.email;
-                const assignedCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id) && extractMentions(t.content || '').includes(myName.replace('@', ''))).length;
+                const assignedCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id) && window.hasMention(t.content)).length;
 
                 submenu.innerHTML = `
                 <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
@@ -485,7 +531,7 @@ window.renderTeamsSidebar = function () {
                  <div class="sidebar-submenu-item ${feedFilter === 'assigned' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='assigned'; renderTeamsSidebar(); renderThreads();">
                     <span># 自分宛て</span>
                      <span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
-                         ${assignedCount}
+                          ${assignedCount}
                     </span>
                 </div>
                 `;
@@ -862,7 +908,7 @@ window.updateTeamMemberRole = async function (userId, newRole) {
 
 
 
-function handleAuthState() {
+async function handleAuthState() {
     // ヘッダーのユーザー情報更新
     userDisplayEl.textContent = currentProfile.display_name || currentUser.email;
     userRoleEl.textContent = getRoleLabel(currentProfile.role);
@@ -908,12 +954,11 @@ function handleAuthState() {
             navTeams.style.display = 'flex';
         } else {
             navTeams.style.display = 'none';
-            // If currently on "teams" (ALL) view but not allowed, switch to user's first team later
         }
     }
 
-    loadMasterData();
-    loadData();
+    await loadMasterData();
+    await loadData();
     subscribeToChanges();
     requestNotificationPermission();
     if (currentUser) fetchTeams(); // Load user's teams
@@ -1034,7 +1079,7 @@ async function loadMasterData() {
     allProfiles = (p || []).map(profile => {
         let role = profile.role || 'User';
         role = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-        return { ...profile, role };
+        return { ...profile, role, display_name: (profile.display_name || "").normalize('NFC') };
     });
     const { data: t } = await supabaseClient.from('tags').select('*');
     allTags = t || [];
@@ -1106,21 +1151,26 @@ window.deleteTag = async function (tagId) {
 // Assuming 'highlightMentions' is a new utility function or was intended to be added.
 function highlightMentions(text) {
     if (!text) return "";
-    // Normalize spaces
-    const normalizedText = text.replace(/\u00A0/g, ' ');
-    const mentionRegex = /@([^\s<]+)/g;
+    // Normalize spaces and convert NBSP, ensure NFC normalization for Japanese
+    const normalizedText = text.normalize('NFC');
+    // Using the same liberal regex as extractMentions
+    const mentionRegex = /@([^\s<>,.;:!?()[\]{}'"]+)/g;
 
     return normalizedText.replace(mentionRegex, (match, name) => {
-        const cleanName = name.replace(/[.,!?;:]$/, ''); // Remove trailing punctuation
-        const norm = (s) => String(s || "").trim().toLowerCase();
-        const target = norm(cleanName);
+        const cleanName = name; // matched group
+        const target = cleanText(cleanName);
+        const targetNoSpace = target.replace(/\s+/g, '');
 
-        const exists = allProfiles.some(p => norm(p.display_name) === target || norm(p.email) === target) ||
-            allTags.some(t => norm(t.name) === target);
+        // Check current profile first (often most relevant)
+        const isMe = (currentProfile && (cleanText(currentProfile.display_name) === target || cleanText(currentProfile.display_name).replace(/\s+/g, '') === targetNoSpace)) ||
+            (currentUser && cleanText(currentUser.email) === target);
+
+        const exists = isMe ||
+            allProfiles.some(p => cleanText(p.display_name) === target || cleanText(p.display_name).replace(/\s+/g, '') === targetNoSpace || cleanText(p.email) === target) ||
+            allTags.some(t => cleanText(t.name) === target || cleanText(t.name).replace(/\s+/g, '') === targetNoSpace);
 
         if (exists) {
-            const suffix = name.slice(cleanName.length);
-            return `<span class="mention">@${cleanName}</span>${suffix}`;
+            return `<span class="mention">@${cleanName}</span>`;
         }
         return match;
     });
@@ -1557,19 +1607,7 @@ function renderThreads() {
     const myTagIds = allTagMembers.filter(m => m.profile_id === currentProfile.id).map(m => m.tag_id);
     const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => t.name);
 
-    const hasMention = (content) => {
-        if (!content) return false;
-        const normalized = (content || "").replace(/\u00A0/g, ' ');
-        const mentions = normalized.match(/@\S+/g) || [];
-        return mentions.some(m => {
-            const name = m.substring(1).replace(/[.,!?;:]$/, '');
-            const target = name.toLowerCase();
-            const emailMatch = (currentProfile.email || "").toLowerCase() === target;
-            const nameMatch = (currentProfile.display_name || "").toString().toLowerCase() === target;
-            const tagMatch = myTagNames.some(tn => String(tn).toLowerCase() === target);
-            return emailMatch || nameMatch || tagMatch;
-        });
-    };
+    // Use the global hasMention helper defined previously
 
     // List Sticky Header Title Calculation
     const currentTeamName = (currentTeamId !== null)
@@ -1930,13 +1968,6 @@ function renderThreads() {
 
     // --- Right Sidebar Rendering (Not Finished / Mentions) ---
 
-    // Define local helper specifically for sidebar snippet extraction
-    const getPlainTextForSidebar = (html) => {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = (html || '').replace(/<br\s*\/?>/gi, ' ');
-        const text = tmp.textContent || tmp.innerText || '';
-        return text.replace(/\u00A0/g, ' '); // Normalize NBSP to space
-    };
 
     const pendingThreads = threads.filter(t => t.status === 'pending' && (currentTeamId === null || t.team_id == currentTeamId)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     pendingThreads.forEach(thread => {
@@ -1960,7 +1991,10 @@ function renderThreads() {
         };
 
         item.innerHTML = `
-                    <div class="sidebar-title">${escapeHtml(thread.title)}</div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div class="sidebar-title">${escapeHtml(thread.title)}</div>
+                <button class="btn btn-sm btn-status" onclick="event.stopPropagation(); toggleStatus('${thread.id}')" style="font-size: 0.7rem; padding: 2px 8px; margin-left: 10px; flex-shrink: 0;">完了</button>
+            </div>
             <div class="task-content">
                 ${styledContent}
             </div>
@@ -1999,8 +2033,9 @@ function renderThreads() {
     const assignedThreads = threads.filter(t => {
         if (currentTeamId !== null && t.team_id != currentTeamId) return false;
         if (t.status === 'completed') return false;
-        if (hasMention(t.content)) return true;
-        return (t.replies || []).some(r => hasMention(r.content));
+        // Check thread content and all replies for mentions
+        if (window.hasMention(t.content)) return true;
+        return (t.replies || []).some(r => window.hasMention(r.content));
     }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     assignedThreads.forEach(thread => {
