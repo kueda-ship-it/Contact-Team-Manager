@@ -328,6 +328,9 @@ body {
     padding: 8px;
     border-radius: 4px;
     gap: 5px;
+    position: relative;
+    z-index: 100;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .side-panel .task-card:hover .quick-reply-form {
@@ -349,10 +352,25 @@ body {
     background: var(--primary);
     color: white;
     border: none;
-    padding: 4px 8px;
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    transition: all 0.1s ease;
+}
+
+.quick-reply-btn:hover {
+    background: var(--primary-light) !important;
+    transform: translateY(-1px) !important;
+}
+
+.quick-reply-btn:active {
+    transform: translateY(1px) scale(0.95) !important;
 }
 
 /* Submenu - Only visible on hover */
@@ -2059,8 +2077,146 @@ html {
 
 .btn-outline[title="チーム設定"]:hover,
 .btn-outline[title="設定"]:hover,
-#admin-btn:hover {
+.admin-btn:hover {
     opacity: 1;
     background: white !important;
     color: var(--accent) !important;
+}
+
+/* --- Dot Menu (Restored) --- */
+.dot-menu-container {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.task-card:hover .dot-menu-container,
+.reply-item:hover .dot-menu-container {
+    opacity: 1;
+}
+
+.dot-menu-trigger {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    transition: background 0.2s;
+}
+
+.dot-menu-trigger:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.dot-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 180px;
+    background: #2B2D31;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    border-radius: 6px;
+    padding: 4px;
+    display: none;
+    /* Controlled by hover */
+    z-index: 1010;
+}
+
+.dot-menu-container:hover .dot-menu {
+    display: block;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.menu-item:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.menu-item-delete:hover {
+    background: var(--danger);
+}
+
+.menu-icon {
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+}
+
+/* --- Reaction Plus Button (Bottom) --- */
+.reaction-container-bottom {
+    position: relative;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.task-card:hover .reaction-container-bottom,
+.reply-item:hover .reaction-container-bottom {
+    opacity: 1;
+}
+
+/* Force Quick Reply on Sidebar Hover */
+.side-panel .task-card:hover .quick-reply-form {
+    display: flex !important;
+}
+
+.side-panel .task-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    /* Enhance hover visibility */
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Contenteditable Placeholder */
+.quick-reply-input:empty:before {
+    content: attr(placeholder);
+    color: rgba(255, 255, 255, 0.4);
+    pointer-events: none;
+    display: block;
+}
+
+/* Mention List Styling (Ensure Visibility) */
+.mention-list {
+    position: absolute;
+    background: #2B2D31;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    width: 100%;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.mention-item {
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #DBDEE1;
+}
+
+.mention-item:hover,
+.mention-item.active {
+    background: #404249;
 }

@@ -1969,13 +1969,31 @@ function renderThreads() {
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
             </div>
             
-            <!--Quick Reply Form-- >
-                    <div class="quick-reply-form" onclick="event.stopPropagation()">
-                        <input type="text" class="quick-reply-input" placeholder="返信..." id="quick-reply-input-${thread.id}" onkeydown="if(event.key === 'Enter') window.quickReply('${thread.id}')">
-                            <button class="quick-reply-btn" onclick="window.quickReply('${thread.id}')">送信</button>
-                    </div>
+            <!-- Quick Reply Form (Contenteditable) -->
+            <div class="quick-reply-form" onclick="event.stopPropagation()">
+                <div style="position: relative; width: 100%;">
+                    <div id="reply-input-quick-${thread.id}" 
+                         contenteditable="true" 
+                         class="quick-reply-input rich-editor" 
+                         placeholder="返信... (@メンション)"
+                         style="min-height: 32px; max-height: 80px; overflow-y: auto; color: white;"
+                         oninput="handleQuickReplyInput(this, '${thread.id}')"
+                         onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); window.quickReply('${thread.id}'); }"></div>
+                    <div id="mention-list-quick-${thread.id}" class="mention-list" style="bottom: 100%; top: auto; display: none; width: 100%;"></div>
+                </div>
+                <button class="quick-reply-btn" onclick="window.quickReply('${thread.id}')" title="送信">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
                 `;
         sidebarListEl.appendChild(item);
+
+        // Register Quick Reply Mention List
+        const qml = document.getElementById(`mention-list-quick-${thread.id}`);
+        if (qml) replyMentionLists['quick-' + thread.id] = qml;
     });
 
     const assignedThreads = threads.filter(t => {
@@ -2107,11 +2125,11 @@ function showMentionSuggestions(query, isThread = true, threadId = null) {
         item.onclick = () => selectMentionCandidate(index, isThread, threadId);
 
         const avatarHtml = p.avatar_url
-            ? `< img src = "${p.avatar_url}" style = "width:100%;height:100%;border-radius:50%;object-fit:cover;" > `
+            ? `<img src="${p.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
             : (p.display_name || p.email)[0].toUpperCase();
 
         item.innerHTML = `
-                    < div class="avatar" > ${avatarHtml}</div >
+                    <div class="avatar">${avatarHtml}</div>
                         <div class="mention-info">
                             <span class="mention-name">${escapeHtml(p.display_name || 'No Name')}</span>
                             <span class="mention-email">${escapeHtml(p.email)}</span>
@@ -2128,7 +2146,7 @@ function showMentionSuggestions(query, isThread = true, threadId = null) {
         item.onmousedown = (e) => e.preventDefault();
         item.onclick = () => selectMentionCandidate(profileCount + i, isThread, threadId);
         item.innerHTML = `
-                    < div class="avatar tag-avatar" >#</div >
+                    <div class="avatar tag-avatar">#</div>
                         <div class="mention-info">
                             <span class="mention-name">${escapeHtml(t.name)}</span>
                             <span class="mention-email">タグ</span>
@@ -2429,6 +2447,75 @@ window.handleReplyInput = function (el, threadId) {
     if (!el.hasMentionListener) {
         el.addEventListener('keydown', (e) => handleMentionKeydown(e, false, threadId));
         el.hasMentionListener = true;
+    }
+};
+
+// Quick Reply Input Handler
+window.handleQuickReplyInput = function (el, threadId) {
+    const listKey = 'quick-' + threadId;
+
+    // For contenteditable, check text node
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    const node = range.startContainer;
+
+    if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent;
+        const cursor = range.startOffset;
+        const lastAt = text.lastIndexOf('@', cursor - 1);
+
+        if (lastAt !== -1 && !text.slice(lastAt, cursor).includes(' ')) {
+            const query = text.slice(lastAt + 1, cursor);
+            // Pass special key for lookup
+            showMentionSuggestions(query, false, listKey);
+        } else {
+            if (replyMentionLists[listKey]) replyMentionLists[listKey].style.display = 'none';
+            mentionSelectedIndex = -1;
+        }
+    } else {
+        if (replyMentionLists[listKey]) replyMentionLists[listKey].style.display = 'none';
+    }
+
+    if (!el.hasMentionListener) {
+        el.addEventListener('keydown', (e) => handleMentionKeydown(e, false, listKey));
+        el.hasMentionListener = true;
+    }
+};
+
+window.quickReply = async function (threadId) {
+    const input = document.getElementById(`reply-input-quick-${threadId}`);
+    if (!input) return;
+
+    const content = input.innerText.trim(); // contenteditable text
+    if (!content) return;
+
+    // Use innerHTML to preserve mentions
+    const htmlContent = input.innerHTML;
+
+    if (currentProfile.role === 'Viewer') return alert("閲覧権限のみです");
+
+    try {
+        const { error } = await supabaseClient.from('replies').insert([{
+            thread_id: threadId,
+            content: htmlContent, // Send HTML for mentions
+            author: currentProfile.display_name || currentUser.email,
+            user_id: currentUser.id
+        }]);
+
+        if (error) throw error;
+
+        input.innerHTML = '';
+        const listKey = 'quick-' + threadId;
+        if (replyMentionLists[listKey]) replyMentionLists[listKey].style.display = 'none';
+
+        showToast('返信しました');
+        // Refresh to show in main thread if visible + update counts
+        loadData();
+
+    } catch (e) {
+        console.error(e);
+        alert('返信失敗: ' + e.message);
     }
 };
 
