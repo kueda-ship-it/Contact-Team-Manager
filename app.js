@@ -56,6 +56,8 @@ const microsoftLoginBtn = document.getElementById('microsoft-login-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const userDisplayEl = document.getElementById('user-display');
 const userRoleEl = document.getElementById('user-role');
+const headerAvatarImg = document.getElementById('header-avatar-img');
+const appTitleEl = document.getElementById('app-title');
 
 const threadListEl = document.getElementById('thread-list');
 const sidebarListEl = document.getElementById('pending-sidebar-list');
@@ -125,8 +127,27 @@ const saveTeamBtn = document.getElementById('save-team-btn');
 
 // --- Team Management Elements ---
 const teamManageModal = document.getElementById('team-manage-modal');
+const teamConfigModal = document.getElementById('team-config-modal');
+const editTeamNameInp = document.getElementById('edit-team-name');
+const saveTeamNameBtn = document.getElementById('save-team-name-btn');
+const editTeamIconPreview = document.getElementById('edit-team-icon-preview');
+const editTeamIconInput = document.getElementById('edit-team-icon-input');
+const saveTeamIconBtnReal = document.getElementById('save-team-icon-btn-real');
+
 const teamMemberEmailInp = document.getElementById('team-member-email');
+
+// Create Team - Member Addition Elements
+const newTeamMembersInput = document.getElementById('new-team-members-input');
+const newTeamMembersList = document.getElementById('new-team-members-list');
+const newTeamSuggestions = document.getElementById('new-team-suggestions');
+let selectedNewTeamMembers = []; // Stores user objects or emails
+
+
 const teamMemberList = document.getElementById('team-member-list');
+
+if (saveTeamBtn) {
+    saveTeamBtn.onclick = createTeam;
+}
 
 // --- Auth & Profile ---
 
@@ -469,22 +490,53 @@ window.renderTeamsSidebar = function () {
                 </div>
                 `;
 
-                // Team Settings for Admin/Owner/Manager
-                const canManage = currentProfile.role === 'Admin' || currentProfile.role === 'Manager' || team.created_by === currentUser.id;
-                if (canManage) {
-                    const settingsHtml = `
+
+                // Add "Members" link for everyone
+                submenu.insertAdjacentHTML('beforeend', `
                     <div class="sidebar-submenu-item" onclick="event.stopPropagation(); window.openTeamSettings();">
-                         <span style="display:flex; align-items:center; gap:6px;">
+                        <span style="display:flex; align-items:center; gap:6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            メンバー一覧
+                        </span>
+                    </div >
+                    `);
+
+                // Team Settings (Icon, Name) for Admin/Owner/Manager ONLY
+                const myRole = currentProfile.role;
+                const isOwner = team.created_by === currentUser.id;
+                if (myRole === 'Admin' || myRole === 'Manager' || isOwner) {
+                    submenu.insertAdjacentHTML('beforeend', `
+                    <div class="sidebar-submenu-item" onclick="event.stopPropagation(); window.openTeamConfigModal();">
+                        <span style="display:flex; align-items:center; gap:6px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="3"></circle>
                                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                             </svg>
-                            チーム管理
+                            設定
                         </span>
                     </div>
-                    `;
-                    submenu.insertAdjacentHTML('beforeend', settingsHtml);
+                `);
+
                 }
+                // Currently openTeamSettings serves both purposes, so we keep the "Team Management" label if they have rights,
+                // OR we can just rely on the "Members" link above to open the same modal, and the modal internal logic hides the sensitive parts.
+                // Let's remove the duplicate "Team Management" link if we rely on "Members" to show the modal.
+                // BUT, "Team Management" implies more than just members.
+                // For now, let's keep "Members" as the primary way to check members.
+                // If the user IS an admin, we can show "設定" (Settings) instead or in addition.
+                // Let's just use "Members" for everyone, and inside the modal, if they are admin, they see extra controls.
+
+                /*
+                const canManage = currentProfile.role === 'Admin' || currentProfile.role === 'Manager' || team.created_by === currentUser.id;
+                if (canManage) {
+                    // ...
+                }
+                */
 
                 div.appendChild(submenu);
             }
@@ -572,7 +624,25 @@ async function createTeam() {
         return;
     }
 
+    // 3. Add selected members
+    if (selectedNewTeamMembers.length > 0) {
+        const newMembersData = selectedNewTeamMembers.map(m => ({
+            team_id: team.id,
+            user_id: m.id
+        }));
+        const { error: batchError } = await supabaseClient.from('team_members').insert(newMembersData);
+        if (batchError) {
+            console.error("Batch Member Add Error:", batchError);
+            alert("一部のメンバー追加に失敗しました");
+        }
+    }
+
     newTeamNameInp.value = '';
+    // Reset member inputs
+    if (newTeamMembersInput) newTeamMembersInput.value = '';
+    if (newTeamMembersList) newTeamMembersList.innerHTML = '';
+    selectedNewTeamMembers = [];
+
     teamModal.style.display = 'none';
     modalOverlay.style.display = 'none';
     fetchTeams();
@@ -585,6 +655,7 @@ window.openTeamSettings = async function () {
     teamManageModal.style.display = 'block';
     adminModal.style.display = 'none';
     settingsModal.style.display = 'none';
+    if (teamConfigModal) teamConfigModal.style.display = 'none';
     if (teamModal) teamModal.style.display = 'none';
 
     // Show current team info in modal
@@ -595,13 +666,26 @@ window.openTeamSettings = async function () {
     const avatarPreview = document.getElementById('team-avatar-preview');
     if (avatarPreview) {
         if (team.avatar_url) {
-            avatarPreview.innerHTML = `<img src="${team.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+            avatarPreview.innerHTML = `< img src = "${team.avatar_url}" style = "width:100%;height:100%;border-radius:50%;object-fit:cover;" > `;
         } else {
             avatarPreview.textContent = team.name[0].toUpperCase();
         }
     }
 
     fetchTeamMembers(currentTeamId);
+
+    // Hide/Show Admin Controls inside the modal based on permissions
+    const canManage = currentProfile.role === 'Admin' || currentProfile.role === 'Manager' || team.created_by === currentUser.id;
+
+    // Icon upload & Add Member inputs
+    const teamSettingsSection = teamManageModal.querySelector('h4').parentNode; // The first section in modal
+    if (teamSettingsSection) {
+        if (canManage) {
+            teamSettingsSection.style.display = 'block';
+        } else {
+            teamSettingsSection.style.display = 'none';
+        }
+    }
 };
 
 window.closeTeamManageModal = function () {
@@ -614,8 +698,8 @@ window.handleTeamAvatarSelect = async function (event) {
     if (!file || !currentTeamId) return;
 
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `team-avatars/${fileName}`;
+    const fileName = `${Math.random()}.${fileExt} `;
+    const filePath = `team - avatars / ${fileName} `;
 
     try {
         // Upload to Storage (Using 'uploads' bucket since 'avatars' might not exist)
@@ -645,12 +729,12 @@ window.handleTeamAvatarSelect = async function (event) {
         // Cache busting URL for immediate display
         const now = Date.now();
         globalAvatarVersion = now; // Update global version for sidebar
-        const displayUrl = `${publicUrl}?t=${now}`;
+        const displayUrl = `${publicUrl}?t = ${now} `;
 
         // UI Feedback - Update Modal Preview
         const avatarPreview = document.getElementById('team-avatar-preview');
         if (avatarPreview) {
-            avatarPreview.innerHTML = `<img src="${displayUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+            avatarPreview.innerHTML = `< img src = "${displayUrl}" style = "width:100%;height:100%;border-radius:50%;object-fit:cover;" > `;
         }
 
         showToast("チームアイコンを更新しました。再読み込み中...");
@@ -675,7 +759,8 @@ async function fetchTeamMembers(teamId) {
                     added_at,
                     role,
                     profiles: user_id(email, display_name, avatar_url)
-                        `);
+                        `)
+        .eq('team_id', teamId);
 
     if (error) {
         console.error('Audit Log Error:', error);
@@ -691,12 +776,12 @@ async function fetchTeamMembers(teamId) {
 
     // Header Row
     const headerRow = `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-size: 0.75rem;">
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-size: 0.75rem;">
             <th style="padding: 10px; text-align: left;">名前 / メール</th>
             <th style="padding: 10px; text-align: left;">ロール</th>
             <th style="padding: 10px; text-align: right;">操作</th>
         </tr>
-                    `;
+    `;
 
     const rows = members.map(m => {
         const p = m.profiles;
@@ -719,14 +804,14 @@ async function fetchTeamMembers(teamId) {
         ];
 
         const roleSelect = `
-                    <select class="input-field btn-sm" style="width:auto; padding: 4px 8px; font-size: 0.85rem;"
+            <select class="input-field btn-sm" style="width:auto; padding: 4px 8px; font-size: 0.85rem;"
                 onchange="window.updateTeamMemberRole('${m.user_id}', this.value)" ${canEdit ? '' : 'disabled'}>
-                    ${roles.map(r => `<option value="${r.val}" ${currentRole === r.val ? 'selected' : ''}>${r.label}</option>`).join('')}
+                ${roles.map(r => `<option value="${r.val}" ${currentRole === r.val ? 'selected' : ''}>${r.label}</option>`).join('')}
             </select>
-                    `;
+        `;
 
         return `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <td style="padding: 10px;">
                     <div style="font-weight:bold; font-size: 0.9rem;">${escapeHtml(name)}</div>
                     <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(email)}</div>
@@ -738,7 +823,7 @@ async function fetchTeamMembers(teamId) {
                     ${!isMe ? `<button class="btn btn-sm" style="background:var(--danger); font-size: 0.8rem; padding: 4px 10px;" onclick="window.removeTeamMember('${m.user_id}')">削除</button>` : '<span style="font-size:0.8rem; color:var(--text-muted);">自分</span>'}
                 </td>
             </tr>
-                    `;
+        `;
     }).join('');
 
     teamMemberList.innerHTML = headerRow + rows;
@@ -783,12 +868,11 @@ function handleAuthState() {
     userRoleEl.textContent = getRoleLabel(currentProfile.role);
 
     // ヘッダーアバターの表示
-    const headerAvatar = document.getElementById('header-avatar-img');
-    if (headerAvatar) {
+    if (headerAvatarImg) {
         if (currentProfile.avatar_url) {
-            headerAvatar.innerHTML = `<img src="${currentProfile.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+            headerAvatarImg.innerHTML = `<img src="${currentProfile.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
         } else {
-            headerAvatar.textContent = (currentProfile.display_name || currentUser.email)[0].toUpperCase();
+            headerAvatarImg.textContent = (currentProfile.display_name || currentUser.email)[0].toUpperCase();
         }
     }
 
@@ -927,11 +1011,11 @@ function shouldNotify(content) {
     if (!currentProfile || currentProfile.notification_preference === 'none') return false;
     if (currentProfile.notification_preference === 'all') return true;
 
-    const myIdentifier = currentProfile.display_name ? `@${currentProfile.display_name}` : `@${currentUser.email}`;
-    const myMentions = [myIdentifier, `@${currentUser.email}`];
+    const myIdentifier = currentProfile.display_name ? `@${currentProfile.display_name} ` : `@${currentUser.email} `;
+    const myMentions = [myIdentifier, `@${currentUser.email} `];
 
     const myTagIds = allTagMembers.filter(m => m.profile_id === currentUser.id).map(m => m.tag_id);
-    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => `@${t.name}`);
+    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => `@${t.name} `);
 
     const allMyMentions = [...myMentions, ...myTagNames];
     return allMyMentions.some(m => content.includes(m));
@@ -1088,17 +1172,17 @@ window.addReaction = async function (targetId, type, emoji) {
 // --- Edit Functions ---
 
 window.editThread = function (threadId) {
-    const titleEl = document.getElementById(`title-${threadId}`);
-    const contentEl = document.getElementById(`content-${threadId}`);
+    const titleEl = document.getElementById(`title - ${threadId} `);
+    const contentEl = document.getElementById(`content - ${threadId} `);
 
     if (!titleEl || !contentEl) return;
 
     const originalTitle = titleEl.textContent;
     const originalContent = contentEl.textContent;
 
-    titleEl.innerHTML = `<input type="text" id="edit-title-${threadId}" class="input-field" value="${escapeHtml(originalTitle)}" style="font-size: 1rem; font-weight: bold;">`;
+    titleEl.innerHTML = `< input type = "text" id = "edit-title-${threadId}" class="input-field" value = "${escapeHtml(originalTitle)}" style = "font-size: 1rem; font-weight: bold;" > `;
     contentEl.innerHTML = `
-                    <textarea id="edit-content-${threadId}" class="input-field" style="height: 100px; resize: vertical;">${escapeHtml(originalContent)}</textarea>
+                    < textarea id = "edit-content-${threadId}" class="input-field" style = "height: 100px; resize: vertical;" > ${escapeHtml(originalContent)}</textarea >
                         <div style="display: flex; gap: 8px; margin-top: 8px;">
                             <button class="btn btn-primary btn-sm" onclick="saveEdit('${threadId}')">更新</button>
                             <button class="btn btn-sm btn-outline" onclick="cancelEdit('${threadId}')">キャンセル</button>
@@ -1107,9 +1191,9 @@ window.editThread = function (threadId) {
 };
 
 window.saveEdit = async function (threadId) {
-    const titleInp = document.getElementById(`edit-title-${threadId}`);
-    const contentInp = document.getElementById(`edit-content-${threadId}`);
-    const saveBtn = document.querySelector(`button[onclick="saveEdit('${threadId}')"]`);
+    const titleInp = document.getElementById(`edit - title - ${threadId} `);
+    const contentInp = document.getElementById(`edit - content - ${threadId} `);
+    const saveBtn = document.querySelector(`button[onclick = "saveEdit('${threadId}')"]`);
 
     if (!titleInp || !contentInp) return;
     const newTitle = titleInp.value;
@@ -1137,12 +1221,12 @@ window.saveEdit = async function (threadId) {
 };
 
 window.editReply = function (replyId, threadId) {
-    const contentEl = document.getElementById(`reply-content-${replyId}`);
+    const contentEl = document.getElementById(`reply - content - ${replyId} `);
     if (!contentEl) return;
 
     const originalContent = contentEl.textContent;
     contentEl.innerHTML = `
-                    <textarea id="edit-reply-content-${replyId}" class="input-field" style="height: 60px; resize: vertical; font-size: 0.8rem; margin-top: 5px;">${escapeHtml(originalContent)}</textarea>
+                    < textarea id = "edit-reply-content-${replyId}" class="input-field" style = "height: 60px; resize: vertical; font-size: 0.8rem; margin-top: 5px;" > ${escapeHtml(originalContent)}</textarea >
                         <div style="display: flex; gap: 8px; margin-top: 8px;">
                             <button class="btn btn-primary btn-sm" onclick="saveReply('${replyId}', '${threadId}')">更新</button>
                             <button class="btn btn-sm btn-outline" onclick="renderThreads()">キャンセル</button>
@@ -1151,8 +1235,8 @@ window.editReply = function (replyId, threadId) {
 };
 
 window.saveReply = async function (replyId, threadId) {
-    const contentInp = document.getElementById(`edit-reply-content-${replyId}`);
-    const saveBtn = document.querySelector(`button[onclick="saveReply('${replyId}', '${threadId}')"]`);
+    const contentInp = document.getElementById(`edit - reply - content - ${replyId} `);
+    const saveBtn = document.querySelector(`button[onclick = "saveReply('${replyId}', '${threadId}')"]`);
 
     if (!contentInp) return;
     const newContent = contentInp.value;
@@ -1310,7 +1394,7 @@ async function addThread() {
 }
 
 window.addReply = async function (threadId) {
-    const input = document.getElementById(`reply-input-${threadId}`);
+    const input = document.getElementById(`reply - input - ${threadId} `);
     const content = input.innerText.trim();
     if (!content || currentProfile.role === 'Viewer') return;
     const authorName = currentProfile.display_name || currentUser.email;
@@ -1334,7 +1418,7 @@ window.addReply = async function (threadId) {
 
         // Scroll to bottom after adding a reply
         setTimeout(() => {
-            const scrollArea = document.querySelector(`#thread-${threadId} .reply-scroll-area`);
+            const scrollArea = document.querySelector(`#thread - ${threadId} .reply - scroll - area`);
             if (scrollArea) {
                 scrollArea.scrollTop = scrollArea.scrollHeight;
             }
@@ -1391,7 +1475,7 @@ window.toggleStatus = async function (threadId) {
 
 window.showToast = function (message, type = 'success') {
     const toast = document.createElement('div');
-    toast.className = `toast ${type === 'error' ? 'toast-error' : ''}`;
+    toast.className = `toast ${type === 'error' ? 'toast-error' : ''} `;
     toast.textContent = message;
     document.body.appendChild(toast);
 
@@ -1408,7 +1492,7 @@ window.showToast = function (message, type = 'success') {
 };
 
 function showCompleteEffect(threadId) {
-    const card = document.getElementById(`thread-${threadId}`);
+    const card = document.getElementById(`thread - ${threadId} `);
     if (!card) return;
 
     const toast = document.createElement('div');
@@ -1688,7 +1772,7 @@ function renderThreads() {
                         </div>
                     </div>
                 </div>
-            </div > `;
+            </div>`;
         }).join('');
 
         const isOwner = (thread.author_name || thread.author) === (currentProfile.display_name || currentUser.email);
@@ -1885,7 +1969,7 @@ function renderThreads() {
                 <span>${new Date(thread.created_at).toLocaleDateString()}</span>
             </div>
             
-            <!-- Quick Reply Form -->
+            <!--Quick Reply Form-- >
                     <div class="quick-reply-form" onclick="event.stopPropagation()">
                         <input type="text" class="quick-reply-input" placeholder="返信..." id="quick-reply-input-${thread.id}" onkeydown="if(event.key === 'Enter') window.quickReply('${thread.id}')">
                             <button class="quick-reply-btn" onclick="window.quickReply('${thread.id}')">送信</button>
@@ -1946,7 +2030,7 @@ function renderAdminUsers() {
         const roleOptions = roles.map(r => `<option value="${r}" ${p.role === r ? 'selected' : ''}>${getRoleLabel(r)}</option>`).join('');
 
         return `
-            <tr>
+                    <tr>
                 <td>
                     ${p.display_name || '-'} 
                     ${currentProfile.role === 'Admin' ? `<button class="btn-sm btn-outline" style="padding: 2px 6px; margin-left: 5px;" onclick="window.openEditUserNameModal('${p.id}', '${escapeHtml(p.display_name || '')}')">✎</button>` : ''}
@@ -1972,7 +2056,7 @@ function renderAdminUsers() {
         }).join('')}
                     </div>
                 </td>
-            </tr>
+            </tr >
                     `;
     }).join('');
 }
@@ -1981,13 +2065,13 @@ function renderAdminTags() {
     adminTagList.innerHTML = allTags.map(t => {
         const count = allTagMembers.filter(m => m.tag_id === t.id).length;
         return `
-            <tr>
+                    < tr >
                 <td>${t.name}</td>
                 <td>${count}人</td>
                 <td>
                     ${currentProfile.role === 'Admin' ? `<button class="btn btn-sm" style="background: var(--danger);" onclick="window.deleteTag('${t.id}')">削除</button>` : '-'}
                 </td>
-            </tr>
+            </tr >
                     `;
     }).join('');
 }
@@ -2023,16 +2107,16 @@ function showMentionSuggestions(query, isThread = true, threadId = null) {
         item.onclick = () => selectMentionCandidate(index, isThread, threadId);
 
         const avatarHtml = p.avatar_url
-            ? `<img src="${p.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
+            ? `< img src = "${p.avatar_url}" style = "width:100%;height:100%;border-radius:50%;object-fit:cover;" > `
             : (p.display_name || p.email)[0].toUpperCase();
 
         item.innerHTML = `
-            <div class="avatar">${avatarHtml}</div>
-            <div class="mention-info">
-                <span class="mention-name">${escapeHtml(p.display_name || 'No Name')}</span>
-                <span class="mention-email">${escapeHtml(p.email)}</span>
-            </div>
-        `;
+                    < div class="avatar" > ${avatarHtml}</div >
+                        <div class="mention-info">
+                            <span class="mention-name">${escapeHtml(p.display_name || 'No Name')}</span>
+                            <span class="mention-email">${escapeHtml(p.email)}</span>
+                        </div>
+                `;
         listEl.appendChild(item);
     });
 
@@ -2044,12 +2128,12 @@ function showMentionSuggestions(query, isThread = true, threadId = null) {
         item.onmousedown = (e) => e.preventDefault();
         item.onclick = () => selectMentionCandidate(profileCount + i, isThread, threadId);
         item.innerHTML = `
-            <div class="avatar tag-avatar">#</div>
-            <div class="mention-info">
-                <span class="mention-name">${escapeHtml(t.name)}</span>
-                <span class="mention-email">タグ</span>
-            </div>
-        `;
+                    < div class="avatar tag-avatar" >#</div >
+                        <div class="mention-info">
+                            <span class="mention-name">${escapeHtml(t.name)}</span>
+                            <span class="mention-email">タグ</span>
+                        </div>
+                `;
         listEl.appendChild(item);
     });
 
@@ -2366,7 +2450,9 @@ settingsBtn.onclick = () => {
 
     modalOverlay.style.display = 'flex';
     settingsModal.style.display = 'block';
-    adminModal.style.display = 'none';
+    if (adminModal) adminModal.style.display = 'none';
+    if (teamModal) teamModal.style.display = 'none';
+    if (teamManageModal) teamManageModal.style.display = 'none';
 };
 
 // --- Microsoft Login Logic ---
@@ -2416,13 +2502,171 @@ if (saveTeamBtn) {
 // --- Team Creation ---
 window.openCreateTeamModal = function () {
     if (teamModal) {
-        teamModal.classList.add('active');
-        if (modalOverlay) modalOverlay.classList.add('active');
+        if (modalOverlay) modalOverlay.style.display = 'flex';
+        // Hide other modals
+        if (adminModal) adminModal.style.display = 'none';
+        if (settingsModal) settingsModal.style.display = 'none';
+        if (teamManageModal) teamManageModal.style.display = 'none';
+
+        teamModal.style.display = 'block';
         if (newTeamNameInp) {
             newTeamNameInp.value = '';
             setTimeout(() => newTeamNameInp.focus(), 100);
         }
+        if (newTeamMembersInput) newTeamMembersInput.value = '';
+        if (newTeamMembersList) newTeamMembersList.innerHTML = '';
+        selectedNewTeamMembers = [];
     }
+};
+
+window.openTeamConfigModal = function () {
+    if (teamConfigModal) {
+        if (modalOverlay) modalOverlay.style.display = 'flex';
+        // Hide other modals
+        if (adminModal) adminModal.style.display = 'none';
+        if (settingsModal) settingsModal.style.display = 'none';
+        if (teamManageModal) teamManageModal.style.display = 'none';
+        if (teamModal) teamModal.style.display = 'none';
+
+        teamConfigModal.style.display = 'block';
+
+        // Load current team info
+        if (currentTeamId) {
+            const team = allTeams.find(t => t.id == currentTeamId);
+            if (team) {
+                if (editTeamNameInp) editTeamNameInp.value = team.name;
+                if (editTeamIconPreview) {
+                    if (team.avatar_url) {
+                        editTeamIconPreview.innerHTML = `<img src="${team.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+                    } else {
+                        editTeamIconPreview.innerHTML = `<span style="font-size: 1.2rem;">${team.name[0].toUpperCase()}</span>`;
+                    }
+                }
+            }
+        }
+    }
+};
+
+window.handleEditTeamIconSelect = function (input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            editTeamIconPreview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+            saveTeamIconBtnReal.style.display = 'inline-block';
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+};
+
+window.saveEditTeamIcon = async function () {
+    if (!currentTeamId) return;
+    const file = editTeamIconInput.files[0];
+    if (!file) return;
+
+    try {
+        const reader = new FileReader();
+        const base64 = await new Promise(resolve => {
+            reader.onload = e => resolve(e.target.result);
+            reader.readAsDataURL(file);
+        });
+
+        const { error } = await supabaseClient.from('teams').update({ avatar_url: base64 }).eq('id', currentTeamId);
+        if (error) throw error;
+
+        // Update local state
+        const team = allTeams.find(t => t.id == currentTeamId);
+        if (team) team.avatar_url = base64;
+
+        saveTeamIconBtnReal.style.display = 'none';
+        alert('アイコンを更新しました');
+        renderTeamsSidebar(); // Update sidebar icon
+    } catch (e) {
+        alert('アイコン更新エラー: ' + e.message);
+    }
+};
+
+if (saveTeamNameBtn) {
+    saveTeamNameBtn.onclick = async () => {
+        if (!currentTeamId) return;
+        const newName = editTeamNameInp.value.trim();
+        if (!newName) return;
+
+        const { error } = await supabaseClient.from('teams').update({ name: newName }).eq('id', currentTeamId);
+        if (error) {
+            alert('名前に変更失敗: ' + error.message);
+        } else {
+            const team = allTeams.find(t => t.id == currentTeamId);
+            if (team) team.name = newName;
+            renderTeamsSidebar();
+            alert('チーム名を更新しました');
+        }
+    };
+}
+
+// --- New Team Member Selection Logic ---
+if (newTeamMembersInput) {
+    newTeamMembersInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        if (!query) {
+            newTeamSuggestions.style.display = 'none';
+            return;
+        }
+
+        const candidates = allProfiles.filter(p => {
+            if (p.id === currentUser.id) return false; // Exclude self
+            if (selectedNewTeamMembers.some(sel => sel.id === p.id)) return false; // Exclude already selected
+            const name = (p.display_name || '').toLowerCase();
+            const email = (p.email || '').toLowerCase();
+            return name.includes(query) || email.includes(query);
+        });
+
+        newTeamSuggestions.innerHTML = '';
+        candidates.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'mention-candidate';
+            div.textContent = `${p.display_name || 'No Name'} (${p.email})`;
+            div.onclick = () => {
+                selectedNewTeamMembers.push(p);
+                newTeamMembersInput.value = '';
+                newTeamSuggestions.style.display = 'none';
+                renderNewTeamSelection();
+            };
+            newTeamSuggestions.appendChild(div);
+        });
+
+        if (candidates.length > 0) {
+            newTeamSuggestions.style.display = 'block';
+        } else {
+            newTeamSuggestions.style.display = 'none';
+        }
+    });
+
+    // Hide suggestions on blur (delayed)
+    newTeamMembersInput.addEventListener('blur', () => {
+        setTimeout(() => newTeamSuggestions.style.display = 'none', 200);
+    });
+}
+
+function renderNewTeamSelection() {
+    if (!newTeamMembersList) return;
+    newTeamMembersList.innerHTML = '';
+    selectedNewTeamMembers.forEach((p, index) => {
+        const tag = document.createElement('span');
+        tag.className = 'tag-badge';
+        tag.style.display = 'flex';
+        tag.style.alignItems = 'center';
+        tag.style.gap = '5px';
+        tag.innerHTML = `
+            ${p.display_name || p.email} 
+            <span style="cursor:pointer; font-weight:bold;" onclick="removeNewTeamMember(${index})">×</span>
+        `;
+        newTeamMembersList.appendChild(tag);
+    });
+}
+
+window.removeNewTeamMember = function (index) {
+    selectedNewTeamMembers.splice(index, 1);
+    renderNewTeamSelection();
 };
 
 if (btnAddTeam) {

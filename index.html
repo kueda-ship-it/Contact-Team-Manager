@@ -58,7 +58,7 @@
                         fill="white" />
                     <circle cx="16" cy="14" r="3" fill="var(--bg-dark)" />
                 </svg>
-                <span>Contact Team Manager</span>
+                <span id="app-title">Contact Team Manager</span>
                 <div class="header-search-container">
                     <input type="text" id="global-search" class="input-field search-input" placeholder="検索 (CTRL+E)">
                 </div>
@@ -340,6 +340,15 @@
                         <label>チーム名</label>
                         <input type="text" id="new-team-name" class="input-field" placeholder="チーム名を入力">
                     </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label>メンバーを追加 (任意)</label>
+                        <input type="text" id="new-team-members-input" class="input-field"
+                            placeholder="名前またはメールアドレスを入力">
+                        <div id="new-team-members-list"
+                            style="margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
+                        <div id="new-team-suggestions" class="mention-list"
+                            style="display: none; max-height: 150px; overflow-y: auto;"></div>
+                    </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 2rem;">
                         <button class="btn btn-close-modal">キャンセル</button>
                         <button id="save-team-btn" class="btn btn-primary">作成</button>
@@ -351,19 +360,7 @@
                     <h3>チームメンバー管理</h3>
                     <div
                         style="margin-top: 1rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                        <h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">チーム設定</h4>
-                        <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
-                            <div id="team-icon-preview"
-                                style="width: 40px; height: 40px; border-radius: 4px; background: #333; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                                <span style="font-size: 1.2rem;">T</span>
-                            </div>
-                            <input type="file" id="team-icon-input" accept="image/*" style="display: none;"
-                                onchange="handleTeamIconSelect(this)">
-                            <button class="btn btn-sm btn-outline"
-                                onclick="document.getElementById('team-icon-input').click()">アイコン変更</button>
-                            <button id="save-team-icon-btn" class="btn btn-sm btn-primary" style="display: none;"
-                                onclick="saveTeamIcon()">保存</button>
-                        </div>
+
 
                         <h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">メンバーを追加</h4>
                         <div style="display: flex; gap: 10px; position: relative;">
@@ -391,6 +388,34 @@
                                     <!-- Injected via JS -->
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
+                        <button class="btn btn-close-modal">閉じる</button>
+                    </div>
+                </div>
+                <!-- Team Configuration Modal (Icon, Name) - Admin/Owner Only -->
+                <div id="team-config-modal" class="modal" style="max-width: 400px;">
+                    <h3>チーム設定</h3>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label>チーム名変更</label>
+                        <input type="text" id="edit-team-name" class="input-field" placeholder="チーム名">
+                        <button id="save-team-name-btn" class="btn btn-sm btn-primary"
+                            style="margin-top: 5px;">名前を保存</button>
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label>チームアイコン</label>
+                        <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                            <div id="edit-team-icon-preview"
+                                style="width: 40px; height: 40px; border-radius: 4px; background: #333; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                <span style="font-size: 1.2rem;">T</span>
+                            </div>
+                            <input type="file" id="edit-team-icon-input" accept="image/*" style="display: none;"
+                                onchange="handleEditTeamIconSelect(this)">
+                            <button class="btn btn-sm btn-outline"
+                                onclick="document.getElementById('edit-team-icon-input').click()">変更</button>
+                            <button id="save-team-icon-btn-real" class="btn btn-sm btn-primary" style="display: none;"
+                                onclick="saveEditTeamIcon()">保存</button>
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
