@@ -202,7 +202,7 @@ body {
     top: 50px;
     left: 0;
     bottom: 0;
-    z-index: 1000;
+    z-index: 3000;
     transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     /* Smooth expansion */
     overflow-x: hidden;
@@ -213,6 +213,8 @@ body {
 
 /* Expand on Hover */
 .teams-sidebar:hover {
+    background: #1E1F22;
+    /* Ensure opacity on expand */
     width: 260px;
     /* Expanded width */
     align-items: stretch;
@@ -232,27 +234,35 @@ body {
 
 .team-list-item {
     display: flex;
+    flex-direction: column;
+    /* Stacks header and submenu vertically */
+    width: 100%;
+    border-radius: 8px;
+    transition: background 0.2s;
+    overflow: hidden;
+    /* Contains children */
+}
+
+/* Header part containing Icon + Name */
+.team-item-header {
+    display: flex;
     align-items: center;
     gap: 12px;
     padding: 8px;
     /* 40px icon + 16px padding = 56px width. Fits perfectly in 56px container */
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.2s;
     width: 100%;
+    cursor: pointer;
+    border-radius: 8px;
     white-space: nowrap;
-    /* Prevent text wrapping */
     overflow: hidden;
-    /* safety */
     justify-content: flex-start;
-    /* Icon on left */
 }
 
-.team-list-item:hover {
+.team-item-header:hover {
     background: rgba(255, 255, 255, 0.05);
 }
 
-.team-list-item.active {
+.team-list-item.active .team-item-header {
     background: rgba(255, 255, 255, 0.1);
 }
 
@@ -309,6 +319,7 @@ body {
     /* Force 2 lines */
     -webkit-box-orient: vertical;
     overflow: hidden;
+    line-clamp: 2;
     text-overflow: ellipsis;
     white-space: normal;
     /* Override pre-wrap if needed */
@@ -376,10 +387,15 @@ body {
 /* Submenu - Only visible on hover */
 .sidebar-submenu {
     display: none;
-    /* Completely hide when collapsed to save space/layout */
-    margin-left: 52px;
-    /* Indent under text */
-    margin-bottom: 8px;
+    /* Hide by default */
+    flex-direction: column;
+    width: 100%;
+    padding-left: 12px;
+    /* Indent slightly less than before to save space */
+    padding-bottom: 8px;
+    gap: 4px;
+    margin-top: 4px;
+    /* Space between header and menu */
 }
 
 .teams-sidebar:hover .sidebar-submenu {
@@ -412,7 +428,7 @@ body {
     color: white;
 }
 
-.team-list-item:hover .team-icon {
+.team-item-header:hover .team-icon {
     border-radius: 12px;
     background: var(--primary);
     color: white;
@@ -1383,11 +1399,17 @@ textarea.input-field {
 }
 
 /* --- Others --- */
+/* メインスレッド・共通のメンション（紫色） */
 .mention {
     color: var(--primary-light) !important;
-    /* #8B8CC7 */
     font-weight: bold !important;
     cursor: pointer;
+}
+
+/* 右サイドバー内のみ、ティール色（水色）で強調 */
+#pending-sidebar-list .mention,
+#assigned-sidebar-list .mention {
+    color: var(--accent) !important;
 }
 
 .modal-overlay {
@@ -2222,4 +2244,25 @@ html {
 .mention-item:hover,
 .mention-item.active {
     background: #404249;
+}
+
+/* --- Animations --- */
+@keyframes button-press {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(0.85);
+    }
+
+    /* Sink down */
+    100% {
+        transform: scale(1);
+    }
+}
+
+.btn-pop {
+    animation: button-press 0.2s cubic-bezier(0.1, 0.7, 1.0, 0.1);
+    /* Snappy press */
 }
