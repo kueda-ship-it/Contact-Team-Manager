@@ -1473,9 +1473,12 @@ window.addReply = async function (threadId) {
 
         // Scroll to bottom after adding a reply
         setTimeout(() => {
-            const scrollArea = document.querySelector(`#thread-${threadId} .reply-scroll-area`);
-            if (scrollArea) {
-                scrollArea.scrollTop = scrollArea.scrollHeight;
+            const card = document.getElementById(`thread-${threadId}`);
+            if (card) {
+                const scrollArea = card.querySelector('.reply-scroll-area');
+                if (scrollArea) {
+                    scrollArea.scrollTop = scrollArea.scrollHeight;
+                }
             }
         }, 100);
     }
