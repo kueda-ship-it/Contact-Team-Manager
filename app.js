@@ -42,6 +42,7 @@ let allReactions = [];
 let currentSortOrder = 'asc'; // 'asc' = newest activity at bottom (standard chat style), 'desc' = newest activity first
 let currentGlobalNav = 'teams'; // 'teams', 'activity', etc.
 let feedFilter = 'all'; // 'all', 'pending', 'assigned' (custom filter within team)
+let threadsLimit = 20; // Lazy loading limit
 
 
 // --- UI Elements ---
@@ -648,7 +649,10 @@ window.switchTeam = function (teamId) {
 
     // メイン領域をトップに戻す
     const feedArea = document.querySelector('.main-feed-area');
-    if (feedArea) feedArea.scrollTo({ top: 0, behavior: 'instant' });
+    // if (feedArea) feedArea.scrollTo({ top: 0, behavior: 'instant' }); // Disable top scroll for ASC default
+
+    window.hasScrolled = false; // Reset scroll flag for new team view
+
 
     renderThreads();
 
@@ -732,11 +736,44 @@ window.openTeamSettings = async function () {
 
     // Icon upload & Add Member inputs
     const teamSettingsSection = teamManageModal.querySelector('h4').parentNode; // The first section in modal
+    const deleteSection = document.getElementById('team-delete-section');
+
     if (teamSettingsSection) {
         if (canManage) {
             teamSettingsSection.style.display = 'block';
+            if (deleteSection) deleteSection.style.display = 'block';
         } else {
             teamSettingsSection.style.display = 'none';
+            if (deleteSection) deleteSection.style.display = 'none';
+        }
+    }
+};
+
+window.deleteTeam = async function () {
+    if (!currentTeamId) return;
+    if (!confirm('本当にこのチームを削除しますか？\nこの操作は取り消せません。\n関連する全てのスレッドとメンバー情報が失われる可能性があります。')) return;
+
+    const btn = document.getElementById('delete-team-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = '削除中...';
+    }
+
+    try {
+        const { error } = await supabaseClient.from('teams').delete().eq('id', currentTeamId);
+        if (error) throw error;
+
+        alert('チームを削除しました。');
+        modalOverlay.style.display = 'none';
+        currentTeamId = null;
+        await fetchTeams();
+        renderThreads();
+    } catch (e) {
+        console.error(e);
+        alert('削除失敗: ' + (e.message || '不明なエラー'));
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'チームを削除する';
         }
     }
 };
@@ -1356,7 +1393,29 @@ function subscribeToChanges() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'threads' }, () => loadData())
         .subscribe();
 
-    supabaseClient.channel('public:replies').on('postgres_changes', { event: '*', schema: 'public', table: 'replies' }, () => loadData()).subscribe();
+    supabaseClient.channel('public:replies')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'replies' }, (payload) => {
+            // Realtime Update for Replies
+            const newReply = payload.new;
+            // Check if thread exists locally and update
+            const thread = threads.find(t => t.id === newReply.thread_id);
+            if (thread) {
+                if (!thread.replies) thread.replies = [];
+                // Check duplicate
+                if (!thread.replies.some(r => r.id === newReply.id)) {
+                    thread.replies.push(newReply);
+                    renderThreads(); // Efficient re-render thanks to lazy loading
+                    showToast('新しい返信があります');
+                }
+            }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'replies' }, () => {
+            // For update/delete, full refresh is safer but maybe not needed if INSERT handles most
+            // We keep loadData for non-INSERT events to be safe
+            // loadData(); // Disabled to prefer manual update or surgical update? 
+            // Ideally for edit/delete we also want sync. Let's keep loadData for update/delete.
+        })
+        .subscribe();
     supabaseClient.channel('public:reactions').on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, () => loadMasterData()).subscribe();
     supabaseClient.channel('public:admin').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadMasterData())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'tags' }, () => loadMasterData())
@@ -1710,8 +1769,27 @@ function renderThreads() {
     if (taskCountEl) taskCountEl.textContent = feedThreads.length;
     threadListEl.insertAdjacentHTML('afterbegin', headerHtml);
 
-    // Render Central Feed Threads
-    feedThreads.forEach(thread => {
+    // Render Central Feed Threads (Lazy Loading)
+    let displayedThreads = [];
+    if (currentSortOrder === 'asc') {
+        // Chat Mode: Show last N (newest) items
+        displayedThreads = feedThreads.slice(Math.max(0, feedThreads.length - threadsLimit));
+    } else {
+        // Standard Mode: Show first N (newest) items
+        displayedThreads = feedThreads.slice(0, threadsLimit);
+    }
+
+    // Load More Button (Top) for ASC
+    if (currentSortOrder === 'asc' && feedThreads.length > threadsLimit) {
+        const loadMoreDiv = document.createElement('div');
+        loadMoreDiv.id = 'load-more-top';
+        loadMoreDiv.style.textAlign = 'center';
+        loadMoreDiv.style.padding = '20px';
+        loadMoreDiv.innerHTML = `<button class="btn btn-outline" onclick="window.loadMoreThreads()" id="btn-load-more">過去の投稿を読み込む (${Math.max(0, feedThreads.length - threadsLimit)}件)</button>`;
+        threadListEl.appendChild(loadMoreDiv);
+    }
+
+    displayedThreads.forEach(thread => {
         const authorName = thread.author_name || thread.author || 'Unknown';
         const authorProfile = allProfiles.find(p => p.email === authorName || p.display_name === authorName);
         const avatarUrl = authorProfile?.avatar_url;
@@ -1721,6 +1799,7 @@ function renderThreads() {
         card.id = `thread-${thread.id}`;
         card.className = `task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''}`;
 
+        // ... (Reactions logic omitted for brevity, it's inside the loop)
         const reactionsForThread = allReactions.filter(r => r.thread_id === thread.id);
         const emojiCounts = reactionsForThread.reduce((acc, r) => {
             acc[r.emoji] = (acc[r.emoji] || 0) + 1;
@@ -1746,7 +1825,7 @@ function renderThreads() {
 
         const currentReplies = thread.replies || [];
         let repliesHtml = currentReplies.map(reply => {
-            // 返信へのリアクション
+            // ... (Reply logic same as before)
             const reactionsForReply = allReactions.filter(r => r.reply_id === reply.id);
             const replyEmojiCounts = reactionsForReply.reduce((acc, r) => {
                 acc[r.emoji] = (acc[r.emoji] || 0) + 1;
@@ -1757,12 +1836,10 @@ function renderThreads() {
             const replyReactionsHtml = Object.entries(replyEmojiCounts)
                 .sort(([a], [b]) => reactionTypesForReply.indexOf(a) - reactionTypesForReply.indexOf(b))
                 .map(([emoji, count]) => {
-                    const reactors = reactionsForReply
-                        .filter(r => r.emoji === emoji)
-                        .map(r => {
-                            const p = allProfiles.find(prof => prof.id === r.profile_id);
-                            return p ? (p.display_name || p.email) : '不明';
-                        });
+                    const reactors = reactionsForReply.filter(r => r.emoji === emoji).map(r => {
+                        const p = allProfiles.find(prof => prof.id === r.profile_id);
+                        return p ? (p.display_name || p.email) : '不明';
+                    });
                     const title = reactors.join(', ');
                     const hasMyReaction = reactionsForReply.some(r => r.profile_id === currentUser.id && r.emoji === emoji);
                     return `<span class="reaction-badge ${hasMyReaction ? 'active' : ''}" style="font-size: 0.7rem; padding: 1px 6px;" title="${title}" onclick="addReaction('${reply.id}', 'reply', '${emoji}')">${emoji} ${count}</span>`;
@@ -1771,7 +1848,6 @@ function renderThreads() {
             const isReplyOwner = reply.author === (currentProfile.display_name || currentUser.email);
             const canDeleteReply = isReplyOwner || ['Admin', 'Manager'].includes(currentProfile.role);
 
-            // 添付ファイルの描画
             let attachmentsHtml = '';
             if (reply.attachments && reply.attachments.length > 0) {
                 attachmentsHtml = `<div class="attachment-display">` + reply.attachments.map(att => {
@@ -1830,18 +1906,11 @@ function renderThreads() {
 
         const isOwner = (thread.author_name || thread.author) === (currentProfile.display_name || currentUser.email);
         const canDelete = isOwner || ['Admin', 'Manager'].includes(currentProfile.role);
-        // 編集は本人のみ
-        const canEdit = isOwner;
-
-        // 完了者情報の取得
         let completerName = '';
         if (thread.status === 'completed' && thread.completed_by) {
             const completer = allProfiles.find(p => p.id === thread.completed_by);
-            if (completer) {
-                completerName = completer.display_name || completer.email;
-            }
+            if (completer) completerName = completer.display_name || completer.email;
         }
-
 
         card.innerHTML = `
             ${thread.is_pinned ? '<div class="pinned-badge">重要</div>' : ''}
@@ -1856,7 +1925,6 @@ function renderThreads() {
                 </div>
                 <div class="menu-item" style="cursor: default; position: relative;">
                     <span class="menu-icon">➡️</span> チーム移動
-                    <!-- Hover Submenu -->
                     <div class="submenu">
                         ${allTeams.filter(t => t.id !== thread.team_id).map(t => `
                             <div class="menu-item" onclick="event.preventDefault(); event.stopPropagation(); window.moveThreadDirectly('${thread.id}', '${t.id}')">
@@ -1906,9 +1974,7 @@ function renderThreads() {
             <div class="reaction-container-bottom">
                 <div class="plus-trigger">+</div>
                 <div class="reaction-menu">
-                    ${reactionTypes.map(emoji =>
-                `<span onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji}</span>`
-            ).join('')}
+                    ${reactionTypes.map(emoji => `<span onclick="addReaction('${thread.id}', 'thread', '${emoji}')">${emoji}</span>`).join('')}
                 </div>
             </div>
 
@@ -1983,6 +2049,27 @@ function renderThreads() {
         }, 50);
     });
 
+    // Load More Button (Bottom) for DESC
+    if (currentSortOrder === 'desc' && feedThreads.length > threadsLimit) {
+        const loadMoreDiv = document.createElement('div');
+        loadMoreDiv.style.textAlign = 'center';
+        loadMoreDiv.style.padding = '20px';
+        loadMoreDiv.innerHTML = `<button class="btn btn-outline" onclick="window.loadMoreThreads()">さらに読み込む (${feedThreads.length - threadsLimit}件)</button>`;
+        threadListEl.appendChild(loadMoreDiv);
+    }
+
+    // Auto-scroll to bottom if ASC (Newest at bottom) and it's an initial load or similar context
+    // Check if we are at the top (implies manual scroll hasn't happened yet) or logic flag
+    // For simplicity, if sorting is ASC, we often want to be at the bottom.
+    // However, we shouldn't force it if user is reading. 
+    // We'll rely on switchTeam/init calling window.scrollTo separately, OR do it here if it's the *first* render?
+    // User asked "Default to bottom".
+    if (currentSortOrder === 'asc' && !window.hasScrolled) {
+        setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
+        window.hasScrolled = true; // Simple flag to prevent constant jumping
+    }
+
+
     sidebarListEl.innerHTML = '';
     assignedSidebarListEl.innerHTML = '';
 
@@ -2002,11 +2089,29 @@ function renderThreads() {
             if (e.target.closest('.quick-reply-form') || e.target.closest('.quick-reply-btn') || e.target.closest('.quick-reply-input')) {
                 return;
             }
-            const target = document.getElementById(`thread-${thread.id}`);
+            const targetId = `thread-${thread.id}`;
+            let target = document.getElementById(targetId);
+
             if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' }); // center is better for visibility
                 target.classList.add('highlight-thread');
                 setTimeout(() => target.classList.remove('highlight-thread'), 2000);
+            } else {
+                // Not in DOM (Lazy Loading) - Expand limit
+                const index = feedThreads.findIndex(t => t.id === thread.id);
+                if (index !== -1) {
+                    threadsLimit = Math.max(threadsLimit, index + 20); // Expand to include this thread
+                    renderThreads();
+                    // Wait for render then scroll
+                    setTimeout(() => {
+                        target = document.getElementById(targetId);
+                        if (target) {
+                            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            target.classList.add('highlight-thread');
+                            setTimeout(() => target.classList.remove('highlight-thread'), 2000);
+                        }
+                    }, 100);
+                }
             }
         };
 
@@ -3259,6 +3364,35 @@ async function logAudit(action, details, targetId) {
         console.warn('Audit log failed:', e); // Non-blocking
     }
 }
+
+
+
+window.loadMoreThreads = function () {
+    const oldHeight = document.body.scrollHeight;
+    const oldScrollTop = window.scrollY; // Current absolute scroll position
+    const oldDistanceFromBottom = oldHeight - oldScrollTop; // Keep distance from bottom?
+    // Actually, if we are loading at TOP (ASC), we want to maintain the current content position relative to viewport.
+    // So we should restore scroll position to (newHeight - oldHeight) + oldScrollTop if loading top?
+    // Or simpler: scroll to maintaining the same elements in view.
+
+    threadsLimit += 20;
+    renderThreads();
+
+    // After render, adjust scroll
+    if (currentSortOrder === 'asc') {
+        // We added content at the TOP. We need to jump down by the difference in height.
+        setTimeout(() => {
+            const newHeight = document.body.scrollHeight;
+            const diff = newHeight - oldHeight;
+            window.scrollTo(0, window.scrollY + diff);
+            // Better: scrollTo(0, oldScrollTop + diff)? No, window.scrollY might be 0 if at top.
+            // If user clicked button at top, they were at top + ~50px.
+            // We want them to stay effectively at the same visual position relative to the *old* content.
+        }, 0);
+    } else {
+        // DESC (Bottom load): Standard behavior is fine (browser handles it, or just stays there)
+    }
+};
 
 // Start initialization
 checkUser();

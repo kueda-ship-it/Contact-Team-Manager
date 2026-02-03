@@ -2195,8 +2195,9 @@ html {
     opacity: 1;
 }
 
-/* Force Quick Reply on Sidebar Hover */
-.side-panel .task-card:hover .quick-reply-form {
+/* Force Quick Reply on Sidebar Hover or Focus */
+.side-panel .task-card:hover .quick-reply-form,
+.quick-reply-form:focus-within {
     display: flex !important;
 }
 

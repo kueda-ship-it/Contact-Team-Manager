@@ -421,6 +421,17 @@
                             </table>
                         </div>
                     </div>
+                    <!-- Team Deletion Section (Admin/Owner Only) -->
+                    <div id="team-delete-section" style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: none;">
+                        <h4 style="font-size: 0.9rem; color: var(--danger); margin-bottom: 8px;">チームを削除</h4>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
+                            このチームと関連するすべてのデータ（スレッド、返信、ファイル）が削除されます。この操作は取り消せません。
+                        </p>
+                        <button id="delete-team-btn" class="btn btn-outline" style="border-color: var(--danger); color: var(--danger);" onclick="window.deleteTeam()">
+                            チームを削除する
+                        </button>
+                    </div>
+
                     <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
                         <button class="btn btn-close-modal">閉じる</button>
                     </div>
