@@ -250,11 +250,19 @@ window.removeWhitelist = async function (email) {
 // --- Teams Operations ---
 
 async function fetchTeams() {
-    const { data: teamIds, error: memberError } = await supabaseClient.from('team_members').select('team_id').eq('user_id', currentUser.id);
-    if (memberError) return;
+    let data;
+    if (currentProfile && currentProfile.role === 'Admin') {
+        // Admin sees all teams
+        const { data: allTeamsData, error } = await supabaseClient.from('teams').select('*');
+        data = allTeamsData;
+    } else {
+        const { data: teamIds, error: memberError } = await supabaseClient.from('team_members').select('team_id').eq('user_id', currentUser.id);
+        if (memberError) return;
+        const ids = teamIds.map(t => t.team_id);
+        const { data: userTeams, error: teamError } = await supabaseClient.from('teams').select('*').in('id', ids);
+        data = userTeams;
+    }
 
-    const ids = teamIds.map(t => t.team_id);
-    const { data, error } = await supabaseClient.from('teams').select('*').in('id', ids);
     if (data) {
         allTeams = data;
         renderTeamsSidebar();
@@ -327,7 +335,7 @@ window.renderTeamsSidebar = function () {
         const allTeamsDiv = document.createElement('div');
         allTeamsDiv.id = 'dynamic-all-teams-nav'; // Assign ID for sub-menu targeting
         allTeamsDiv.className = `team-list-item ${currentTeamId === null ? 'active' : ''}`;
-        allTeamsDiv.onclick = () => selectTeam(null);
+        allTeamsDiv.onclick = () => switchTeam(null);
         allTeamsDiv.innerHTML = `
         <div class="team-icon" style="background: linear-gradient(135deg, #FF6B6B, #FF8E53); color: white; display:flex; align-items:center; justify-content:center;">
              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
@@ -360,8 +368,9 @@ window.renderTeamsSidebar = function () {
             const pendingCount = filteredThreads.filter(t => t.status === 'pending').length;
             const myCount = filteredThreads.filter(t => t.status === 'pending' && window.hasMention(t.content)).length;
 
-            const filterHtml = `
-            <div class="sidebar-submenu" style="margin-left: 20px; margin-bottom: 15px; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 10px;">
+            const submenu = document.createElement('div');
+            submenu.className = 'sidebar-submenu';
+            submenu.innerHTML = `
                 <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
                     <span># すべて</span>
                 </div>
@@ -377,10 +386,8 @@ window.renderTeamsSidebar = function () {
                          ${myCount}
                     </span>
                 </div>
-            </div>
-        `;
-            // Append submenu directly after the ALL Teams Item
-            allTeamsDiv.insertAdjacentHTML('afterend', filterHtml);
+            `;
+            allTeamsDiv.appendChild(submenu);
         }
 
         allTeams.forEach(team => {
@@ -1947,7 +1954,12 @@ function renderThreads() {
                 `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
                 : ''}
                 ${currentProfile.role !== 'Viewer' ? `
-                    <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
+                    <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}" onclick="toggleStatus('${thread.id}')" title="${thread.status === 'completed' ? '戻す' : '完了'}" style="width: 32px; height: 32px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #ffffff; color: #333333; border: 1px solid #ffffff;">
+                        ${thread.status === 'completed' ?
+                    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>` :
+                    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
+                }
+                    </button>
                     ` : ''}
             </div>
         </div>
@@ -2001,7 +2013,12 @@ function renderThreads() {
         item.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div class="sidebar-title">${escapeHtml(thread.title)}</div>
-                <button class="btn btn-sm btn-status" onclick="event.stopPropagation(); toggleStatus('${thread.id}')" style="font-size: 0.7rem; padding: 2px 8px; margin-left: 10px; flex-shrink: 0;">完了</button>
+                <button class="btn btn-sm btn-status" onclick="event.stopPropagation(); toggleStatus('${thread.id}')" style="width: 28px; height: 28px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-left: 10px; flex-shrink: 0; background: #ffffff; color: #333333; border: 1px solid #ffffff;" title="${thread.status === 'completed' ? '戻す' : '完了'}">
+                    ${thread.status === 'completed' ?
+                `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`
+                : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
+            }
+                </button>
             </div>
             <div class="task-content">
                 ${styledContent}

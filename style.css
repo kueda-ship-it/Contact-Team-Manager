@@ -246,6 +246,8 @@ body {
     /* safety */
     justify-content: flex-start;
     /* Icon on left */
+    flex-wrap: wrap;
+    /* Allow submenu to wrap below icon/name */
 }
 
 .team-list-item:hover {
@@ -377,8 +379,13 @@ body {
 .sidebar-submenu {
     display: none;
     /* Completely hide when collapsed to save space/layout */
-    margin-left: 52px;
-    /* Indent under text */
+    width: 100%;
+    /* Full width to force wrapping below header */
+    margin-left: 0;
+    /* Remove previous indent */
+    padding-left: 52px;
+    /* Indent only the contents */
+    margin-top: 4px;
     margin-bottom: 8px;
 }
 
