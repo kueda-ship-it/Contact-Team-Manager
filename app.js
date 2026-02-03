@@ -1410,11 +1410,11 @@ function subscribeToChanges() {
                 }
             }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'replies' }, () => {
-            // For update/delete, full refresh is safer but maybe not needed if INSERT handles most
-            // We keep loadData for non-INSERT events to be safe
-            // loadData(); // Disabled to prefer manual update or surgical update? 
-            // Ideally for edit/delete we also want sync. Let's keep loadData for update/delete.
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'replies' }, (payload) => {
+            console.log('Realtime Reply Event:', payload);
+            if (payload.eventType !== 'INSERT') {
+                loadData();
+            }
         })
         .subscribe();
     supabaseClient.channel('public:reactions').on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, () => loadMasterData()).subscribe();
@@ -2118,8 +2118,19 @@ function renderThreads() {
                 // Not in DOM (Lazy Loading) - Expand limit
                 const index = feedThreads.findIndex(t => t.id === thread.id);
                 if (index !== -1) {
-                    threadsLimit = Math.max(threadsLimit, index + 20); // Expand to include this thread
+                    if (currentSortOrder === 'asc') {
+                        // ASC: Index 0 is oldest. Visible is [Length - Limit ... Length]
+                        // We need Length - Limit <= Index  =>  Limit >= Length - Index
+                        // We add +20 buffer for comfort
+                        threadsLimit = Math.max(threadsLimit, feedThreads.length - index + 5);
+                    } else {
+                        // DESC: Index 0 is newest. Visible is [0 ... Limit]
+                        // We need Limit > Index
+                        threadsLimit = Math.max(threadsLimit, index + 20);
+                    }
+
                     renderThreads();
+                    // Wait for render then scroll
                     // Wait for render then scroll
                     setTimeout(() => {
                         target = document.getElementById(targetId);
