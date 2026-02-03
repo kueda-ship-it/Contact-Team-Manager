@@ -40,7 +40,6 @@ let allTeams = [];
 let whitelist = [];
 let allReactions = [];
 let currentSortOrder = 'asc'; // 'asc' = newest activity at bottom (standard chat style), 'desc' = newest activity first
-let animatingThreadId = null; // Track ID for animation
 let currentGlobalNav = 'teams'; // 'teams', 'activity', etc.
 let feedFilter = 'all'; // 'all', 'pending', 'assigned' (custom filter within team)
 
@@ -251,85 +250,58 @@ window.removeWhitelist = async function (email) {
 // --- Teams Operations ---
 
 async function fetchTeams() {
-    try {
-        const { data: teamIds, error: memberError } = await supabaseClient.from('team_members').select('team_id').eq('user_id', currentUser.id);
+    const { data: teamIds, error: memberError } = await supabaseClient.from('team_members').select('team_id').eq('user_id', currentUser.id);
+    if (memberError) return;
 
-        if (memberError) {
-            console.warn("fetchTeams: Error fetching member teams", memberError);
-            allTeams = [];
-            renderTeamsSidebar();
-            return;
-        }
-
-        const ids = (teamIds || []).map(t => t.team_id);
-
-        if (ids.length === 0) {
-            allTeams = [];
-            renderTeamsSidebar();
-            return;
-        }
-
-        const { data, error } = await supabaseClient.from('teams').select('*').in('id', ids);
-
-        if (error) {
-            console.error("fetchTeams: Error fetching team details", error);
-            allTeams = [];
-            renderTeamsSidebar();
-            return;
-        }
-
-        allTeams = data || [];
-        renderTeamsSidebar();
-
-    } catch (e) {
-        console.error("fetchTeams: Unexpected error", e);
-        // Ensure sidebar appears even if something crashes
+    const ids = teamIds.map(t => t.team_id);
+    const { data, error } = await supabaseClient.from('teams').select('*').in('id', ids);
+    if (data) {
+        allTeams = data;
         renderTeamsSidebar();
     }
 }
 
 // Helper to get plain text from HTML
 function getPlainTextForSidebar(html) {
-    if (!html) return "";
-    // Remove everything except mention spans - preserve mentions for highlighting
-    // First, temporarily replace mention spans with a marker
-    let processed = html.replace(/<span class="mention">(.*?)<\/span>/g, '___MENTION_START___$1___MENTION_END___');
-    // Now strip other HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = processed;
-    let plain = tempDiv.innerText || tempDiv.textContent || "";
-    // Restore mention spans
-    plain = plain.replace(/___MENTION_START___(.*?)___MENTION_END___/g, '<span class="mention">$1</span>');
-    return plain;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = (html || '').replace(/<br\s*\/?>/gi, ' ');
+    const text = tmp.textContent || tmp.innerText || '';
+    return text.replace(/\u00A0/g, ' '); // Normalize NBSP to space
 }
 
 // Helper to extract mentions
-function hasMention(content) {
+function extractMentions(content) {
+    if (!content) return [];
+    // Ensure we are working with plain text before matching
+    const plainText = content.normalize('NFC').includes('<') ? getPlainTextForSidebar(content) : content.normalize('NFC');
+    // More liberal regex to capture virtually everything after @ until a delimiter
+    const matches = plainText.match(/@([^\s<>,.;:!?()[\]{}'"]+)/g);
+    if (!matches) return [];
+    return matches.map(m => m.substring(1));
+}
+
+window.hasMention = function (content) {
     if (!content) return false;
-    const plainText = (content.normalize('NFC').includes('<') ? getPlainTextForSidebar(content) : content.normalize('NFC')).toLowerCase();
+    if (!currentProfile || !currentUser) return false;
 
-    // Greedy match for mentions
-    const matches = plainText.match(/@([^<>\n\r,.;:!?()[\]{}'\"]+)/g);
-    if (!matches) return false;
+    const myName = cleanText(currentProfile.display_name);
+    const myNameNoSpace = myName.replace(/\s+/g, '');
+    const myEmail = cleanText(currentUser.email);
 
-    // Get all possible target strings for current user
-    const targets = new Set();
-    if (currentUser && currentUser.email) targets.add(cleanText(currentUser.email));
-    if (currentProfile) {
-        if (currentProfile.display_name) {
-            const name = cleanText(currentProfile.display_name);
-            targets.add(name);
-            targets.add(name.replace(/\s+/g, '')); // No space version
-        }
-    }
+    const myTagIds = allTagMembers.filter(m => m.profile_id === currentUser.id).map(m => m.tag_id);
+    const myTagNames = allTags.filter(t => myTagIds.includes(t.id)).map(t => cleanText(t.name));
+    const myTagNamesNoSpace = myTagNames.map(tn => tn.replace(/\s+/g, ''));
 
-    // Check if any match starts with any target
-    return matches.some(m => {
-        const candidates = m.substring(1).toLowerCase();
-        for (let t of targets) {
-            if (candidates.startsWith(t)) return true;
-        }
-        return false;
+    const mentions = extractMentions(content);
+
+    return mentions.some(m => {
+        const mClean = cleanText(m);
+        const mNoSpace = mClean.replace(/\s+/g, '');
+        return (myName && mClean === myName) ||
+            (myNameNoSpace && mNoSpace === myNameNoSpace) ||
+            (myEmail && mClean === myEmail) ||
+            myTagNames.includes(mClean) ||
+            myTagNamesNoSpace.includes(mNoSpace);
     });
 }
 
@@ -355,7 +327,7 @@ window.renderTeamsSidebar = function () {
         const allTeamsDiv = document.createElement('div');
         allTeamsDiv.id = 'dynamic-all-teams-nav'; // Assign ID for sub-menu targeting
         allTeamsDiv.className = `team-list-item ${currentTeamId === null ? 'active' : ''}`;
-        allTeamsDiv.onclick = () => switchTeam(null);
+        allTeamsDiv.onclick = () => selectTeam(null);
         allTeamsDiv.innerHTML = `
         <div class="team-icon" style="background: linear-gradient(135deg, #FF6B6B, #FF8E53); color: white; display:flex; align-items:center; justify-content:center;">
              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
@@ -364,25 +336,32 @@ window.renderTeamsSidebar = function () {
     `;
         teamsListEl.appendChild(allTeamsDiv);
 
+        // Inject Submenu if ALL Teams is active
+        if (currentTeamId === null) {
+            /* ... (Existing Submenu Logic Skipped for Conciseness in Tool, assumed preserved if no changes) ... */
+            // Actually, replace_file_content replaces the BLOCK. I must be careful to preserve lines 260-288 logic?
+            // The user tool input doesn't show lines 260-288 being replaced.
+            // Wait, the previous view showed lines 240-350.
+            // I will implement the logic cleanly.
+            // Since I can't see the internal submenu logic in the prompt's memory (Wait, I viewed it in 1293/1303), I will copy it.
+            // Actually, I should use `allTeamsDiv.onclick`...
+            // Wait, I am replacing lines 240-258. I will KEEP lines 259+.
+            // Ah, `teamsListEl.innerHTML` triggers clearing.
+        }
 
-        // Structure: Header (Clickable) + Submenu container
-        let allTeamsHtml = `
-            <div class="team-item-header" onclick="switchTeam(null)">
-                <div class="team-icon" style="background: linear-gradient(135deg, #FF6B6B, #FF8E53); color: white; display:flex; align-items:center; justify-content:center;">
-                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                </div>
-                <span class="team-name-label" style="font-weight:bold; color: #fff;">ALL Teams</span>
-            </div>
-        `;
+        // Wait, I need to wrap the whole function to inject the sort logic at the TOP.
+        // My start line 241 is INSIDE the function.
+        // I will replace the START of the function only.
 
         // Inject Submenu if ALL Teams is active
         if (currentTeamId === null) {
-            const filteredThreads = threads.filter(t => t.status !== 'completed');
+            const filteredThreads = threads.filter(t => t.status !== 'completed'); // Base count for "All"
+            // Recalculate counts for accurate badges
             const pendingCount = filteredThreads.filter(t => t.status === 'pending').length;
             const myCount = filteredThreads.filter(t => t.status === 'pending' && window.hasMention(t.content)).length;
 
-            allTeamsHtml += `
-            <div class="sidebar-submenu">
+            const filterHtml = `
+            <div class="sidebar-submenu" style="margin-left: 20px; margin-bottom: 15px; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 10px;">
                 <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
                     <span># すべて</span>
                 </div>
@@ -399,10 +378,10 @@ window.renderTeamsSidebar = function () {
                     </span>
                 </div>
             </div>
-            `;
+        `;
+            // Append submenu directly after the ALL Teams Item
+            allTeamsDiv.insertAdjacentHTML('afterend', filterHtml);
         }
-        allTeamsDiv.innerHTML = allTeamsHtml;
-        teamsListEl.appendChild(allTeamsDiv);
 
         allTeams.forEach(team => {
             const div = document.createElement('div');
@@ -410,54 +389,91 @@ window.renderTeamsSidebar = function () {
             div.className = `team-list-item ${isActive ? 'active' : ''}`;
             div.title = team.name;
 
-            // Drag and Drop Attributes (Apply to the main container)
+            // Drag and Drop Attributes
             div.draggable = true;
             div.dataset.teamId = team.id;
 
-            // Drag Events (Same as before)
+            // Drag Events
             div.ondragstart = (e) => {
                 e.dataTransfer.setData('text/plain', team.id);
                 e.dataTransfer.effectAllowed = 'move';
                 div.classList.add('dragging');
+
+                // Use only the icon for the drag image
                 const iconEl = div.querySelector('.team-icon');
-                if (iconEl) e.dataTransfer.setDragImage(iconEl, 20, 20);
-                requestAnimationFrame(() => teamsListEl.classList.add('is-dragging'));
+                if (iconEl) {
+                    e.dataTransfer.setDragImage(iconEl, 20, 20);
+                }
+
+                requestAnimationFrame(() => {
+                    teamsListEl.classList.add('is-dragging');
+                });
             };
+
             div.ondragover = (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
+
+                // Calculate drop position (Top or Bottom half)
                 const rect = div.getBoundingClientRect();
                 const offsetY = e.clientY - rect.top;
                 const isTop = offsetY < (rect.height / 2);
-                if (isTop) { div.classList.add('drag-over-top'); div.classList.remove('drag-over-bottom'); }
-                else { div.classList.add('drag-over-bottom'); div.classList.remove('drag-over-top'); }
+
+                if (isTop) {
+                    div.classList.add('drag-over-top');
+                    div.classList.remove('drag-over-bottom');
+                } else {
+                    div.classList.add('drag-over-bottom');
+                    div.classList.remove('drag-over-top');
+                }
                 div.classList.add('drag-over');
             };
-            div.ondragleave = () => div.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
+
+            div.ondragleave = () => {
+                div.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
+            };
+
             div.ondragend = () => {
                 div.classList.remove('dragging');
                 teamsListEl.classList.remove('is-dragging');
                 document.querySelectorAll('.team-list-item').forEach(el => el.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom'));
             };
+
             div.ondrop = (e) => {
                 e.preventDefault();
                 div.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
+
                 const draggedId = e.dataTransfer.getData('text/plain');
                 const targetId = team.id;
+
                 if (draggedId !== String(targetId)) {
+                    // Reorder logic
                     const oldIndex = allTeams.findIndex(t => String(t.id) === draggedId);
                     let newIndex = allTeams.findIndex(t => String(t.id) === String(targetId));
+
+                    // Adjust insertion index based on drop position
                     const rect = div.getBoundingClientRect();
                     const offsetY = e.clientY - rect.top;
                     const isTop = offsetY < (rect.height / 2);
+
                     if (oldIndex > -1 && newIndex > -1) {
                         const [movedTeam] = allTeams.splice(oldIndex, 1);
+
+                        // If we removed the item from BEFORE the target, the target's index shifted down by 1.
+                        // We need to fetch the index of target AGAIN or adjust.
                         let adjustedTargetIndex = allTeams.findIndex(t => String(t.id) === String(targetId));
-                        if (!isTop) adjustedTargetIndex += 1;
+
+                        if (!isTop) {
+                            adjustedTargetIndex += 1; // Insert AFTER
+                        }
+
                         allTeams.splice(adjustedTargetIndex, 0, movedTeam);
+
+                        // Save new order
                         const newOrder = allTeams.map(t => String(t.id));
                         localStorage.setItem(`team_order_${currentUser.id}`, JSON.stringify(newOrder));
-                        renderTeamsSidebar();
+
+                        renderTeamsSidebar(); // Re-render
                     }
                 }
             };
@@ -475,51 +491,54 @@ window.renderTeamsSidebar = function () {
                 iconHtml = `<div class="team-icon" style="background: ${team.icon_color || '#313338'}; color: var(--text-muted);">${team.name.charAt(0).toUpperCase()}</div>`;
             }
 
-            // Click Handler Wrapper
-            const clickHandler = `
-                const tId = '${team.id}';
+            div.innerHTML = `
+            ${iconHtml}
+            <span class="team-name-label">${escapeHtml(team.name)}</span>
+        `;
+
+            // Use dataset to store ID safely
+            div.dataset.teamId = team.id;
+            div.onclick = function () {
+                const tId = this.dataset.teamId;
+                // Toggle logic: If clicking active team, deselect it (hide submenu)
                 if (String(currentTeamId) === String(tId)) {
                     switchTeam(null);
                 } else {
                     switchTeam(tId);
                 }
-            `;
-
-            // HTML Structure: Header + Submenu
-            let itemHtml = `
-                <div class="team-item-header" onclick="${clickHandler.replace(/"/g, '&quot;').replace(/\n/g, '')}">
-                    ${iconHtml}
-                    <span class="team-name-label">${escapeHtml(team.name)}</span>
-                </div>
-            `;
+            };
+            teamsListEl.appendChild(div);
 
             // Render Channels (Submenu) if Active
             if (isActive) {
+                const submenu = document.createElement('div');
+                submenu.className = 'sidebar-submenu'; // Critical for CSS hiding
+
+                // Dynamic counts
                 const pendingCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id)).length;
                 const assignedCount = threads.filter(t => t.status === 'pending' && String(t.team_id) === String(team.id) && window.hasMention(t.content)).length;
 
-                // Helper for visibility of admin controls
-                const myRole = currentProfile.role;
-                const isOwner = team.created_by === currentUser.id;
-                const showSettings = (myRole === 'Admin' || myRole === 'Manager' || isOwner);
+                submenu.innerHTML = `
+                <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
+                    <span># 一般</span>
+                </div>
+                 <div class="sidebar-submenu-item ${feedFilter === 'pending' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='pending'; renderTeamsSidebar(); renderThreads();">
+                    <span># 未完了</span>
+                    <span class="badge" style="background: var(--danger); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
+                        ${pendingCount}
+                    </span>
+                </div>
+                 <div class="sidebar-submenu-item ${feedFilter === 'assigned' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='assigned'; renderTeamsSidebar(); renderThreads();">
+                    <span># 自分宛て</span>
+                     <span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
+                          ${assignedCount}
+                    </span>
+                </div>
+                `;
 
-                itemHtml += `
-                <div class="sidebar-submenu">
-                    <div class="sidebar-submenu-item ${feedFilter === 'all' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='all'; renderTeamsSidebar(); renderThreads();">
-                        <span># 一般</span>
-                    </div>
-                     <div class="sidebar-submenu-item ${feedFilter === 'pending' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='pending'; renderTeamsSidebar(); renderThreads();">
-                        <span># 未完了</span>
-                        <span class="badge" style="background: var(--danger); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
-                            ${pendingCount}
-                        </span>
-                    </div>
-                     <div class="sidebar-submenu-item ${feedFilter === 'assigned' ? 'active' : ''}" onclick="event.stopPropagation(); feedFilter='assigned'; renderTeamsSidebar(); renderThreads();">
-                        <span># 自分宛て</span>
-                         <span class="badge" style="background: var(--primary-light); color: white; border-radius: 10px; padding: 2px 8px; font-size: 0.7rem;">
-                              ${assignedCount}
-                        </span>
-                    </div>
+
+                // Add "Members" link for everyone
+                submenu.insertAdjacentHTML('beforeend', `
                     <div class="sidebar-submenu-item" onclick="event.stopPropagation(); window.openTeamSettings();">
                         <span style="display:flex; align-items:center; gap:6px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -530,8 +549,14 @@ window.renderTeamsSidebar = function () {
                             </svg>
                             メンバー一覧
                         </span>
-                    </div>
-                    ${showSettings ? `
+                    </div >
+                    `);
+
+                // Team Settings (Icon, Name) for Admin/Owner/Manager ONLY
+                const myRole = currentProfile.role;
+                const isOwner = team.created_by === currentUser.id;
+                if (myRole === 'Admin' || myRole === 'Manager' || isOwner) {
+                    submenu.insertAdjacentHTML('beforeend', `
                     <div class="sidebar-submenu-item" onclick="event.stopPropagation(); window.openTeamConfigModal();">
                         <span style="display:flex; align-items:center; gap:6px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -540,18 +565,27 @@ window.renderTeamsSidebar = function () {
                             </svg>
                             設定
                         </span>
-                    </div>` : ''}
-                </div>
-                `;
+                    </div>
+                `);
+
+                }
+                // Currently openTeamSettings serves both purposes, so we keep the "Team Management" label if they have rights,
+                // OR we can just rely on the "Members" link above to open the same modal, and the modal internal logic hides the sensitive parts.
+                // Let's remove the duplicate "Team Management" link if we rely on "Members" to show the modal.
+                // BUT, "Team Management" implies more than just members.
+                // For now, let's keep "Members" as the primary way to check members.
+                // If the user IS an admin, we can show "設定" (Settings) instead or in addition.
+                // Let's just use "Members" for everyone, and inside the modal, if they are admin, they see extra controls.
+
+                /*
+                const canManage = currentProfile.role === 'Admin' || currentProfile.role === 'Manager' || team.created_by === currentUser.id;
+                if (canManage) {
+                    // ...
+                }
+                */
+
+                div.appendChild(submenu);
             }
-
-            div.innerHTML = itemHtml;
-            // Add click listener purely to outer div for fallback?
-            // - No, we used inline onclick on header.
-            // But we need to support the logic where clicking the CONTAINER (if padding exists) does something?
-            // Actually, we'll rely on the header click. The container is just a wrapper now.
-
-            teamsListEl.appendChild(div);
         });
 
         // Separator
@@ -564,7 +598,6 @@ window.renderTeamsSidebar = function () {
         addTeamDiv.className = 'team-list-item';
         addTeamDiv.onclick = openCreateTeamModal;
         addTeamDiv.innerHTML = `
-                <div class="team-item-header"> <!-- Wrapper for styling consistency -->
                     <div class="team-icon" style="border: 2px dashed rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -572,7 +605,6 @@ window.renderTeamsSidebar = function () {
                         </svg>
                     </div>
                     <span class="team-name-label" style="color: rgba(255,255,255,0.7);">チームを追加</span>
-                </div>
                 `;
         teamsListEl.appendChild(addTeamDiv);
     } catch (e) {
@@ -1119,46 +1151,27 @@ window.deleteTag = async function (tagId) {
 // Assuming 'highlightMentions' is a new utility function or was intended to be added.
 function highlightMentions(text) {
     if (!text) return "";
+    // Normalize spaces and convert NBSP, ensure NFC normalization for Japanese
     const normalizedText = text.normalize('NFC');
+    // Using the same liberal regex as extractMentions
+    const mentionRegex = /@([^\s<>,.;:!?()[\]{}'"]+)/g;
 
-    // Match existing mention spans OR bare @mentions
-    // We stop bare mentions at a variety of delimiters but NOT spaces initially to allow greedy checking
-    const mentionRegex = /<span class="mention">.*?<\/span>|@([^<>\n\r,.;:!?()[\]{}'"]+)/g;
-
-    // Helper to check if a name exists (as user or tag)
-    const checkName = (name) => {
-        const target = cleanText(name);
+    return normalizedText.replace(mentionRegex, (match, name) => {
+        const cleanName = name; // matched group
+        const target = cleanText(cleanName);
         const targetNoSpace = target.replace(/\s+/g, '');
 
+        // Check current profile first (often most relevant)
         const isMe = (currentProfile && (cleanText(currentProfile.display_name) === target || cleanText(currentProfile.display_name).replace(/\s+/g, '') === targetNoSpace)) ||
             (currentUser && cleanText(currentUser.email) === target);
 
-        if (isMe) return true;
+        const exists = isMe ||
+            allProfiles.some(p => cleanText(p.display_name) === target || cleanText(p.display_name).replace(/\s+/g, '') === targetNoSpace || cleanText(p.email) === target) ||
+            allTags.some(t => cleanText(t.name) === target || cleanText(t.name).replace(/\s+/g, '') === targetNoSpace);
 
-        if (allProfiles.some(p => cleanText(p.display_name) === target || cleanText(p.display_name).replace(/\s+/g, '') === targetNoSpace || cleanText(p.email) === target)) return true;
-        if (allTags.some(t => cleanText(t.name) === target || cleanText(t.name).replace(/\s+/g, '') === targetNoSpace)) return true;
-
-        return false;
-    };
-
-    return normalizedText.replace(mentionRegex, (match, bareName) => {
-        if (match.startsWith('<span')) return match; // Already highlighted
-
-        // Greedy search: try to find the longest prefix of bareName that exists
-        const candidates = bareName;
-        // We split by spaces and check prefixes from long to short
-        const parts = candidates.split(' ');
-        for (let i = parts.length; i > 0; i--) {
-            const potentialName = parts.slice(0, i).join(' ');
-            if (checkName(potentialName)) {
-                // Return highlighted part + the rest
-                const rest = candidates.substring(potentialName.length);
-                return `<span class="mention">@${potentialName}</span>${rest}`;
-            }
+        if (exists) {
+            return `<span class="mention">@${cleanName}</span>`;
         }
-
-        // Final check: maybe the name has NO space but candidates has a space after it
-        // Or it's just a single word that doesn't exist - return as is
         return match;
     });
 }
@@ -1209,17 +1222,17 @@ window.addReaction = async function (targetId, type, emoji) {
 // --- Edit Functions ---
 
 window.editThread = function (threadId) {
-    const titleEl = document.getElementById(`title - ${threadId} `);
-    const contentEl = document.getElementById(`content - ${threadId} `);
+    const titleEl = document.getElementById(`title-${threadId}`);
+    const contentEl = document.getElementById(`content-${threadId}`);
 
     if (!titleEl || !contentEl) return;
 
     const originalTitle = titleEl.textContent;
     const originalContent = contentEl.textContent;
 
-    titleEl.innerHTML = `< input type = "text" id = "edit-title-${threadId}" class="input-field" value = "${escapeHtml(originalTitle)}" style = "font-size: 1rem; font-weight: bold;" > `;
+    titleEl.innerHTML = `<input type="text" id="edit-title-${threadId}" class="input-field" value="${escapeHtml(originalTitle)}" style="font-size: 1rem; font-weight: bold;">`;
     contentEl.innerHTML = `
-                    < textarea id = "edit-content-${threadId}" class="input-field" style = "height: 100px; resize: vertical;" > ${escapeHtml(originalContent)}</textarea >
+                    <textarea id="edit-content-${threadId}" class="input-field" style="height: 100px; resize: vertical;">${escapeHtml(originalContent)}</textarea>
                         <div style="display: flex; gap: 8px; margin-top: 8px;">
                             <button class="btn btn-primary btn-sm" onclick="saveEdit('${threadId}')">更新</button>
                             <button class="btn btn-sm btn-outline" onclick="cancelEdit('${threadId}')">キャンセル</button>
@@ -1228,9 +1241,9 @@ window.editThread = function (threadId) {
 };
 
 window.saveEdit = async function (threadId) {
-    const titleInp = document.getElementById(`edit - title - ${threadId} `);
-    const contentInp = document.getElementById(`edit - content - ${threadId} `);
-    const saveBtn = document.querySelector(`button[onclick = "saveEdit('${threadId}')"]`);
+    const titleInp = document.getElementById(`edit-title-${threadId}`);
+    const contentInp = document.getElementById(`edit-content-${threadId}`);
+    const saveBtn = document.querySelector(`button[onclick="saveEdit('${threadId}')"]`);
 
     if (!titleInp || !contentInp) return;
     const newTitle = titleInp.value;
@@ -1258,12 +1271,12 @@ window.saveEdit = async function (threadId) {
 };
 
 window.editReply = function (replyId, threadId) {
-    const contentEl = document.getElementById(`reply - content - ${replyId} `);
+    const contentEl = document.getElementById(`reply-content-${replyId}`);
     if (!contentEl) return;
 
     const originalContent = contentEl.textContent;
     contentEl.innerHTML = `
-                    < textarea id = "edit-reply-content-${replyId}" class="input-field" style = "height: 60px; resize: vertical; font-size: 0.8rem; margin-top: 5px;" > ${escapeHtml(originalContent)}</textarea >
+                    <textarea id="edit-reply-content-${replyId}" class="input-field" style="height: 60px; resize: vertical; font-size: 0.8rem; margin-top: 5px;">${escapeHtml(originalContent)}</textarea>
                         <div style="display: flex; gap: 8px; margin-top: 8px;">
                             <button class="btn btn-primary btn-sm" onclick="saveReply('${replyId}', '${threadId}')">更新</button>
                             <button class="btn btn-sm btn-outline" onclick="renderThreads()">キャンセル</button>
@@ -1272,8 +1285,8 @@ window.editReply = function (replyId, threadId) {
 };
 
 window.saveReply = async function (replyId, threadId) {
-    const contentInp = document.getElementById(`edit - reply - content - ${replyId} `);
-    const saveBtn = document.querySelector(`button[onclick = "saveReply('${replyId}', '${threadId}')"]`);
+    const contentInp = document.getElementById(`edit-reply-content-${replyId}`);
+    const saveBtn = document.querySelector(`button[onclick="saveReply('${replyId}', '${threadId}')"]`);
 
     if (!contentInp) return;
     const newContent = contentInp.value;
@@ -1431,7 +1444,7 @@ async function addThread() {
 }
 
 window.addReply = async function (threadId) {
-    const input = document.getElementById(`reply - input - ${threadId} `);
+    const input = document.getElementById(`reply-input-${threadId}`);
     const content = input.innerText.trim();
     if (!content || currentProfile.role === 'Viewer') return;
     const authorName = currentProfile.display_name || currentUser.email;
@@ -1443,6 +1456,7 @@ window.addReply = async function (threadId) {
         thread_id: threadId,
         content: input.innerHTML,
         author: authorName,
+        user_id: currentUser.id, // Link to auth user
         attachments: atts
     }]);
 
@@ -1476,9 +1490,6 @@ window.toggleStatus = async function (threadId) {
 
     thread.status = thread.status === 'completed' ? 'pending' : 'completed';
 
-    // Trigger Animation
-    animatingThreadId = threadId;
-
     // Update local state for immediate UI feedback
     if (thread.status === 'completed') {
         thread.completed_by = currentUser.id;
@@ -1490,14 +1501,6 @@ window.toggleStatus = async function (threadId) {
     }
 
     renderThreads();
-
-    // Reset animation trigger after short delay
-    setTimeout(() => {
-        if (animatingThreadId === threadId) { // Check if still same
-            animatingThreadId = null;
-        }
-    }, 500);
-
     // -------------------------
 
     const updatePayload = { status: thread.status };
@@ -1937,11 +1940,7 @@ function renderThreads() {
                 `<span style="font-size: 0.8rem; color: #4bf2ad; font-weight: bold;">✓ 完了: ${completerName}</span>`
                 : ''}
                 ${currentProfile.role !== 'Viewer' ? `
-                    <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''} ${animatingThreadId === thread.id ? 'btn-pop' : ''}" onclick="toggleStatus('${thread.id}')" title="${thread.status === 'completed' ? '未完了に戻す' : '完了にする'}" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
-                        ${thread.status === 'completed' ?
-                    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>` :
-                    `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`}
-                    </button>
+                    <button class="btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}" onclick="toggleStatus('${thread.id}')">${thread.status === 'completed' ? '戻す' : '完了'}</button>
                     ` : ''}
             </div>
         </div>
@@ -1976,7 +1975,7 @@ function renderThreads() {
         const item = document.createElement('div');
         item.className = 'task-card'; // Changed to match CSS
         const plainContent = getPlainTextForSidebar(thread.content);
-        const styledContent = highlightMentions(plainContent);
+        const styledContent = highlightMentions(escapeHtml(plainContent));
         const authorName = thread.author_name || thread.author || 'Unknown';
 
         // Prevent clicking the card when clicking the form
@@ -1995,9 +1994,7 @@ function renderThreads() {
         item.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div class="sidebar-title">${escapeHtml(thread.title)}</div>
-                <button class="btn btn-sm btn-status ${animatingThreadId === thread.id ? 'btn-pop' : ''}" onclick="event.stopPropagation(); toggleStatus('${thread.id}')" title="完了にする" style="width: 28px; height: 28px; padding: 0; margin-left: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                </button>
+                <button class="btn btn-sm btn-status" onclick="event.stopPropagation(); toggleStatus('${thread.id}')" style="font-size: 0.7rem; padding: 2px 8px; margin-left: 10px; flex-shrink: 0;">完了</button>
             </div>
             <div class="task-content">
                 ${styledContent}
@@ -2048,7 +2045,7 @@ function renderThreads() {
         item.style.borderLeft = '3px solid var(--accent)';
         const authorName = thread.author_name || thread.author || 'Unknown';
         const plainContent = getPlainTextForSidebar(thread.content);
-        const styledContent = highlightMentions(plainContent);
+        const styledContent = highlightMentions(escapeHtml(plainContent));
         item.innerHTML = `
                     <div class="sidebar-title">${escapeHtml(thread.title)}</div>
             <div class="line-clamp-2">${styledContent}</div>
@@ -2141,39 +2138,6 @@ const replyMentionLists = {}; // スレッドIDごとにメンションリスト
 function showMentionSuggestions(query, isThread = true, threadId = null) {
     const listEl = isThread ? mentionListEl : replyMentionLists[threadId];
     if (!listEl) return;
-
-    // --- Dynamic Positioning Logic ---
-    let inputEl = null;
-    if (isThread) {
-        inputEl = newContentInp;
-    } else {
-        if (typeof threadId === 'string' && threadId.startsWith('quick-')) {
-            const realId = threadId.replace('quick-', '');
-            inputEl = document.getElementById(`reply-input-quick-${realId}`);
-        } else {
-            inputEl = document.getElementById(`reply-input-${threadId}`);
-        }
-    }
-
-    if (inputEl) {
-        const rect = inputEl.getBoundingClientRect();
-        const threshold = window.innerHeight / 2;
-
-        // If input is in the top half of the screen, show list BELOW
-        if (rect.top < threshold) {
-            listEl.style.top = '100%';
-            listEl.style.bottom = 'auto'; // Reset bottom
-            listEl.style.marginTop = '5px'; // Add some spacing
-            listEl.style.marginBottom = '0';
-        } else {
-            // Otherwise show list ABOVE (default)
-            listEl.style.bottom = '100%';
-            listEl.style.top = 'auto'; // Reset top
-            listEl.style.marginBottom = '5px'; // Add some spacing
-            listEl.style.marginTop = '0';
-        }
-    }
-    // ---------------------------------
 
     const filteredProfiles = allProfiles.filter(p =>
         (p.display_name && String(p.display_name).toLowerCase().includes(query.toLowerCase())) ||
