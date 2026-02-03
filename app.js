@@ -1445,6 +1445,10 @@ async function addThread() {
 
 window.addReply = async function (threadId) {
     const input = document.getElementById(`reply-input-${threadId}`);
+    if (!input) {
+        console.error(`Reply input not found for thread: ${threadId}`);
+        return;
+    }
     const content = input.innerText.trim();
     if (!content || currentProfile.role === 'Viewer') return;
     const authorName = currentProfile.display_name || currentUser.email;
@@ -1469,7 +1473,7 @@ window.addReply = async function (threadId) {
 
         // Scroll to bottom after adding a reply
         setTimeout(() => {
-            const scrollArea = document.querySelector(`#thread - ${threadId} .reply - scroll - area`);
+            const scrollArea = document.querySelector(`#thread-${threadId} .reply-scroll-area`);
             if (scrollArea) {
                 scrollArea.scrollTop = scrollArea.scrollHeight;
             }
@@ -1543,7 +1547,7 @@ window.showToast = function (message, type = 'success') {
 };
 
 function showCompleteEffect(threadId) {
-    const card = document.getElementById(`thread - ${threadId} `);
+    const card = document.getElementById(`thread-${threadId}`);
     if (!card) return;
 
     const toast = document.createElement('div');
