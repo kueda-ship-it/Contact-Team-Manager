@@ -105,6 +105,7 @@ function formatDate(isoString) {
 }
 
 const adminBtn = document.getElementById('admin-btn');
+const dashboardBtn = document.getElementById('dashboard-btn');
 const settingsBtn = document.getElementById('settings-btn');
 const modalOverlay = document.getElementById('modal-overlay');
 const settingsModal = document.getElementById('settings-modal');
@@ -1149,6 +1150,7 @@ async function loadMasterData() {
         }
     }
 
+    updateButtonVisibility(); // Show/hide admin and dashboard buttons
     renderThreads();
 }
 
@@ -3032,6 +3034,21 @@ adminBtn.onclick = () => {
     fetchWhitelist();
 };
 
+// Show Admin/Dashboard buttons for Admin/Manager roles
+function updateButtonVisibility() {
+    if (currentProfile) {
+        const role = currentProfile.role;
+        if (role === 'Admin' || role === 'Manager') {
+            if (adminBtn) adminBtn.style.display = 'block';
+            if (dashboardBtn) dashboardBtn.style.display = 'block';
+        } else {
+            if (adminBtn) adminBtn.style.display = 'none';
+            if (dashboardBtn) dashboardBtn.style.display = 'none';
+        }
+    }
+}
+
+
 // --- Expand/Collapse Content ---
 // Defined at top but safety check here
 if (!window.toggleExpand) {
@@ -3422,6 +3439,13 @@ window.loadMoreThreads = function () {
         // DESC (Bottom load): Standard behavior is fine (browser handles it, or just stays there)
     }
 };
+
+// Dashboard Button Handler
+if (dashboardBtn) {
+    dashboardBtn.onclick = () => {
+        window.location.href = 'dashboard.html';
+    };
+}
 
 // Start initialization
 checkUser();
