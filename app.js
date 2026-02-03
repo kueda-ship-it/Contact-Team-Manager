@@ -1398,11 +1398,12 @@ function subscribeToChanges() {
             // Realtime Update for Replies
             const newReply = payload.new;
             // Check if thread exists locally and update
-            const thread = threads.find(t => t.id === newReply.thread_id);
+            // Use loose quality (==) to handle string/number ID differences from Supabase vs Local
+            const thread = threads.find(t => t.id == newReply.thread_id);
             if (thread) {
                 if (!thread.replies) thread.replies = [];
                 // Check duplicate
-                if (!thread.replies.some(r => r.id === newReply.id)) {
+                if (!thread.replies.some(r => r.id == newReply.id)) {
                     thread.replies.push(newReply);
                     renderThreads(); // Efficient re-render thanks to lazy loading
                     showToast('新しい返信があります');
@@ -1461,7 +1462,14 @@ async function loadData() {
             repliesByThread[r.thread_id].push(r);
         });
 
-        threads = (threadData || []).map(t => ({
+        // Security Filter: Ensure non-admins only access threads for teams they are in
+        let safeThreadData = threadData || [];
+        if (currentProfile && currentProfile.role !== 'Admin') {
+            const allowedTeamIds = new Set(allTeams.map(t => t.id));
+            safeThreadData = safeThreadData.filter(t => allowedTeamIds.has(t.team_id));
+        }
+
+        threads = safeThreadData.map(t => ({
             ...t,
             replies: repliesByThread[t.id] || []
         }));
@@ -1522,17 +1530,27 @@ window.addReply = async function (threadId) {
     // Attachments for this thread's reply
     const atts = replyAttachments[threadId] || [];
 
-    const { error } = await supabaseClient.from('replies').insert([{
+    const { data: replyData, error } = await supabaseClient.from('replies').insert([{
         thread_id: threadId,
         content: input.innerHTML,
         author: authorName,
         user_id: currentUser.id, // Link to auth user
         attachments: atts
-    }]);
+    }]).select();
 
     if (error) {
         alert("返信失敗: " + error.message);
     } else {
+        if (replyData && replyData[0]) {
+            const thread = threads.find(t => t.id === threadId);
+            if (thread) {
+                if (!thread.replies) thread.replies = [];
+                thread.replies.push(replyData[0]);
+                renderThreads();
+            }
+        }
+
+
         input.innerHTML = '';
         replyAttachments[threadId] = []; // Clear
         renderReplyAttachmentPreview(threadId);
