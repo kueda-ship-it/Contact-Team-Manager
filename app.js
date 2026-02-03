@@ -1939,6 +1939,10 @@ function renderThreads() {
             <div class="dot-menu-container">
                 <div class="dot-menu-trigger">⋮</div>
                 <div class="dot-menu">
+                ${(isOwner || ['Admin', 'Manager'].includes(currentProfile.role)) ? `
+                <div class="menu-item" onclick="editThread('${thread.id}')">
+                    <span class="menu-icon">✎</span> 編集
+                </div>` : ''}
                 ${['Admin', 'Manager'].includes(currentProfile.role) ? `
                 <div class="menu-item" onclick="openTeamSelectModal('${thread.id}', 'repost')">
                     <span class="menu-icon">↪️</span> 別チームへ投稿 (コピー)

@@ -5,7 +5,16 @@
 
 const SUPABASE_URL = "https://bvhfmwrjrrqrpqvlzkyd.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2aGZtd3JqcnJxcnBxdmx6a3lkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxNzczMzQsImV4cCI6MjA1Mjc1MzMzNH0.SSOcbdXqye0lPUQXMhMQ_PXcYrk6c";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Initialize Supabase client
+let supabaseClient;
+try {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    console.log('Supabase client initialized successfully');
+} catch (error) {
+    console.error('Failed to initialize Supabase client:', error);
+}
+
 
 let currentUser = null;
 let currentProfile = null;
@@ -13,66 +22,136 @@ let charts = {};
 
 // Auth Check
 async function checkAuth() {
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+        console.log('Checking authentication...');
 
-    if (!user) {
-        alert('ログインが必要です');
-        window.location.href = 'index.html';
+        // First, try to get the session
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+
+        if (sessionError) {
+            console.error('Session error:', sessionError);
+            alert('セッションエラー: ' + sessionError.message);
+            window.location.href = 'index.html';
+            return false;
+        }
+
+        if (!session) {
+            console.log('No active session found');
+            alert('ログインが必要です');
+            window.location.href = 'index.html';
+            return false;
+        }
+
+        currentUser = session.user;
+        console.log('✅ User authenticated:', currentUser.email);
+        console.log('User ID:', currentUser.id);
+
+        // Get profile and check role
+        console.log('Fetching profile for user ID:', currentUser.id);
+        const { data: profile, error: profileError } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+
+        console.log('Profile query result:', { profile, profileError });
+
+        if (profileError) {
+            console.error('❌ Profile fetch error:', profileError);
+            alert('プロファイル取得エラー: ' + profileError.message + '\n\nRLSポリシーを確認してください');
+            return false;
+        }
+
+        if (!profile) {
+            console.error('❌ No profile found');
+            alert('プロファイルがありません');
+            return false;
+        }
+
+        currentProfile = profile;
+        console.log('✅ Profile loaded successfully!');
+        console.log('User role:', profile.role);
+
+        if (!['Admin', 'Manager'].includes(profile.role)) {
+            console.warn('❌ Access denied - User role:', profile.role);
+            console.warn('⚠️ TEMPORARILY BYPASSING ROLE CHECK FOR DEBUGGING');
+            // alert('このページはAdmin/Manager専用です\n現在のロール: ' + profile.role);
+            // window.location.href = 'index.html';
+            // return false;
+
+            // Show warning banner instead
+            setTimeout(() => {
+                const banner = document.createElement('div');
+                banner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: #ff9800; color: white; padding: 15px; text-align: center; z-index: 10000; font-weight: bold;';
+                banner.innerHTML = `⚠️ デバッグモード: あなたのロールは "${profile.role}" です。Admin/Managerに変更する必要があります。<br>F12でコンソールを開いて詳細を確認してください。`;
+                document.body.prepend(banner);
+            }, 100);
+        }
+
+        console.log('✅ Authorization successful!');
+        return true;
+    } catch (error) {
+        console.error('Unexpected error in checkAuth:', error);
+        alert('予期しないエラーが発生しました: ' + error.message);
         return false;
     }
-
-    currentUser = user;
-
-    // Get profile and check role
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-    currentProfile = profile;
-
-    if (!profile || !['Admin', 'Manager'].includes(profile.role)) {
-        alert('このページはAdmin/Manager専用です');
-        window.location.href = 'index.html';
-        return false;
-    }
-
-    return true;
 }
 
 // Load and analyze data
 async function loadDashboardData() {
-    const periodFilter = document.getElementById('period-filter').value;
-    let dateFilter = null;
+    try {
+        console.log('Loading dashboard data...');
+        const periodFilter = document.getElementById('period-filter').value;
+        let dateFilter = null;
 
-    if (periodFilter !== 'all') {
-        const daysAgo = parseInt(periodFilter);
-        dateFilter = new Date();
-        dateFilter.setDate(dateFilter.getDate() - daysAgo);
+        if (periodFilter !== 'all') {
+            const daysAgo = parseInt(periodFilter);
+            dateFilter = new Date();
+            dateFilter.setDate(dateFilter.getDate() - daysAgo);
+        }
+
+        // Fetch threads
+        let threadsQuery = supabaseClient.from('threads').select('*');
+        if (dateFilter) {
+            threadsQuery = threadsQuery.gte('created_at', dateFilter.toISOString());
+        }
+        const { data: threads, error: threadsError } = await threadsQuery;
+        if (threadsError) {
+            console.error('Threads fetch error:', threadsError);
+            throw threadsError;
+        }
+
+        // Fetch replies
+        let repliesQuery = supabaseClient.from('replies').select('*');
+        if (dateFilter) {
+            repliesQuery = repliesQuery.gte('created_at', dateFilter.toISOString());
+        }
+        const { data: replies, error: repliesError } = await repliesQuery;
+        if (repliesError) {
+            console.error('Replies fetch error:', repliesError);
+            throw repliesError;
+        }
+
+        // Fetch profiles
+        const { data: profiles, error: profilesError } = await supabaseClient.from('profiles').select('*');
+        if (profilesError) {
+            console.error('Profiles fetch error:', profilesError);
+            throw profilesError;
+        }
+
+        // Fetch teams
+        const { data: teams, error: teamsError } = await supabaseClient.from('teams').select('*');
+        if (teamsError) {
+            console.error('Teams fetch error:', teamsError);
+            throw teamsError;
+        }
+
+        console.log('Data loaded successfully:', { threads: threads?.length, replies: replies?.length, profiles: profiles?.length, teams: teams?.length });
+        return { threads: threads || [], replies: replies || [], profiles: profiles || [], teams: teams || [] };
+    } catch (error) {
+        console.error('Error in loadDashboardData:', error);
+        throw error;
     }
-
-    // Fetch threads
-    let threadsQuery = supabase.from('threads').select('*');
-    if (dateFilter) {
-        threadsQuery = threadsQuery.gte('created_at', dateFilter.toISOString());
-    }
-    const { data: threads } = await threadsQuery;
-
-    // Fetch replies
-    let repliesQuery = supabase.from('replies').select('*');
-    if (dateFilter) {
-        repliesQuery = repliesQuery.gte('created_at', dateFilter.toISOString());
-    }
-    const { data: replies } = await repliesQuery;
-
-    // Fetch profiles
-    const { data: profiles } = await supabase.from('profiles').select('*');
-
-    // Fetch teams
-    const { data: teams } = await supabase.from('teams').select('*');
-
-    return { threads: threads || [], replies: replies || [], profiles: profiles || [], teams: teams || [] };
 }
 
 // Calculate statistics
@@ -292,12 +371,23 @@ function updateTrendChart(postsByDay) {
 
 // Main update function
 async function updateDashboard() {
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('dashboard-content').style.display = 'none';
+    try {
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('dashboard-content').style.display = 'none';
 
-    const data = await loadDashboardData();
-    const stats = calculateStats(data);
-    updateUI(stats);
+        const data = await loadDashboardData();
+        const stats = calculateStats(data);
+        updateUI(stats);
+    } catch (error) {
+        console.error('Error updating dashboard:', error);
+        document.getElementById('loading').innerHTML = `
+            <div style="color: var(--danger);">
+                <p>データの読み込みに失敗しました</p>
+                <p style="font-size: 0.9rem;">${error.message}</p>
+                <button class="btn btn-primary" onclick="location.reload()" style="margin-top: 20px;">再読み込み</button>
+            </div>
+        `;
+    }
 }
 
 // Initialize

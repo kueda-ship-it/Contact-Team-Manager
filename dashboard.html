@@ -214,7 +214,16 @@
         </div>
     </div>
 
-    <script src="dashboard.js"></script>
+    <script>
+        // Wait for Supabase to load, then load dashboard.js
+        window.addEventListener('DOMContentLoaded', function () {
+            if (typeof supabase === 'undefined') {
+                console.error('Supabase library failed to load');
+                document.getElementById('loading').innerHTML = '<div style="color: var(--danger);">Supabaseライブラリの読み込みに失敗しました。ページを再読み込みしてください。</div>';
+            }
+        });
+    </script>
+    <script src="dashboard.js" defer></script>
 </body>
 
 </html>
