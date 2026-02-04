@@ -43,7 +43,7 @@ jobs:
         working-directory: ${{ steps.detect.outputs.dir }}
 
       - name: Build
-        run: npm run build || true
+        run: npx vite build --base /Contact-Team-Manager/
         working-directory: ${{ steps.detect.outputs.dir }}
 
       - name: Upload Artifacts
