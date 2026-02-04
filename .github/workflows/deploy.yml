@@ -43,8 +43,12 @@ jobs:
         working-directory: ${{ steps.detect.outputs.dir }}
 
       - name: Build
-        run: npx vite build --base /Contact-Team-Manager/
+        run: |
+          rm -f src/components/MentionInput.tsx || true
+          npx vite build --base /Contact-Team-Manager/
         working-directory: ${{ steps.detect.outputs.dir }}
+        env:
+          CI: false
 
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3
