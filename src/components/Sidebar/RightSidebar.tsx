@@ -105,7 +105,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         .filter(t => {
             if (t.status === 'completed') return false;
             return hasMention(t.content, currentProfile, user?.email || null) ||
-                (t.replies || []).some(r => hasMention(r.content, currentProfile, user?.email || null));
+                (t.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
         })
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 10);

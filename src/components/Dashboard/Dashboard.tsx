@@ -2,10 +2,10 @@ import React from 'react';
 
 
 interface DashboardProps {
-    currentTeamId: number | string | null;
+    currentTeamId: number | null;
     threads: any[];
     teams: any[];
-    onSelectTeam: (id: number | string | null) => void;
+    onSelectTeam: (id: number | null) => void;
     isLoading: boolean;
 }
 
@@ -148,7 +148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                         onChange={(e) => {
                             const val = e.target.value;
                             console.log('Dashboard Selection Change:', val);
-                            onSelectTeam(val || null);
+                            onSelectTeam(val ? Number(val) : null);
                         }}
                         style={{
                             background: 'transparent',

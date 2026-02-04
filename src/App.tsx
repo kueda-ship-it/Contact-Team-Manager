@@ -12,7 +12,7 @@ import { useThreads, useTeams } from './hooks/useSupabase';
 
 function App() {
   const { user, profile, loading: authLoading } = useAuth();
-  const [currentTeamId, setCurrentTeamId] = useState<number | string | null>(null);
+  const [currentTeamId, setCurrentTeamId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'feed' | 'dashboard'>('feed');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { threads, loading: threadsLoading, error: threadsError, refetch } = useThreads(currentTeamId as any);
@@ -111,7 +111,7 @@ function App() {
                 currentTeamId={currentTeamId}
                 threads={threads}
                 teams={teams}
-                onSelectTeam={setCurrentTeamId}
+                onSelectTeam={(id) => setCurrentTeamId(id as number | null)}
                 isLoading={threadsLoading}
               />
             ) : (
