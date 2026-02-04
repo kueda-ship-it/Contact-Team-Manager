@@ -14,6 +14,7 @@ function App() {
   const { user, profile, loading: authLoading } = useAuth();
   const [currentTeamId, setCurrentTeamId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'feed' | 'dashboard'>('feed');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'mentions'>('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { threads, loading: threadsLoading, error: threadsError, refetch } = useThreads(currentTeamId as any);
   const { teams } = useTeams();
@@ -96,6 +97,8 @@ function App() {
               }}
               viewMode={viewMode}
               onSelectDashboard={() => setViewMode('dashboard')}
+              statusFilter={statusFilter}
+              onSelectStatus={setStatusFilter}
               onEditTeam={(teamId) => {
                 setCurrentTeamId(teamId); // Ensure team is selected
                 setIsSettingsOpen(true);
@@ -120,6 +123,8 @@ function App() {
                   <ThreadList
                     currentTeamId={currentTeamId}
                     threadsData={{ threads, loading: threadsLoading, error: threadsError, refetch }}
+                    statusFilter={statusFilter}
+                    onStatusChange={setStatusFilter}
                   />
                 </div>
                 <PostForm

@@ -3,7 +3,7 @@ import { useTeams, useProfiles, useTags, useReactions } from '../../hooks/useSup
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { formatDate } from '../../utils/text';
-import { highlightMentions } from '../../utils/mentions';
+import { highlightMentions, hasMention } from '../../utils/mentions';
 import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
@@ -16,9 +16,11 @@ interface ThreadListProps {
         error: Error | null;
         refetch: (silent?: boolean) => void;
     };
+    statusFilter: 'all' | 'pending' | 'completed' | 'mentions';
+    onStatusChange: (status: 'all' | 'pending' | 'completed' | 'mentions') => void;
 }
 
-export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsData }) => {
+export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsData, statusFilter, onStatusChange }) => {
     const { threads, loading, error, refetch } = threadsData;
     const { teams } = useTeams();
     const { profiles } = useProfiles();
@@ -200,10 +202,16 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
         <div className="thread-list" ref={threadListRef} style={{ overflowY: 'auto', height: '100%' }}>
             <div className="feed-header-sticky">
                 <div className="feed-header-left">
-                    <select className="input-field" style={{ width: 'auto', padding: '2px 10px', fontSize: '0.8rem' }}>
+                    <select
+                        className="input-field"
+                        style={{ width: 'auto', padding: '2px 10px', fontSize: '0.8rem' }}
+                        value={statusFilter}
+                        onChange={(e) => onStatusChange(e.target.value as any)}
+                    >
                         <option value="all">すべて表示</option>
                         <option value="pending">未完了</option>
                         <option value="completed">完了済み</option>
+                        <option value="mentions">自分宛て</option>
                     </select>
                 </div>
                 <div className="feed-header-center">
@@ -217,353 +225,375 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                 </div>
             </div>
 
-            {threads.length === 0 ? (
+            {threads
+                .filter(thread => {
+                    if (statusFilter === 'pending') return thread.status === 'pending';
+                    if (statusFilter === 'completed') return thread.status === 'completed';
+                    if (statusFilter === 'mentions') {
+                        return hasMention(thread.content, currentProfile, user?.email || null) ||
+                            (thread.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
+                    }
+                    return true;
+                })
+                .length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    投稿がありません。
+                    表示する投稿がありません。
                 </div>
             ) : (
-                threads.map(thread => {
-                    const authorProfile = getProfile(thread.author);
-                    const authorAvatar = authorProfile?.avatar_url;
+                threads
+                    .filter(thread => {
+                        if (statusFilter === 'pending') return thread.status === 'pending';
+                        if (statusFilter === 'completed') return thread.status === 'completed';
+                        if (statusFilter === 'mentions') {
+                            return hasMention(thread.content, currentProfile, user?.email || null) ||
+                                (thread.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
+                        }
+                        return true;
+                    })
+                    .map(thread => {
+                        const authorProfile = getProfile(thread.author);
+                        const authorAvatar = authorProfile?.avatar_url;
 
-                    const completerProfile = thread.completed_by ? profiles.find(p => p.id === thread.completed_by) : null;
-                    const completerName = completerProfile?.display_name || completerProfile?.email || 'Unknown';
+                        const completerProfile = thread.completed_by ? profiles.find(p => p.id === thread.completed_by) : null;
+                        const completerName = completerProfile?.display_name || completerProfile?.email || 'Unknown';
 
-                    return (
-                        <div
-                            key={thread.id}
-                            id={`thread-${thread.id}`}
-                            className={`task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''}`}
-                            style={{ position: 'relative', paddingBottom: '50px' }}
-                        >
-                            {thread.is_pinned && <div className="pinned-badge">重要</div>}
-                            {currentTeamId === null && (
-                                <div className="team-badge">
-                                    {teams.find(t => t.id === thread.team_id)?.name || 'Unknown'}
-                                </div>
-                            )}
+                        return (
+                            <div
+                                key={thread.id}
+                                id={`thread-${thread.id}`}
+                                className={`task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''}`}
+                                style={{ position: 'relative', paddingBottom: '50px' }}
+                            >
+                                {thread.is_pinned && <div className="pinned-badge">重要</div>}
+                                {currentTeamId === null && (
+                                    <div className="team-badge">
+                                        {teams.find(t => t.id === thread.team_id)?.name || 'Unknown'}
+                                    </div>
+                                )}
 
-                            <div className="dot-menu-container">
-                                <div className="dot-menu-trigger">⋮</div>
-                                <div className="dot-menu">
-                                    {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
-                                        <>
-                                            {user?.id === thread.user_id && (
-                                                <div className="menu-item" onClick={() => {
-                                                    setEditingThreadId(thread.id);
-                                                    // useTimeout to wait for render then focus? 
-                                                    // handled by simple autofocus or effect?
-                                                    // We can rely on user clicking or just standard flow.
-                                                }}>
-                                                    <span className="menu-icon">✏️</span> 編集
+                                <div className="dot-menu-container">
+                                    <div className="dot-menu-trigger">⋮</div>
+                                    <div className="dot-menu">
+                                        {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                            <>
+                                                {user?.id === thread.user_id && (
+                                                    <div className="menu-item" onClick={() => {
+                                                        setEditingThreadId(thread.id);
+                                                        // useTimeout to wait for render then focus? 
+                                                        // handled by simple autofocus or effect?
+                                                        // We can rely on user clicking or just standard flow.
+                                                    }}>
+                                                        <span className="menu-icon">✏️</span> 編集
+                                                    </div>
+                                                )}
+                                                <div className="menu-item menu-item-delete" onClick={() => handleDeleteThread(thread.id)}>
+                                                    <span className="menu-icon">🗑️</span> 削除
                                                 </div>
-                                            )}
-                                            <div className="menu-item menu-item-delete" onClick={() => handleDeleteThread(thread.id)}>
-                                                <span className="menu-icon">🗑️</span> 削除
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="task-header-meta">
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                        <div className="avatar-container">
+                                            <div className="avatar">
+                                                {authorAvatar ? (
+                                                    <img src={authorAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    (thread.author && thread.author[0].toUpperCase())
+                                                )}
                                             </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="task-header-meta">
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                                    <div className="avatar-container">
-                                        <div className="avatar">
-                                            {authorAvatar ? (
-                                                <img src={authorAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                                            ) : (
-                                                (thread.author && thread.author[0].toUpperCase())
-                                            )}
+                                            <div className="status-dot active"></div>
                                         </div>
-                                        <div className="status-dot active"></div>
-                                    </div>
-                                    <div className="task-author-info">
-                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                            <span className="author-name">{thread.author}</span>
-                                            <span className="thread-date" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                {formatDate(thread.created_at)}
-                                            </span>
+                                        <div className="task-author-info">
+                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                                <span className="author-name">{thread.author}</span>
+                                                <span className="thread-date" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                    {formatDate(thread.created_at)}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="task-title-line" id={`title-${thread.id}`}>{thread.title}</div>
-                            {editingThreadId === thread.id ? (
-                                <div className="edit-form" style={{ marginBottom: '10px' }}>
-                                    <div
-                                        ref={(el) => {
-                                            if (el) {
-                                                editRefs.current[thread.id] = el;
-                                                // Initialize content only once if empty
-                                                if (!el.innerHTML && thread.content) {
-                                                    el.innerHTML = thread.content;
+                                <div className="task-title-line" id={`title-${thread.id}`}>{thread.title}</div>
+                                {editingThreadId === thread.id ? (
+                                    <div className="edit-form" style={{ marginBottom: '10px' }}>
+                                        <div
+                                            ref={(el) => {
+                                                if (el) {
+                                                    editRefs.current[thread.id] = el;
+                                                    // Initialize content only once if empty
+                                                    if (!el.innerHTML && thread.content) {
+                                                        el.innerHTML = thread.content;
+                                                    }
                                                 }
-                                            }
-                                        }}
-                                        contentEditable
-                                        className="input-field rich-editor"
-                                        style={{ minHeight: '80px', marginBottom: '8px', color: 'var(--text-main)' }}
-                                        onInput={(e) => handleInput(e, thread.id)}
-                                        onKeyDown={(e) => {
-                                            if (isOpen && targetThreadId === thread.id) {
-                                                handleKeyDown(e, thread.id, e.currentTarget);
-                                            }
-                                        }}
-                                    />
-                                    {isOpen && targetThreadId === thread.id && (
-                                        <MentionList
-                                            candidates={candidates}
-                                            activeIndex={activeIndex}
-                                            onSelect={(c) => {
-                                                const el = editRefs.current[thread.id];
-                                                if (el) insertMention(c, el);
                                             }}
-                                            style={{
-                                                top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
-                                                left: mentionCoords.left,
-                                                position: 'fixed'
+                                            contentEditable
+                                            className="input-field rich-editor"
+                                            style={{ minHeight: '80px', marginBottom: '8px', color: 'var(--text-main)' }}
+                                            onInput={(e) => handleInput(e, thread.id)}
+                                            onKeyDown={(e) => {
+                                                if (isOpen && targetThreadId === thread.id) {
+                                                    handleKeyDown(e, thread.id, e.currentTarget);
+                                                }
                                             }}
                                         />
-                                    )}
-                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                        <button className="btn btn-sm" onClick={() => setEditingThreadId(null)}>キャンセル</button>
-                                        <button className="btn btn-sm btn-primary" onClick={() => handleUpdateThread(thread.id)}>保存</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    className="task-content line-clamp-2"
-                                    dangerouslySetInnerHTML={{ __html: highlightMentions(thread.content, mentionOptions) }}
-                                    style={{ whiteSpace: 'pre-wrap', cursor: 'pointer' }}
-                                    title="クリックで全文表示/折りたたみ"
-                                    onClick={(e) => e.currentTarget.classList.toggle('line-clamp-2')}
-                                />
-                            )}
-
-                            <div className="task-footer-teams">
-                                <ReactionBar
-                                    reactions={reactions.filter(r => r.thread_id === thread.id && !r.reply_id)}
-                                    profiles={profiles}
-                                    currentUserId={user?.id}
-                                    onAdd={(emoji) => handleAddReaction(emoji, thread.id, undefined)}
-                                    onRemove={handleRemoveReaction}
-                                />
-                            </div>
-
-                            <div className={`reply-section ${(!thread.replies || thread.replies.length === 0) ? 'is-empty' : ''}`}>
-                                {thread.replies && thread.replies.length > 0 && (
-                                    <div className="reply-scroll-area">
-                                        {[...thread.replies].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map(reply => {
-                                            const replyAuthorProfile = getProfile(reply.author);
-                                            const replyAvatar = replyAuthorProfile?.avatar_url;
-                                            return (
-                                                <div key={reply.id} className="reply-item" style={{ position: 'relative' }}>
-                                                    <div className="dot-menu-container" style={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}>
-                                                        <div className="dot-menu-trigger">⋮</div>
-                                                        <div className="dot-menu">
-                                                            {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
-                                                                <>
-                                                                    {user?.id === reply.user_id && (
-                                                                        <div className="menu-item" onClick={() => setEditingReplyId(reply.id)}>
-                                                                            <span className="menu-icon">✏️</span> 編集
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="menu-item menu-item-delete" onClick={() => handleDeleteReply(reply.id)}>
-                                                                        <span className="menu-icon">🗑️</span> 削除
-                                                                    </div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="reply-header">
-                                                        <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.6rem' }}>
-                                                            {replyAvatar ? (
-                                                                <img src={replyAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                                                            ) : (
-                                                                (reply.author && reply.author[0].toUpperCase())
-                                                            )}
-                                                        </div>
-                                                        <span>{reply.author}</span>
-                                                        <span>{formatDate(reply.created_at)}</span>
-                                                    </div>
-                                                    {editingReplyId === reply.id ? (
-                                                        <div className="edit-form" style={{ marginTop: '5px' }}>
-                                                            <div style={{ position: 'relative' }}>
-                                                                <div
-                                                                    ref={(el) => {
-                                                                        if (el) {
-                                                                            editRefs.current[reply.id] = el;
-                                                                            // Initialize content only once if empty
-                                                                            if (!el.innerHTML && reply.content) {
-                                                                                el.innerHTML = reply.content;
-                                                                            }
-                                                                        }
-                                                                    }}
-                                                                    contentEditable
-                                                                    className="input-field rich-editor"
-                                                                    style={{ minHeight: '60px', marginBottom: '8px', color: 'var(--text-main)', fontSize: '0.85rem' }}
-                                                                    onInput={(e) => handleInput(e, reply.id)}
-                                                                    onKeyDown={(e) => {
-                                                                        if (isOpen && targetThreadId === reply.id) {
-                                                                            handleKeyDown(e, reply.id, e.currentTarget);
-                                                                        }
-                                                                    }}
-                                                                />
-                                                                {isOpen && targetThreadId === reply.id && (
-                                                                    <MentionList
-                                                                        candidates={candidates}
-                                                                        activeIndex={activeIndex}
-                                                                        onSelect={(c) => {
-                                                                            const el = editRefs.current[reply.id];
-                                                                            if (el) insertMention(c, el);
-                                                                        }}
-                                                                        style={{
-                                                                            top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
-                                                                            left: mentionCoords.left,
-                                                                            position: 'fixed'
-                                                                        }}
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                                <button className="btn btn-sm" onClick={() => setEditingReplyId(null)}>キャンセル</button>
-                                                                <button className="btn btn-sm btn-primary" onClick={() => handleUpdateReply(reply.id)}>保存</button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div
-                                                            className="reply-content"
-                                                            dangerouslySetInnerHTML={{ __html: highlightMentions(reply.content, mentionOptions) }}
-                                                        />
-                                                    )}
-                                                    <ReactionBar
-                                                        reactions={reactions.filter(r => r.reply_id === reply.id)}
-                                                        profiles={profiles}
-                                                        currentUserId={user?.id}
-                                                        onAdd={(emoji) => handleAddReaction(emoji, undefined, reply.id)}
-                                                        onRemove={handleRemoveReaction}
-                                                        style={{ marginTop: '4px' }}
-                                                    />
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                                {thread.status !== 'completed' && (
-                                    <div className="reply-form" style={{ display: 'flex', gap: '15px', alignItems: 'flex-start', marginTop: '10px' }}>
-                                        <div style={{ flex: 1, position: 'relative' }}>
-                                            <div
-                                                ref={(el) => { if (el) replyRefs.current[thread.id] = el; }}
-                                                contentEditable
-                                                className="input-field btn-sm rich-editor"
-                                                style={{ minHeight: '38px', marginTop: 0, padding: '8px' }}
-                                                onInput={(e) => {
-                                                    handleInput(e, thread.id);
+                                        {isOpen && targetThreadId === thread.id && (
+                                            <MentionList
+                                                candidates={candidates}
+                                                activeIndex={activeIndex}
+                                                onSelect={(c) => {
+                                                    const el = editRefs.current[thread.id];
+                                                    if (el) insertMention(c, el);
                                                 }}
-                                                onKeyDown={(e) => {
-                                                    if (isOpen && targetThreadId === thread.id) {
-                                                        handleKeyDown(e, thread.id, e.currentTarget);
-                                                        if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
-                                                            return;
-                                                        }
-                                                    }
-                                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                                        e.preventDefault();
-                                                        handleAddReply(thread.id);
-                                                    }
+                                                style={{
+                                                    top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
+                                                    left: mentionCoords.left,
+                                                    position: 'fixed'
                                                 }}
                                             />
-                                            {isOpen && targetThreadId === thread.id && (
-                                                <MentionList
-                                                    candidates={candidates}
-                                                    activeIndex={activeIndex}
-                                                    onSelect={(c) => {
-                                                        const el = replyRefs.current[thread.id];
-                                                        if (el) insertMention(c, el);
+                                        )}
+                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                            <button className="btn btn-sm" onClick={() => setEditingThreadId(null)}>キャンセル</button>
+                                            <button className="btn btn-sm btn-primary" onClick={() => handleUpdateThread(thread.id)}>保存</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div
+                                        className="task-content line-clamp-2"
+                                        dangerouslySetInnerHTML={{ __html: highlightMentions(thread.content, mentionOptions) }}
+                                        style={{ whiteSpace: 'pre-wrap', cursor: 'pointer' }}
+                                        title="クリックで全文表示/折りたたみ"
+                                        onClick={(e) => e.currentTarget.classList.toggle('line-clamp-2')}
+                                    />
+                                )}
+
+                                <div className="task-footer-teams">
+                                    <ReactionBar
+                                        reactions={reactions.filter(r => r.thread_id === thread.id && !r.reply_id)}
+                                        profiles={profiles}
+                                        currentUserId={user?.id}
+                                        currentProfile={currentProfile}
+                                        onAdd={(emoji) => handleAddReaction(emoji, thread.id, undefined)}
+                                        onRemove={handleRemoveReaction}
+                                    />
+                                </div>
+
+                                <div className={`reply-section ${(!thread.replies || thread.replies.length === 0) ? 'is-empty' : ''}`}>
+                                    {thread.replies && thread.replies.length > 0 && (
+                                        <div className="reply-scroll-area">
+                                            {[...thread.replies].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map(reply => {
+                                                const replyAuthorProfile = getProfile(reply.author);
+                                                const replyAvatar = replyAuthorProfile?.avatar_url;
+                                                return (
+                                                    <div key={reply.id} className="reply-item" style={{ position: 'relative' }}>
+                                                        <div className="dot-menu-container" style={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}>
+                                                            <div className="dot-menu-trigger">⋮</div>
+                                                            <div className="dot-menu">
+                                                                {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                                                    <>
+                                                                        {user?.id === reply.user_id && (
+                                                                            <div className="menu-item" onClick={() => setEditingReplyId(reply.id)}>
+                                                                                <span className="menu-icon">✏️</span> 編集
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="menu-item menu-item-delete" onClick={() => handleDeleteReply(reply.id)}>
+                                                                            <span className="menu-icon">🗑️</span> 削除
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="reply-header">
+                                                            <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.6rem' }}>
+                                                                {replyAvatar ? (
+                                                                    <img src={replyAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                                                ) : (
+                                                                    (reply.author && reply.author[0].toUpperCase())
+                                                                )}
+                                                            </div>
+                                                            <span>{reply.author}</span>
+                                                            <span>{formatDate(reply.created_at)}</span>
+                                                        </div>
+                                                        {editingReplyId === reply.id ? (
+                                                            <div className="edit-form" style={{ marginTop: '5px' }}>
+                                                                <div style={{ position: 'relative' }}>
+                                                                    <div
+                                                                        ref={(el) => {
+                                                                            if (el) {
+                                                                                editRefs.current[reply.id] = el;
+                                                                                // Initialize content only once if empty
+                                                                                if (!el.innerHTML && reply.content) {
+                                                                                    el.innerHTML = reply.content;
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        contentEditable
+                                                                        className="input-field rich-editor"
+                                                                        style={{ minHeight: '60px', marginBottom: '8px', color: 'var(--text-main)', fontSize: '0.85rem' }}
+                                                                        onInput={(e) => handleInput(e, reply.id)}
+                                                                        onKeyDown={(e) => {
+                                                                            if (isOpen && targetThreadId === reply.id) {
+                                                                                handleKeyDown(e, reply.id, e.currentTarget);
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    {isOpen && targetThreadId === reply.id && (
+                                                                        <MentionList
+                                                                            candidates={candidates}
+                                                                            activeIndex={activeIndex}
+                                                                            onSelect={(c) => {
+                                                                                const el = editRefs.current[reply.id];
+                                                                                if (el) insertMention(c, el);
+                                                                            }}
+                                                                            style={{
+                                                                                top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
+                                                                                left: mentionCoords.left,
+                                                                                position: 'fixed'
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                                    <button className="btn btn-sm" onClick={() => setEditingReplyId(null)}>キャンセル</button>
+                                                                    <button className="btn btn-sm btn-primary" onClick={() => handleUpdateReply(reply.id)}>保存</button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div
+                                                                className="reply-content"
+                                                                dangerouslySetInnerHTML={{ __html: highlightMentions(reply.content, mentionOptions) }}
+                                                            />
+                                                        )}
+                                                        <ReactionBar
+                                                            reactions={reactions.filter(r => r.reply_id === reply.id)}
+                                                            profiles={profiles}
+                                                            currentUserId={user?.id}
+                                                            currentProfile={currentProfile}
+                                                            onAdd={(emoji) => handleAddReaction(emoji, undefined, reply.id)}
+                                                            onRemove={handleRemoveReaction}
+                                                            style={{ marginTop: '4px' }}
+                                                        />
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                    {thread.status !== 'completed' && (
+                                        <div className="reply-form" style={{ display: 'flex', gap: '15px', alignItems: 'flex-start', marginTop: '10px' }}>
+                                            <div style={{ flex: 1, position: 'relative' }}>
+                                                <div
+                                                    ref={(el) => { if (el) replyRefs.current[thread.id] = el; }}
+                                                    contentEditable
+                                                    className="input-field btn-sm rich-editor"
+                                                    style={{ minHeight: '38px', marginTop: 0, padding: '8px' }}
+                                                    onInput={(e) => {
+                                                        handleInput(e, thread.id);
                                                     }}
-                                                    style={{
-                                                        top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
-                                                        left: mentionCoords.left,
-                                                        position: 'fixed'
+                                                    onKeyDown={(e) => {
+                                                        if (isOpen && targetThreadId === thread.id) {
+                                                            handleKeyDown(e, thread.id, e.currentTarget);
+                                                            if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
+                                                                return;
+                                                            }
+                                                        }
+                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                            handleAddReply(thread.id);
+                                                        }
                                                     }}
                                                 />
-                                            )}
+                                                {isOpen && targetThreadId === thread.id && (
+                                                    <MentionList
+                                                        candidates={candidates}
+                                                        activeIndex={activeIndex}
+                                                        onSelect={(c) => {
+                                                            const el = replyRefs.current[thread.id];
+                                                            if (el) insertMention(c, el);
+                                                        }}
+                                                        style={{
+                                                            top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
+                                                            left: mentionCoords.left,
+                                                            position: 'fixed'
+                                                        }}
+                                                    />
+                                                )}
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '5px', marginTop: '0px' }}>
+                                                <button className="btn-sm btn-outline" style={{ padding: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    className="btn-send-minimal"
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        color: 'white',
+                                                        width: '38px',
+                                                        height: '38px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        padding: 0,
+                                                        flexShrink: 0,
+                                                        cursor: 'pointer',
+                                                        transition: 'color 0.2s ease'
+                                                    }}
+                                                    onClick={() => handleAddReply(thread.id)}
+                                                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
+                                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'white')}
+                                                >
+                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div style={{ display: 'flex', gap: '5px', marginTop: '0px' }}>
-                                            <button className="btn-sm btn-outline" style={{ padding: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                                                </svg>
-                                            </button>
-                                            <button
-                                                className="btn-send-minimal"
-                                                style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    color: 'white',
-                                                    width: '38px',
-                                                    height: '38px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    padding: 0,
-                                                    flexShrink: 0,
-                                                    cursor: 'pointer',
-                                                    transition: 'color 0.2s ease'
-                                                }}
-                                                onClick={() => handleAddReply(thread.id)}
-                                                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
-                                                onMouseLeave={(e) => (e.currentTarget.style.color = 'white')}
-                                            >
-                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 100 }}>
-                                {thread.status === 'completed' && (
-                                    <div style={{
-                                        fontSize: '0.75rem',
-                                        color: 'var(--success)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        background: 'rgba(67, 181, 129, 0.1)',
-                                        padding: '4px 12px',
-                                        borderRadius: '20px',
-                                        border: '1px solid rgba(67, 181, 129, 0.2)',
-                                        animation: 'fadeIn 0.3s ease-out'
-                                    }}>
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="20 6 9 17 4 12"></polyline>
-                                        </svg>
-                                        <span style={{ fontWeight: 600 }}>完了者: {completerName}</span>
-                                        <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.completed_at)}</span>
-                                    </div>
-                                )}
-                                <button
-                                    className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}`}
-                                    title={thread.status === 'completed' ? '未完了に戻す' : '完了にする'}
-                                    style={{ width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: '1px solid rgba(255, 255, 255, 0.4)' }}
-                                    onClick={() => handleToggleStatus(thread.id, thread.status)}
-                                >
-                                    {thread.status === 'completed' ? (
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-                                    ) : (
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                                     )}
-                                </button>
+                                </div>
+
+                                <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 100 }}>
+                                    {thread.status === 'completed' && (
+                                        <div style={{
+                                            fontSize: '0.75rem',
+                                            color: 'var(--success)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                            background: 'rgba(67, 181, 129, 0.1)',
+                                            padding: '4px 12px',
+                                            borderRadius: '20px',
+                                            border: '1px solid rgba(67, 181, 129, 0.2)',
+                                            animation: 'fadeIn 0.3s ease-out'
+                                        }}>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12"></polyline>
+                                            </svg>
+                                            <span style={{ fontWeight: 600 }}>完了者: {completerName}</span>
+                                            <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.completed_at)}</span>
+                                        </div>
+                                    )}
+                                    <button
+                                        className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}`}
+                                        title={thread.status === 'completed' ? '未完了に戻す' : '完了にする'}
+                                        style={{ width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: '1px solid rgba(255, 255, 255, 0.4)' }}
+                                        onClick={() => handleToggleStatus(thread.id, thread.status)}
+                                    >
+                                        {thread.status === 'completed' ? (
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                                        ) : (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    );
-                })
+                        );
+                    })
             )}
         </div >
     );
