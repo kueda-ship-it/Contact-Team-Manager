@@ -7,9 +7,10 @@ import { highlightMentions, hasMention } from '../../utils/mentions';
 import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
+import { CustomSelect } from '../common/CustomSelect';
 
 interface ThreadListProps {
-    currentTeamId: number | null;
+    currentTeamId: number | string | null;
     threadsData: {
         threads: any[];
         loading: boolean;
@@ -202,17 +203,21 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
         <div className="thread-list" ref={threadListRef} style={{ overflowY: 'auto', height: '100%' }}>
             <div className="feed-header-sticky">
                 <div className="feed-header-left">
-                    <select
-                        className="input-field"
-                        style={{ width: 'auto', padding: '2px 10px', fontSize: '0.8rem' }}
+                    <CustomSelect
+                        options={[
+                            { value: 'all', label: 'すべて表示' },
+                            { value: 'pending', label: '未完了' },
+                            { value: 'completed', label: '完了済み' },
+                            { value: 'mentions', label: '自分宛て' }
+                        ]}
                         value={statusFilter}
-                        onChange={(e) => onStatusChange(e.target.value as any)}
-                    >
-                        <option value="all">すべて表示</option>
-                        <option value="pending">未完了</option>
-                        <option value="completed">完了済み</option>
-                        <option value="mentions">自分宛て</option>
-                    </select>
+                        onChange={(val: string | number) => onStatusChange(val as any)}
+                        style={{
+                            width: '140px',
+                            background: 'transparent',
+                            border: 'none',
+                        }}
+                    />
                 </div>
                 <div className="feed-header-center">
                     <h2 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>

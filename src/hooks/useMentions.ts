@@ -12,7 +12,7 @@ export interface MentionCandidate {
 interface UseMentionsProps {
     profiles: any[];
     tags: any[];
-    currentTeamId: number | null;
+    currentTeamId: number | string | null;
 }
 
 export const useMentions = ({ profiles, tags, currentTeamId }: UseMentionsProps) => {

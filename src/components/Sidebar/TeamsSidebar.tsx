@@ -3,8 +3,8 @@ import { useTeams } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 
 interface TeamsSidebarProps {
-    currentTeamId: number | null;
-    onSelectTeam: (id: number | null) => void;
+    currentTeamId: number | string | null;
+    onSelectTeam: (id: number | string | null) => void;
     viewMode: 'feed' | 'dashboard';
     onSelectDashboard: () => void;
     statusFilter: 'all' | 'pending' | 'completed' | 'mentions';

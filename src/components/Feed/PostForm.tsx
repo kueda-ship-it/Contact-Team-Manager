@@ -6,7 +6,7 @@ import { useProfiles, useTags } from '../../hooks/useSupabase';
 import { MentionList } from '../common/MentionList';
 
 interface PostFormProps {
-    teamId: number | null;
+    teamId: number | string | null;
     onSuccess?: () => void;
 }
 

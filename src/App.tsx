@@ -12,7 +12,7 @@ import { useThreads, useTeams } from './hooks/useSupabase';
 
 function App() {
   const { user, profile, loading: authLoading } = useAuth();
-  const [currentTeamId, setCurrentTeamId] = useState<number | null>(null);
+  const [currentTeamId, setCurrentTeamId] = useState<number | string | null>(null);
   const [viewMode, setViewMode] = useState<'feed' | 'dashboard'>('feed');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'mentions'>('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -46,8 +46,13 @@ function App() {
   return (
     <>
       <header>
-        <div className="logo">
-          <img src="/favicon-v2.png" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} />
+        <div
+          className="logo"
+          onClick={() => setViewMode('feed')}
+          style={{ cursor: 'pointer' }}
+          title="フィードに戻る"
+        >
+          <img src={`${import.meta.env.BASE_URL}favicon-v2.png`} alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} />
           <span>Contact Team Manager</span>
         </div>
         <div className="header-search-container">
@@ -80,7 +85,7 @@ function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        currentTeamId={currentTeamId as any}
+        currentTeamId={currentTeamId}
         currentTeamName={currentTeamName}
         initialTab="profile" // Default
       />
@@ -89,7 +94,7 @@ function App() {
         <aside className="teams-sidebar">
           <div className="teams-list">
             <TeamsSidebar
-              currentTeamId={currentTeamId as any}
+              currentTeamId={currentTeamId}
               onSelectTeam={(id) => {
                 setCurrentTeamId(id);
                 // ALWAYS switch to feed when clicking a team in the sidebar
@@ -98,7 +103,10 @@ function App() {
               viewMode={viewMode}
               onSelectDashboard={() => setViewMode('dashboard')}
               statusFilter={statusFilter}
-              onSelectStatus={setStatusFilter}
+              onSelectStatus={(status) => {
+                setStatusFilter(status);
+                setViewMode('feed');
+              }}
               onEditTeam={(teamId) => {
                 setCurrentTeamId(teamId); // Ensure team is selected
                 setIsSettingsOpen(true);
@@ -114,7 +122,7 @@ function App() {
                 currentTeamId={currentTeamId}
                 threads={threads}
                 teams={teams}
-                onSelectTeam={(id) => setCurrentTeamId(id as number | null)}
+                onSelectTeam={(id) => setCurrentTeamId(id)}
                 isLoading={threadsLoading}
               />
             ) : (
