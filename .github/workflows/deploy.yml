@@ -26,18 +26,30 @@ jobs:
       - name: List files (DEBUG)
         run: ls -R
 
+      - name: Detect project directory
+        id: detect
+        run: |
+          if [ -f "package.json" ]; then
+            echo "dir=." >> $GITHUB_OUTPUT
+          elif [ -d "Contact-Team-Manager-react" ]; then
+            echo "dir=Contact-Team-Manager-react" >> $GITHUB_OUTPUT
+          else
+            echo "Error: package.json not found"
+            exit 1
+          fi
+
       - name: Install dependencies
         run: npm install
-        working-directory: Contact-Team-Manager-react
+        working-directory: ${{ steps.detect.outputs.dir }}
 
       - name: Build
         run: npm run build
-        working-directory: Contact-Team-Manager-react
+        working-directory: ${{ steps.detect.outputs.dir }}
 
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Contact-Team-Manager-react/dist/
+          path: ${{ steps.detect.outputs.dir }}/dist/
 
   deploy:
     needs: build_site
