@@ -10,7 +10,7 @@ export const msalConfig: Configuration = {
         redirectUri: import.meta.env.VITE_AZURE_REDIRECT_URI,
     },
     cache: {
-        cacheLocation: "sessionStorage",
+        cacheLocation: "localStorage",
     },
 };
 
@@ -29,9 +29,14 @@ export const ensureMsalInitialized = async () => {
 
     msalInitPromise = (async () => {
         await msalInstance.initialize();
-        const result = await msalInstance.handleRedirectPromise();
-        if (result) {
-            msalInstance.setActiveAccount(result.account);
+        try {
+            const result = await msalInstance.handleRedirectPromise();
+            if (result) {
+                msalInstance.setActiveAccount(result.account);
+            }
+        } catch (error) {
+            console.warn("MSAL handleRedirectPromise error (non-fatal):", error);
+            // Ignore no_token_request_cache_error as it just means no redirect happened or cache was lost
         }
     })();
 
