@@ -1008,11 +1008,130 @@ body {
     background: transparent !important;
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
     color: var(--text-main) !important;
+    transition: all 0.2s ease !important;
 }
 
 .btn-outline:hover {
     background: rgba(255, 255, 255, 0.1) !important;
     border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.btn-outline:active {
+    transform: scale(0.92);
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* --- Status Toggle Buttons (Common) --- */
+.btn-status {
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    /* Default White Line */
+    color: white !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+/* Complete (Emerald) State Hover - Only applies when NOT revert */
+.btn-status:not(.btn-revert):hover {
+    background: rgba(27, 255, 164, 0.1) !important;
+    /* Emerald skeleton */
+    border-color: #1bffa4 !important;
+    color: #1bffa4 !important;
+    box-shadow: 0 0 10px rgba(27, 255, 164, 0.2);
+}
+
+.btn-status:active {
+    transform: scale(0.9);
+}
+
+/* Revert (Purple) State - Typically inherits btn-status, but explicit override */
+.btn-status.btn-revert {
+    background: transparent !important;
+    /* Ensure transparent background */
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    /* Default White Line */
+    color: white !important;
+}
+
+/* Revert (Purple) Hover */
+.btn-status.btn-revert:hover {
+    background: rgba(167, 139, 250, 0.15) !important;
+    /* Purple skeleton */
+    border-color: #a78bfa !important;
+    color: #a78bfa !important;
+    box-shadow: 0 0 10px rgba(167, 139, 250, 0.2);
+}
+
+.btn-status.btn-revert:active {
+    transform: scale(0.9);
+}
+
+/* --- Clip (Attachment) Button --- */
+.btn-clip-yellow {
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    /* Default White Line */
+    color: white !important;
+    border-radius: 8px !important;
+    /* Rounded square */
+    transition: all 0.2s ease !important;
+}
+
+.btn-clip-yellow:hover {
+    background: rgba(255, 215, 0, 0.1) !important;
+    /* Yellow skeleton */
+    border-color: #FFD700 !important;
+    color: #FFD700 !important;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+}
+
+.btn-clip-yellow:active {
+    transform: scale(0.92);
+}
+
+/* --- Send Button (Blue) --- */
+.btn-send-blue {
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    /* Default White Line */
+    color: white !important;
+    transition: all 0.2s ease !important;
+    border-radius: 8px !important;
+    /* Rounded square */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0 !important;
+}
+
+
+.btn-send-blue:hover {
+    background: rgba(0, 183, 195, 0.1) !important;
+    /* Blue skeleton */
+    border-color: #00B7C3 !important;
+    color: #00B7C3 !important;
+    box-shadow: 0 0 10px rgba(0, 183, 195, 0.2);
+}
+
+.btn-send-blue:active {
+    transform: scale(0.92);
+}
+
+.btn-download-mini {
+    transition: all 0.2s ease !important;
+}
+
+.btn-download-mini:hover {
+    background: rgba(0, 0, 0, 0.9) !important;
+    transform: translateY(-1px);
+}
+
+.btn-download-mini:active {
+    transform: scale(0.9) translateY(0);
 }
 
 .task-author-info .timestamp {

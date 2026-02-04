@@ -1,6 +1,8 @@
 import React from 'react';
 import { useTeams, useProfiles, useTags, useReactions } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
+import { Attachment } from '../../hooks/useFileUpload';
 import { supabase } from '../../lib/supabase';
 import { formatDate } from '../../utils/text';
 import { highlightMentions, hasMention } from '../../utils/mentions';
@@ -31,6 +33,14 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
     const [editingThreadId, setEditingThreadId] = React.useState<string | null>(null);
     const [editingReplyId, setEditingReplyId] = React.useState<string | null>(null);
     const editRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
+    const fileInputRefs = React.useRef<{ [key: string]: HTMLInputElement | null }>({});
+
+    // Track multiple file uploads for different reply forms
+    // Using a simple object to manage attachments per reply form
+    const [replyAttachments, setReplyAttachments] = React.useState<{ [key: string]: Attachment[] }>({});
+    const [replyUploading, setReplyUploading] = React.useState<{ [key: string]: boolean }>({});
+
+    const { uploadFile, downloadFileFromOneDrive } = useOneDriveUpload(); // Use OneDrive instead of Supabase
 
     const {
         isOpen,
@@ -115,22 +125,54 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
 
         if (!plainText) return;
         if (!user) return;
+        if (replyUploading[threadId]) return;
 
         const authorName = currentProfile?.display_name || user.email || 'Unknown';
+        const atts = replyAttachments[threadId] || [];
 
         const { error } = await supabase.from('replies').insert([{
             thread_id: threadId,
             content: content,
             author: authorName,
-            user_id: user.id
+            user_id: user.id,
+            attachments: atts.length > 0 ? atts : null
         }]);
 
         if (error) {
             alert('返信に失敗しました: ' + error.message);
         } else {
             inputEl.innerHTML = '';
+            setReplyAttachments(prev => ({ ...prev, [threadId]: [] }));
             refetch(true);
         }
+    };
+
+    const handleReplyFileChange = async (threadId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0 || !user) return;
+
+        setReplyUploading(prev => ({ ...prev, [threadId]: true }));
+        try {
+            const newAtts: Attachment[] = [];
+            for (const file of files) {
+                const uploaded = await uploadFile(file);
+                if (uploaded) newAtts.push(uploaded);
+            }
+            setReplyAttachments(prev => ({
+                ...prev,
+                [threadId]: [...(prev[threadId] || []), ...newAtts]
+            }));
+        } finally {
+            setReplyUploading(prev => ({ ...prev, [threadId]: false }));
+            if (e.target) e.target.value = '';
+        }
+    };
+
+    const removeReplyAttachment = (threadId: string, index: number) => {
+        setReplyAttachments(prev => ({
+            ...prev,
+            [threadId]: (prev[threadId] || []).filter((_, i) => i !== index)
+        }));
     };
 
     const handleDeleteReply = async (replyId: string) => {
@@ -197,6 +239,55 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
         } else {
             refetchReactions();
         }
+    };
+
+    const renderAttachments = (attachments: any[] | null) => {
+        if (!attachments || attachments.length === 0) return null;
+        return (
+            <div className="attachment-display" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+                {attachments.map((att: any, idx: number) => {
+                    const isOneDrive = att.storageProvider === 'onedrive' || att.id;
+                    return (
+                        <div key={idx} className="attachment-wrapper" style={{ position: 'relative' }}>
+                            <div onClick={() => window.open(att.url, '_blank')} style={{ cursor: 'pointer' }}>
+                                {att.type?.startsWith('image/') ? (
+                                    <img src={att.url} alt={att.name} className="attachment-thumb-large" style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                                ) : (
+                                    <div className="file-link" style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '1.2rem' }}>📄</span>
+                                        <span style={{ fontSize: '0.85rem' }}>{att.name}</span>
+                                    </div>
+                                )}
+                            </div>
+                            {isOneDrive && att.id && (
+                                <button
+                                    className="btn-download-mini"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        downloadFileFromOneDrive(att.id, att.name!);
+                                    }}
+                                    style={{
+                                        position: 'absolute',
+                                        top: '4px',
+                                        right: '4px',
+                                        background: 'rgba(0,0,0,0.7)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        padding: '2px 6px',
+                                        fontSize: '10px',
+                                        cursor: 'pointer',
+                                        zIndex: 10
+                                    }}
+                                >
+                                    📥 ﾀﾞｳﾝﾛｰﾄﾞ
+                                </button>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        );
     };
 
     return (
@@ -375,6 +466,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                     />
                                 )}
 
+                                {renderAttachments(thread.attachments)}
+
                                 <div className="task-footer-teams">
                                     <ReactionBar
                                         reactions={reactions.filter(r => r.thread_id === thread.id && !r.reply_id)}
@@ -472,6 +565,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                                                 dangerouslySetInnerHTML={{ __html: highlightMentions(reply.content, mentionOptions) }}
                                                             />
                                                         )}
+                                                        {renderAttachments(reply.attachments)}
                                                         <ReactionBar
                                                             reactions={reactions.filter(r => r.reply_id === reply.id)}
                                                             profiles={profiles}
@@ -525,32 +619,60 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                                         }}
                                                     />
                                                 )}
+                                                {(replyAttachments[thread.id]?.length || 0) > 0 && (
+                                                    <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                                                        {replyAttachments[thread.id].map((att, idx) => (
+                                                            <div key={idx} className="attachment-item" style={{ position: 'relative', width: '40px', height: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                {att.type.startsWith('image/') ? (
+                                                                    <img src={att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                ) : (
+                                                                    <span style={{ fontSize: '14px' }}>📄</span>
+                                                                )}
+                                                                <div
+                                                                    className="attachment-remove"
+                                                                    onClick={() => removeReplyAttachment(thread.id, idx)}
+                                                                    style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}
+                                                                >
+                                                                    ×
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div style={{ display: 'flex', gap: '5px', marginTop: '0px' }}>
-                                                <button className="btn-sm btn-outline" style={{ padding: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                                                    </svg>
+                                                <button
+                                                    className="btn-sm btn-clip-yellow"
+                                                    style={{ padding: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                                    onClick={() => fileInputRefs.current[thread.id]?.click()}
+                                                    disabled={replyUploading[thread.id]}
+                                                >
+                                                    {replyUploading[thread.id] ? (
+                                                        <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                    ) : (
+                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                                        </svg>
+                                                    )}
+                                                    <input
+                                                        type="file"
+                                                        ref={el => { fileInputRefs.current[thread.id] = el; }}
+                                                        style={{ display: 'none' }}
+                                                        multiple
+                                                        onChange={(e) => handleReplyFileChange(thread.id, e)}
+                                                        disabled={replyUploading[thread.id]}
+                                                    />
                                                 </button>
                                                 <button
-                                                    className="btn-send-minimal"
+                                                    className="btn-send-blue"
                                                     style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        color: 'white',
                                                         width: '38px',
                                                         height: '38px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
                                                         padding: 0,
                                                         flexShrink: 0,
-                                                        cursor: 'pointer',
-                                                        transition: 'color 0.2s ease'
+                                                        cursor: 'pointer'
                                                     }}
                                                     onClick={() => handleAddReply(thread.id)}
-                                                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
-                                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'white')}
                                                 >
                                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                         <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -562,7 +684,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                     )}
                                 </div>
 
-                                <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 100 }}>
+                                <div style={{ position: 'absolute', bottom: '10px', right: (thread.replies && thread.replies.length > 0) ? '20px' : '15px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 100 }}>
                                     {thread.status === 'completed' && (
                                         <div style={{
                                             fontSize: '0.75rem',
@@ -574,7 +696,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                             padding: '4px 12px',
                                             borderRadius: '20px',
                                             border: '1px solid rgba(67, 181, 129, 0.2)',
-                                            animation: 'fadeIn 0.3s ease-out'
+                                            animation: 'fadeIn 0.3s ease-out',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
                                         }}>
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                 <polyline points="20 6 9 17 4 12"></polyline>
@@ -586,13 +709,13 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                     <button
                                         className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}`}
                                         title={thread.status === 'completed' ? '未完了に戻す' : '完了にする'}
-                                        style={{ width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: '1px solid rgba(255, 255, 255, 0.4)' }}
+                                        style={{ width: '38px', height: '38px' }}
                                         onClick={() => handleToggleStatus(thread.id, thread.status)}
                                     >
                                         {thread.status === 'completed' ? (
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
                                         ) : (
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                                         )}
                                     </button>
                                 </div>

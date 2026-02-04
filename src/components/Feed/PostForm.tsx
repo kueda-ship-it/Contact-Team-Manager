@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useMentions } from '../../hooks/useMentions';
 import { useProfiles, useTags } from '../../hooks/useSupabase';
+import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { MentionList } from '../common/MentionList';
 
 interface PostFormProps {
@@ -18,6 +19,8 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
 
     const { profiles } = useProfiles();
     const { tags } = useTags();
+    const { attachments, uploading, uploadFile, removeFile, clearFiles } = useOneDriveUpload();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const {
         isOpen,
@@ -37,6 +40,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         }
 
         if (!user) return;
+        if (uploading) return;
 
         setLoading(true);
         try {
@@ -49,7 +53,8 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                     author: authorName,
                     user_id: user.id,
                     team_id: teamId,
-                    status: 'pending'
+                    status: 'pending',
+                    attachments: attachments.length > 0 ? attachments : null
                 }
             ]);
 
@@ -57,6 +62,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
 
             setTitle('');
             if (contentRef.current) contentRef.current.innerHTML = '';
+            clearFiles();
             if (onSuccess) onSuccess();
 
         } catch (error: any) {
@@ -64,6 +70,18 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        for (const file of files) {
+            await uploadFile(file);
+        }
+
+        // Reset input
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     return (
@@ -81,15 +99,27 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                     />
                     <button
                         type="button"
-                        className="btn btn-outline"
+                        className="btn btn-clip-yellow"
                         title="ファイル添付"
                         style={{ padding: 0, width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                        disabled={loading}
+                        disabled={loading || uploading}
+                        onClick={() => fileInputRef.current?.click()}
                     >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                        </svg>
-                        <input type="file" style={{ display: 'none' }} multiple />
+                        {uploading ? (
+                            <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                        ) : (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                            </svg>
+                        )}
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            multiple
+                            onChange={handleFileChange}
+                            disabled={loading || uploading}
+                        />
                     </button>
                 </div>
 
@@ -124,7 +154,39 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                                 }
                             }}
                         />
-                        <div className="attachment-preview-area"></div>
+                        {attachments.length > 0 && (
+                            <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                                {attachments.map((att, index) => (
+                                    <div key={index} className="attachment-item" style={{ position: 'relative', width: '60px', height: '60px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        {att.type.startsWith('image/') ? (
+                                            <img src={att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                            <span style={{ fontSize: '20px' }}>📄</span>
+                                        )}
+                                        <div
+                                            className="attachment-remove"
+                                            onClick={() => removeFile(index)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                right: 0,
+                                                background: 'rgba(0,0,0,0.5)',
+                                                color: 'white',
+                                                width: '18px',
+                                                height: '18px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                            }}
+                                        >
+                                            ×
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         {isOpen && (
                             <MentionList
                                 candidates={candidates}
@@ -142,28 +204,19 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                     </div>
                     <button
                         type="button"
-                        className="btn-send-minimal"
+                        className="btn-send-blue"
                         title="投稿"
                         style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'white',
                             padding: 0,
                             width: '38px',
                             height: '38px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
                             flexShrink: 0,
                             cursor: 'pointer',
-                            transition: 'color 0.2s ease',
                             marginTop: '0px',
                             alignSelf: 'flex-start'
                         }}
                         onClick={handleSubmit}
-                        disabled={loading}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = 'white')}
+                        disabled={loading || uploading}
                     >
                         {loading ? '...' : (
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
