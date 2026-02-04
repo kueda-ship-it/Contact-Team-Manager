@@ -45,6 +45,7 @@ jobs:
       - name: Build
         run: |
           rm -f src/components/MentionInput.tsx || true
+          rm -f postcss.config.js tailwind.config.js ../postcss.config.js ../tailwind.config.js || true
           npx vite build --base /Contact-Team-Manager/
         working-directory: ${{ steps.detect.outputs.dir }}
         env:
