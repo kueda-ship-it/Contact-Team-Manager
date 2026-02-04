@@ -4,8 +4,9 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/Employee-Directory/',
-  server: {
-    port: 5180,
+  resolve: {
+    alias: {
+      '@': '/src',
+    },
   },
 })
