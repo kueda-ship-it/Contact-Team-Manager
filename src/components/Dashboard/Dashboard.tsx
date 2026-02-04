@@ -1,4 +1,5 @@
 import React from 'react';
+import { CustomSelect } from '../common/CustomSelect';
 
 
 interface DashboardProps {
@@ -143,31 +144,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                         </svg>
                         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>表示チーム:</span>
                     </div>
-                    <select
+                    <CustomSelect
+                        options={[
+                            { value: '', label: 'すべてのチーム' },
+                            ...teams.map(t => ({ value: t.id, label: t.name }))
+                        ]}
                         value={currentTeamId || ''}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            console.log('Dashboard Selection Change:', val);
-                            onSelectTeam(val || null);
-                        }}
+                        onChange={(val: string | number) => onSelectTeam(val || null)}
                         style={{
+                            width: '200px',
                             background: 'transparent',
                             border: 'none',
-                            color: 'var(--text-main)',
-                            fontSize: '1rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            outline: 'none',
-                            padding: '2px 5px',
-                            minWidth: '160px',
-                            textOverflow: 'ellipsis'
                         }}
-                    >
-                        <option value="" style={{ background: 'var(--bg-secondary)', color: 'var(--text-main)' }}>すべてのチーム</option>
-                        {teams.map(team => (
-                            <option key={team.id} value={team.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-main)' }}>{team.name}</option>
-                        ))}
-                    </select>
+                    />
                 </div>
             </div>
 

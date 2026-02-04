@@ -3,12 +3,12 @@ import { useProfiles, useTags } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { highlightMentions, hasMention } from '../../utils/mentions';
-import { getPlainTextForSidebar } from '../../utils/text';
+import { getPlainTextForSidebar, formatDate } from '../../utils/text';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 
 interface RightSidebarProps {
-    currentTeamId: number | null;
+    currentTeamId: number | string | null;
     threadsData: {
         threads: any[];
         loading: boolean;
@@ -105,7 +105,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         .filter(t => {
             if (t.status === 'completed') return false;
             return hasMention(t.content, currentProfile, user?.email || null) ||
-                (t.replies || []).some(r => hasMention(r.content, currentProfile, user?.email || null));
+                (t.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
         })
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 10);
@@ -146,7 +146,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                 />
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                                     <span>by {t.author}</span>
-                                    <span>{new Date(t.created_at).toLocaleDateString()}</span>
+                                    <span>{formatDate(t.created_at)}</span>
                                 </div>
 
                                 <div className="quick-reply-form" onClick={(e) => e.stopPropagation()}>
@@ -219,7 +219,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                 />
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                                     <span>by {t.author}</span>
-                                    <span>{new Date(t.created_at).toLocaleDateString()}</span>
+                                    <span>{formatDate(t.created_at)}</span>
                                 </div>
                             </div>
                         ))

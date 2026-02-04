@@ -575,26 +575,28 @@ body {
 .feed-header-sticky {
     position: sticky;
     top: 0;
-    z-index: 1001;
+    z-index: 9999;
+    /* Boosted to ensure dropdowns are on top of threads */
     background: var(--bg-dark);
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     padding: 0;
-    /* Hidden by default */
     height: 6px;
-    /* Minimal usage */
     opacity: 0.3;
-    /* Faint usage */
-    overflow: hidden;
-    /* Hide content */
+    overflow: visible;
+    /* Changed from hidden to allow dropdowns */
     border-bottom: 1px solid transparent;
     width: 100%;
     margin-bottom: 10px;
     transition: all 0.3s ease;
-    /* Smooth toggle */
     cursor: pointer;
-    /* Indicate interaction */
+}
+
+/* Ensure content is hidden when collapsed since we removed overflow: hidden */
+.feed-header-sticky:not(:hover)>* {
+    visibility: hidden;
+    pointer-events: none;
 }
 
 /* Expand on hover */
@@ -603,6 +605,11 @@ body {
     height: auto;
     opacity: 1;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.feed-header-sticky:hover>* {
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .feed-header-left {
@@ -683,12 +690,15 @@ body {
 .modal {
     background: var(--bg-secondary);
     border-radius: 12px;
-    padding: 24px;
-    width: 90%;
-    max-width: 480px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    position: relative;
+    padding: 25px;
+    width: 600px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    z-index: 20000;
+    /* Much higher than feed headers */
     max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 /* Fixed: Added closing brace */
@@ -973,8 +983,11 @@ body {
 
 /* Status Button Hover Feedback */
 .btn-status:hover {
-    background: #4bf2ad !important;
-    color: #111 !important;
+    background: rgba(75, 242, 173, 0.2) !important;
+    /* Translucent emerald */
+    color: #4bf2ad !important;
+    /* Keep emerald text */
+    border: 1px solid #4bf2ad !important;
 }
 
 .btn-primary {
@@ -1091,33 +1104,44 @@ body {
 
 .input-field {
     width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    /* Slightly firmer border */
+    background-color: #000000 !important;
+    /* Pure black background */
     margin-bottom: 10px;
-    /* Reduced space between fields */
-    color: var(--text-main);
+    color: #FFFFFF !important;
+    /* Pure white text */
     padding: 10px 14px;
     border-radius: 8px;
     font-size: 0.95rem;
-    /* Unified font size */
     outline: none;
-    transition: border-color 0.2s, background 0.2s;
+    transition: all 0.2s ease;
+}
+
+.input-field:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    background-color: #1a1a1a !important;
+    /* Slightly brighter than pure black */
 }
 
 select.input-field {
-    background: #2D2C2B !important;
+    background-color: #000000 !important;
+    /* Pure black background for consistency */
     cursor: pointer;
     appearance: none;
     -webkit-appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300B7C3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+    /* Accent color arrow */
     background-repeat: no-repeat !important;
-    background-position: right 10px center !important;
-    background-size: 16px !important;
-    padding-right: 35px !important;
+    background-position: right 12px center !important;
+    background-size: 14px !important;
+    padding-right: 38px !important;
+    font-weight: 500;
 }
 
 select.input-field option {
-    background: #1F1E1D;
-    color: white;
+    background-color: #000000;
+    color: #FFFFFF;
 }
 
 .compact-form .input-field,
@@ -1424,7 +1448,7 @@ textarea.input-field {
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 3000;
+    z-index: 10000;
 }
 
 .modal {
@@ -2120,8 +2144,9 @@ html {
 .btn-outline[title="設定"]:hover,
 .admin-btn:hover {
     opacity: 1;
-    background: white !important;
-    color: var(--accent) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+    border-color: white !important;
 }
 
 /* --- Dot Menu (Restored) --- */

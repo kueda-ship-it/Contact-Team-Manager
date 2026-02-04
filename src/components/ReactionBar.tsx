@@ -43,7 +43,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, onClos
                         onSelect(emoji);
                         onClose();
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                     {emoji}
@@ -61,6 +61,7 @@ interface ReactionBarProps {
     }>;
     profiles: any[];
     currentUserId?: string;
+    currentProfile?: any;
     onAdd: (emoji: string) => void;
     onRemove: (reactionId: string) => void;
     style?: React.CSSProperties;
@@ -70,6 +71,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
     reactions,
     profiles,
     currentUserId,
+    currentProfile,
     onAdd,
     onRemove,
     style
@@ -97,7 +99,14 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
     const getReactionTooltip = (reactionList: typeof reactions) => {
         return reactionList.map(r => {
             const profile = profiles.find(p => p.id === r.user_id);
-            return profile?.display_name || profile?.email || 'Unknown';
+            if (profile) return profile.display_name || profile.email;
+
+            // Fallback for current user if their profile isn't in 'profiles' yet
+            if (currentUserId && r.user_id === currentUserId && currentProfile) {
+                return currentProfile.display_name || currentProfile.email || 'You';
+            }
+
+            return 'Unknown';
         }).join(', ');
     };
 
@@ -116,24 +125,43 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
                         key={emoji}
                         className={`reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}`}
                         style={{
-                            background: hasUserReacted ? '#004578' : 'var(--bg-tertiary)',
-                            border: `1.5px solid ${hasUserReacted ? '#0078D4' : 'var(--border-color)'}`,
-                            boxShadow: hasUserReacted ? '0 0 10px rgba(0, 120, 212, 0.4)' : 'none',
+                            background: hasUserReacted ? '#004578' : 'rgba(255, 255, 255, 0.05)',
+                            border: `2px solid ${hasUserReacted ? '#0078D4' : 'rgba(255, 255, 255, 0.2)'}`,
+                            boxShadow: hasUserReacted ? '0 0 12px rgba(0, 120, 212, 0.5)' : 'none',
                             borderRadius: '12px',
-                            padding: '2px 8px',
+                            padding: '2px 10px',
                             fontSize: '14px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.2s',
-                            color: hasUserReacted ? '#fff' : 'var(--text-main)'
+                            gap: '5px',
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            color: hasUserReacted ? '#fff' : 'var(--text-main)',
+                            transformOrigin: 'center'
                         }}
                         onClick={() => handleReactionClick(emoji, reactionList)}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.08)';
+                            if (!hasUserReacted) {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            if (!hasUserReacted) {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                            }
+                        }}
                         title={tooltipNames}
                     >
-                        <span>{emoji}</span>
-                        <span style={{ fontSize: '11px', color: hasUserReacted ? 'rgba(255,255,255,0.9)' : 'var(--text-muted)' }}>
+                        <span style={{ filter: hasUserReacted ? 'drop-shadow(0 0 2px rgba(255,255,255,0.5))' : 'none' }}>{emoji}</span>
+                        <span style={{
+                            fontSize: '11px',
+                            fontWeight: hasUserReacted ? '700' : '500',
+                            color: hasUserReacted ? '#fff' : 'var(--text-muted)'
+                        }}>
                             {reactionList.length}
                         </span>
                     </button>

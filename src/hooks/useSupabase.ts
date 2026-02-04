@@ -311,3 +311,78 @@ export function useReactions() {
 
     return { reactions, loading, refetch: fetchReactions };
 }
+
+export function useTeamMembers(teamId: number | string | null) {
+    const [members, setMembers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    const fetchMembers = useCallback(async () => {
+        if (!teamId) {
+            setMembers([]);
+            return;
+        }
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('team_members')
+                .select(`
+                    *,
+                    profile:profiles(*)
+                `)
+                .eq('team_id', teamId);
+
+            if (error) throw error;
+            setMembers(data || []);
+        } catch (error) {
+            console.error('Error fetching team members:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [teamId]);
+
+    useEffect(() => {
+        fetchMembers();
+    }, [fetchMembers]);
+
+    const addMember = async (profileId: string, role = 'Member') => {
+        if (!teamId) return;
+        const { error } = await supabase
+            .from('team_members')
+            .insert([{ team_id: teamId, user_id: profileId, role }]);
+        if (error) throw error;
+        await fetchMembers();
+    };
+
+    const updateMemberRole = async (profileId: string, role: string) => {
+        if (!teamId) return;
+        console.log(`[useTeamMembers] Updating role: team=${teamId}, profile=${profileId}, role=${role}`);
+        const { error } = await supabase
+            .from('team_members')
+            .update({ role })
+            .eq('team_id', teamId)
+            .eq('user_id', profileId);
+        if (error) {
+            console.error('[useTeamMembers] Update error:', error);
+            throw error;
+        }
+        await fetchMembers();
+    };
+
+    const removeMember = async (profileId: string) => {
+        if (!teamId) return;
+        console.log(`[useTeamMembers] Removing member: team=${teamId}, profile=${profileId}`);
+        const { error } = await supabase
+            .from('team_members')
+            .delete()
+            .eq('team_id', teamId)
+            .eq('user_id', profileId);
+        if (error) {
+            console.error('[useTeamMembers] Remove error:', error);
+            throw error;
+        }
+        await fetchMembers();
+    };
+
+    return { members, loading, addMember, updateMemberRole, removeMember, refetch: fetchMembers };
+}
+

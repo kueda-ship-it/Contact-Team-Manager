@@ -3,14 +3,24 @@ import { useTeams } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 
 interface TeamsSidebarProps {
-    currentTeamId: number | null;
-    onSelectTeam: (id: number | null) => void;
+    currentTeamId: number | string | null;
+    onSelectTeam: (id: number | string | null) => void;
     viewMode: 'feed' | 'dashboard';
     onSelectDashboard: () => void;
+    statusFilter: 'all' | 'pending' | 'completed' | 'mentions';
+    onSelectStatus: (status: 'all' | 'pending' | 'completed' | 'mentions') => void;
     onEditTeam: (teamId: number) => void;
 }
 
-export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({ currentTeamId, onSelectTeam, viewMode, onSelectDashboard, onEditTeam }) => {
+export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
+    currentTeamId,
+    onSelectTeam,
+    viewMode,
+    onSelectDashboard,
+    statusFilter,
+    onSelectStatus,
+    onEditTeam
+}) => {
     const { teams: rawTeams, loading } = useTeams();
     const { user, profile } = useAuth();
     const [sortedTeams, setSortedTeams] = useState<typeof rawTeams>([]);
@@ -211,13 +221,22 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({ currentTeamId, onSel
 
                     {currentTeamId === team.id && (
                         <div className="sidebar-submenu">
-                            <div className="sidebar-submenu-item active">
+                            <div
+                                className={`sidebar-submenu-item ${statusFilter === 'all' ? 'active' : ''}`}
+                                onClick={() => onSelectStatus('all')}
+                            >
                                 <span># 一般</span>
                             </div>
-                            <div className="sidebar-submenu-item">
+                            <div
+                                className={`sidebar-submenu-item ${statusFilter === 'pending' ? 'active' : ''}`}
+                                onClick={() => onSelectStatus('pending')}
+                            >
                                 <span># 未完了</span>
                             </div>
-                            <div className="sidebar-submenu-item">
+                            <div
+                                className={`sidebar-submenu-item ${statusFilter === 'mentions' ? 'active' : ''}`}
+                                onClick={() => onSelectStatus('mentions')}
+                            >
                                 <span># 自分宛て</span>
                             </div>
                         </div>
