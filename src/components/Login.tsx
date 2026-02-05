@@ -61,6 +61,25 @@ export const Login: React.FC = () => {
             setLoading(false);
         }
     };
+    const handleMicrosoftSignIn = async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'azure',
+                options: {
+                    scopes: 'email openid profile offline_access',
+                    redirectTo: window.location.origin,
+                }
+            });
+
+            if (error) throw error;
+        } catch (err: any) {
+            setError(err.message);
+            setLoading(false);
+        }
+    };
 
     return (
         <div id="auth-container" className="container" style={{ maxWidth: '400px', paddingTop: '100px' }}>
@@ -99,9 +118,14 @@ export const Login: React.FC = () => {
                             {loading ? 'ログイン中...' : 'ログイン'}
                         </button>
 
-                        <button type="button" className="btn" style={{ background: '#2F2F2F', color: 'white', border: '1px solid #444', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                            {/* Microsoft Logo SVG */}
-                            Microsoft でサインイン
+                        <button type="button" className="btn" onClick={handleMicrosoftSignIn} disabled={loading} style={{ background: '#2F2F2F', color: 'white', border: '1px solid #444', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                            <svg width="20" height="20" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect width="11" height="11" fill="#F25022" />
+                                <rect x="12" width="11" height="11" fill="#7FBA00" />
+                                <rect y="12" width="11" height="11" fill="#00A4EF" />
+                                <rect x="12" y="12" width="11" height="11" fill="#FFB900" />
+                            </svg>
+                            {loading ? 'サインイン中...' : 'Microsoft でサインイン'}
                         </button>
 
                         <div style={{ textAlign: 'center', margin: '10px 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>または</div>
