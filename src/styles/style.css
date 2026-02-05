@@ -1369,11 +1369,12 @@ textarea.input-field {
 .submenu::before {
     content: '';
     position: absolute;
-    top: 0;
-    bottom: 0;
+    top: -20px;
+    bottom: -20px;
     left: 100%;
-    width: 20px;
+    width: 40px;
     background: transparent;
+    z-index: -1;
 }
 
 .menu-item:hover .submenu {
@@ -1863,16 +1864,14 @@ html {
     pointer-events: none;
 }
 
-/* 騾乗縺ｪ繝悶Μ繝ず (Dot Menu) */
+/* 透明なブリッジ (Dot Menu) */
 .dot-menu::before {
     content: '';
     position: absolute;
     bottom: 100%;
     right: 0;
-    width: 60px;
-    /* 繝医Μ繧ｬ繝ｼ蜻ｨ霎ｺ繧偵き繝舌 */
+    width: 100%;
     height: 20px;
-    /* 髫咎俣繧貞沂繧√ｋ */
     background: transparent;
 }
 
@@ -2036,7 +2035,7 @@ html {
     width: max-content;
 }
 
-/* 騾乗縺ｪ繝悶Μ繝ず (Reaction Menu) */
+/* 透明なブリッジ (Reaction Menu) */
 .reaction-container-bottom .reaction-menu::before {
     content: '';
     position: absolute;
@@ -2044,7 +2043,6 @@ html {
     left: 0;
     width: 100%;
     height: 20px;
-    /* 髫咎俣繧貞沂繧√ｋ */
     background: transparent;
 }
 
@@ -2321,6 +2319,7 @@ html {
 }
 
 .menu-item {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 8px;

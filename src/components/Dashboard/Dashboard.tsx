@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CustomSelect } from '../common/CustomSelect';
+import { useProfiles } from '../../hooks/useSupabase';
 
 
 interface DashboardProps {
@@ -11,21 +12,57 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, teams, onSelectTeam, isLoading }) => {
-    console.log('Dashboard Render:', { currentTeamId, threadsCount: threads.length, isLoading });
+    const { profiles } = useProfiles();
+    const [period, setPeriod] = useState<'all' | 'year' | 'month' | 'week' | 'day'>('all');
+
+    const getFilteredThreads = () => {
+        if (period === 'all') return threads;
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+        return threads.filter(t => {
+            const date = new Date(t.completed_at || t.created_at).getTime();
+            if (period === 'year') {
+                return new Date(date).getFullYear() === now.getFullYear();
+            }
+            if (period === 'month') {
+                const d = new Date(date);
+                return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+            }
+            if (period === 'week') {
+                const oneWeekAgo = startOfDay - (7 * 24 * 60 * 60 * 1000);
+                return date >= oneWeekAgo;
+            }
+            if (period === 'day') {
+                return date >= startOfDay;
+            }
+            return true;
+        });
+    };
+
+    const displayThreads = getFilteredThreads();
+
+    console.log('Dashboard Render:', {
+        currentTeamId,
+        period,
+        totalThreads: displayThreads.length,
+        completedThreads: displayThreads.filter(t => t.status === 'completed').length,
+        isLoading
+    });
 
     // Filter threads if needed (though passed threads are usually already filtered by App/useThreads)
     // Actually App passes threads from useThreads(currentTeamId), so 'threads' here are already filtered.
     // However, if currentTeamId is null (All Teams), we might want to aggregate overall stats.
 
-    const totalThreads = threads.length;
-    const completedThreads = threads.filter(t => t.status === 'completed').length;
-    // const pendingThreads = threads.filter(t => t.status !== 'completed').length; // or 'pending'
+    const totalThreads = displayThreads.length;
+    const completedThreads = displayThreads.filter(t => t.status === 'completed').length;
+    // const pendingThreads = displayThreads.filter(t => t.status !== 'completed').length; // or 'pending'
 
     const completionRate = totalThreads > 0 ? Math.round((completedThreads / totalThreads) * 100) : 0;
 
     // User Activity Stats
     // Time Metrics & User Details
-    const [selectedUser, setSelectedUser] = React.useState<string | null>(null);
+    const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
     const calculateAvgTime = (userThreads: any[]) => {
         const completed = userThreads.filter(t => t.status === 'completed' && t.completed_at && t.created_at);
@@ -77,11 +114,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
         return `${hours}時間 ${mins}分`;
     };
 
-    const overallAvgTime = calculateAvgTime(threads);
+    const overallAvgTime = calculateAvgTime(displayThreads);
 
     const userStats: { [key: string]: { name: string; count: number; completedCount: number; avgTime: string; completionRate: number; dailySpan: string } } = {};
 
-    threads.forEach(t => {
+    displayThreads.forEach(t => {
         const author = t.author_name || t.author || 'Unknown'; // Ensure we have a display name preferably
         if (!userStats[author]) {
             userStats[author] = { name: author, count: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A' };
@@ -95,15 +132,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
     // Calculate derived stats for each user
     Object.keys(userStats).forEach(author => {
         const stats = userStats[author];
-        const userThreads = threads.filter(t => (t.author_name || t.author || 'Unknown') === author);
+        // For stats, we still want to see the user's threads as author for some metrics,
+        // but for "Completed Count", we should ideally use completed_by if it's for performance tracking.
+        // However, existing logic uses threads where they are the author.
+        const userThreadsAsAuthor = displayThreads.filter(t => (t.author_name || t.author || 'Unknown') === author);
         stats.completionRate = stats.count > 0 ? Math.round((stats.completedCount / stats.count) * 100) : 0;
-        stats.avgTime = calculateAvgTime(userThreads);
-        stats.dailySpan = calculateDailyActivitySpan(userThreads);
+        stats.avgTime = calculateAvgTime(userThreadsAsAuthor);
+        stats.dailySpan = calculateDailyActivitySpan(userThreadsAsAuthor);
+    });
+
+    // RE-AGGREGATE Completion Count based on WHO completed it (for the "Completions by Member" chart)
+    const completerStats: { [name: string]: number } = {};
+    displayThreads.forEach(t => {
+        if (t.status === 'completed') {
+            const completerProfile = t.completed_by ? (profiles.find((p: any) => p.id === t.completed_by)) : null;
+            const completerName = completerProfile?.display_name || completerProfile?.email || t.author_name || t.author || 'Unknown';
+            completerStats[completerName] = (completerStats[completerName] || 0) + 1;
+        }
     });
 
     const sortedUserStats = Object.values(userStats).sort((a, b) => b.count - a.count);
-    const sortedByCompletions = [...Object.values(userStats)].sort((a, b) => b.completedCount - a.completedCount);
+    const sortedByCompletions = Object.entries(completerStats)
+        .map(([name, count]) => ({ name, completedCount: count }))
+        .sort((a, b) => b.completedCount - a.completedCount);
     const maxCompletions = Math.max(...sortedByCompletions.map(s => s.completedCount), 1);
+
+    // Team Stats for aggregation
+    const teamStats: { [key: string]: { id: number | string; name: string; completedCount: number } } = {};
+    displayThreads.forEach(t => {
+        if (t.status === 'completed') {
+            // Use the thread's team_id if available, otherwise fallback
+            const tId = t.team_id || 'no-team';
+            const teamIdStr = String(tId);
+            if (!teamStats[teamIdStr]) {
+                const team = teams.find(tm => String(tm.id) === teamIdStr);
+                teamStats[teamIdStr] = {
+                    id: tId,
+                    name: team?.name || (tId === 'no-team' ? 'チームなし' : '不明なチーム'),
+                    completedCount: 0
+                };
+            }
+            teamStats[teamIdStr].completedCount++;
+        }
+    });
+    console.log('Team Aggregation Results:', teamStats);
+    const sortedTeamStats = Object.values(teamStats).sort((a, b) => b.completedCount - a.completedCount);
+    const maxTeamCompletions = Math.max(...sortedTeamStats.map(s => s.completedCount), 1);
 
     // Calculate Dash Offset for SVG Pie/Circle Chart
     // Circumference = 2 * PI * r
@@ -134,29 +208,60 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                         <img src={currentTeam.avatar_url} alt="" style={{ width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover' }} />
                     )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: 'rgba(255,255,255,0.08)', padding: '8px 20px', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>表示チーム:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.08)', padding: '4px 12px', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>期間:</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                            {[
+                                { id: 'all', label: 'すべて' },
+                                { id: 'year', label: '年' },
+                                { id: 'month', label: '月' },
+                                { id: 'week', label: '週' },
+                                { id: 'day', label: '日' }
+                            ].map(p => (
+                                <button
+                                    key={p.id}
+                                    onClick={() => setPeriod(p.id as any)}
+                                    style={{
+                                        padding: '4px 10px',
+                                        fontSize: '0.75rem',
+                                        borderRadius: '15px',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        background: period === p.id ? 'var(--primary)' : 'transparent',
+                                        color: period === p.id ? 'white' : 'var(--text-muted)',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                    <CustomSelect
-                        options={[
-                            { value: '', label: 'すべてのチーム' },
-                            ...teams.map(t => ({ value: t.id, label: t.name }))
-                        ]}
-                        value={currentTeamId || ''}
-                        onChange={(val: string | number) => onSelectTeam(val || null)}
-                        style={{
-                            width: '200px',
-                            background: 'transparent',
-                            border: 'none',
-                        }}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: 'rgba(255,255,255,0.08)', padding: '8px 20px', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>表示チーム:</span>
+                        </div>
+                        <CustomSelect
+                            options={[
+                                { value: '', label: 'すべてのチーム' },
+                                ...teams.map(t => ({ value: t.id, label: t.name }))
+                            ]}
+                            value={currentTeamId || ''}
+                            onChange={(val: string | number) => onSelectTeam(val || null)}
+                            style={{
+                                width: '200px',
+                                background: 'transparent',
+                                border: 'none',
+                            }}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -168,7 +273,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                         <line x1="9" y1="13" x2="15" y2="13"></line>
                         <line x1="9" y1="17" x2="13" y2="17"></line>
                     </svg>
-                    <p>このチームにはまだ投稿がありません。</p>
+                    <p>この期間内のデータはありません。</p>
                 </div>
             ) : (
                 <>
@@ -188,7 +293,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-                        {/* Task Progress (Completions) Chart */}
+                        {/* Task Progress (Completions) Chart - Members */}
                         <div className="task-card" style={{ padding: '25px' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>完了数（メンバー別）</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -210,6 +315,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* Task Progress (Completions) Chart - Teams (Show when "All Teams" or multiple results) */}
+                        <div className="task-card" style={{ padding: '25px' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>完了数（チーム別）</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                {sortedTeamStats.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>データなし</div>
+                                ) : (
+                                    sortedTeamStats.slice(0, 5).map((stat) => (
+                                        <div key={String(stat.id)}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.9rem' }}>
+                                                <span style={{ fontWeight: 600 }}>{stat.name}</span>
+                                                <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{stat.completedCount}件</span>
+                                            </div>
+                                            <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                                                <div
+                                                    style={{
+                                                        height: '100%',
+                                                        width: `${(stat.completedCount / maxTeamCompletions) * 100}%`,
+                                                        background: 'var(--accent)',
+                                                        transition: 'width 1s ease-out'
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </div>
 

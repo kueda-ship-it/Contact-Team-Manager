@@ -9,25 +9,30 @@ interface SettingsModalProps {
     onClose: () => void;
     currentTeamId: number | string | null;
     currentTeamName: string;
-    initialTab?: 'profile' | 'team';
+    initialTab?: 'profile' | 'team' | 'admin';
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId, currentTeamName, initialTab = 'profile' }) => {
     const { user, profile } = useAuth();
     const { profiles } = useProfiles();
     const { members, loading: membersLoading, addMember, updateMemberRole, removeMember } = useTeamMembers(currentTeamId);
-    const [activeTab, setActiveTab] = useState<'profile' | 'team'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'admin'>(initialTab as any);
     const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen) {
-            setActiveTab(initialTab);
+            setActiveTab(initialTab as any);
         }
     }, [isOpen, initialTab]);
 
     // Profile State
     const [displayName, setDisplayName] = useState('');
     const [avatarUrl, setAvatarUrl] = useState('');
+
+    // Admin User Edit State
+    const [selectedUserId, setSelectedUserId] = useState<string>('');
+    const [editDisplayName, setEditDisplayName] = useState('');
+    const [editAvatarUrl, setEditAvatarUrl] = useState('');
 
     // Team State
     const [teamName, setTeamName] = useState('');
@@ -56,6 +61,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         }
     };
 
+    const isAdmin = profile?.role === 'Admin';
+
+    useEffect(() => {
+        if (selectedUserId) {
+            const u = profiles.find(p => p.id === selectedUserId);
+            if (u) {
+                setEditDisplayName(u.display_name || '');
+                setEditAvatarUrl(u.avatar_url || '');
+            }
+        }
+    }, [selectedUserId, profiles]);
+
     const handleSaveProfile = async () => {
         if (!user) return;
         const updates = {
@@ -71,6 +88,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         } else {
             alert('プロフィールを更新しました');
             onClose();
+        }
+    };
+
+    const handleAdminSaveUser = async () => {
+        if (!selectedUserId) return;
+        const updates = {
+            id: selectedUserId,
+            display_name: editDisplayName,
+            avatar_url: editAvatarUrl,
+            updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase.from('profiles').upsert(updates);
+        if (error) {
+            alert('ユーザーの更新に失敗しました: ' + error.message);
+        } else {
+            alert('ユーザー情報を更新しました');
         }
     };
 
@@ -115,6 +149,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                     >
                         チーム設定
                     </button>
+                    {isAdmin && (
+                        <button
+                            className={`btn btn-sm ${activeTab === 'admin' ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 'none' }}
+                            onClick={() => setActiveTab('admin')}
+                        >
+                            ユーザー管理
+                        </button>
+                    )}
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '12px', minHeight: 0 }}>
@@ -272,6 +315,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 </div>
                             </div>
                             {/* Extra space to ensure dropdowns at the bottom are not clipped by the scroll container */}
+                            <div style={{ height: '180px' }}></div>
+                        </div>
+                    )}
+
+                    {activeTab === 'admin' && isAdmin && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <h4 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>ユーザー管理</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>ユーザーを選択</label>
+                                        <CustomSelect
+                                            placeholder="ユーザーを選択..."
+                                            options={[
+                                                { value: '', label: 'ユーザーを選択...' },
+                                                ...profiles.map(p => ({ value: p.id, label: `${p.display_name} (${p.email})` }))
+                                            ]}
+                                            value={selectedUserId}
+                                            onChange={(val) => setSelectedUserId(String(val))}
+                                            style={{ height: '36px' }}
+                                        />
+                                    </div>
+
+                                    {selectedUserId && (
+                                        <>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>表示名</label>
+                                                <input
+                                                    type="text"
+                                                    className="input-field"
+                                                    value={editDisplayName}
+                                                    onChange={(e) => setEditDisplayName(e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>アイコン画像</label>
+                                                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                                                    {editAvatarUrl && <img src={editAvatarUrl} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        style={{ fontSize: '0.8rem' }}
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file || !selectedUserId) return;
+                                                            try {
+                                                                const fileExt = file.name.split('.').pop();
+                                                                const fileName = `admin-avatar-${selectedUserId}-${Math.random()}.${fileExt}`;
+                                                                const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);
+                                                                if (uploadError) throw uploadError;
+                                                                const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+                                                                setEditAvatarUrl(data.publicUrl);
+                                                            } catch (err: any) {
+                                                                alert('アップロード失敗: ' + err.message);
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                                <button className="btn btn-sm btn-primary" onClick={handleAdminSaveUser}>ユーザー情報を保存</button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                             <div style={{ height: '180px' }}></div>
                         </div>
                     )}

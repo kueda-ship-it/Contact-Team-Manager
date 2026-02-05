@@ -385,6 +385,29 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                                 <div className="menu-item menu-item-delete" onClick={() => handleDeleteThread(thread.id)}>
                                                     <span className="menu-icon">🗑️</span> 削除
                                                 </div>
+                                                {['Admin'].includes(currentProfile?.role || '') && (
+                                                    <div className="menu-item move-team-item">
+                                                        <span className="menu-icon">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                                            </svg>
+                                                        </span> チーム移動
+                                                        <div className="submenu">
+                                                            {teams.filter(t => t.id !== thread.team_id).map(t => (
+                                                                <div key={t.id} className="menu-item" onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    if (window.confirm(`この投稿を「${t.name}」へ移動しますか？`)) {
+                                                                        const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
+                                                                        if (error) alert('移動に失敗しました: ' + error.message);
+                                                                        else refetch(true);
+                                                                    }
+                                                                }}>
+                                                                    {t.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                     </div>
