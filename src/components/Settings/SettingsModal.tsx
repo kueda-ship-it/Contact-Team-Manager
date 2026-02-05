@@ -184,10 +184,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                         if (!file || !user) return;
                                         try {
                                             const fileExt = file.name.split('.').pop();
-                                            const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-                                            const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);
+                                            const fileName = `avatars/${user.id}-${Math.random()}.${fileExt}`;
+                                            const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
                                             if (uploadError) throw uploadError;
-                                            const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+                                            const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
                                             setAvatarUrl(data.publicUrl);
                                         } catch (err: any) {
                                             alert('アップロード失敗: ' + err.message);
@@ -233,10 +233,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                     if (!file || !currentTeamId) return;
                                                     try {
                                                         const fileExt = file.name.split('.').pop();
-                                                        const fileName = `team-${currentTeamId}-${Math.random()}.${fileExt}`;
-                                                        const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);
+                                                        const fileName = `avatars/team-${currentTeamId}-${Math.random()}.${fileExt}`;
+                                                        const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
                                                         if (uploadError) throw uploadError;
-                                                        const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+                                                        const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
                                                         setTeamIconUrl(data.publicUrl);
                                                     } catch (err: any) {
                                                         alert('アップロード失敗: ' + err.message);
@@ -362,10 +362,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                             if (!file || !selectedUserId) return;
                                                             try {
                                                                 const fileExt = file.name.split('.').pop();
-                                                                const fileName = `admin-avatar-${selectedUserId}-${Math.random()}.${fileExt}`;
-                                                                const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);
+                                                                const fileName = `avatars/admin-avatar-${selectedUserId}-${Math.random()}.${fileExt}`;
+                                                                const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
                                                                 if (uploadError) throw uploadError;
-                                                                const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+                                                                const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
                                                                 setEditAvatarUrl(data.publicUrl);
                                                             } catch (err: any) {
                                                                 alert('アップロード失敗: ' + err.message);

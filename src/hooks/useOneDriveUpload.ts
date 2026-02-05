@@ -9,9 +9,13 @@ export function useOneDriveUpload() {
     const login = async () => {
         try {
             await ensureMsalInitialized();
-            // Using redirect instead of popup for better stability
-            await msalInstance.loginRedirect(loginRequest);
-            return null; // The page will redirect
+            // Using popup to avoid page reload which disrupts the user's draft
+            const result = await msalInstance.loginPopup(loginRequest);
+            if (result) {
+                msalInstance.setActiveAccount(result.account);
+                return result.account;
+            }
+            return null;
         } catch (error) {
             console.error("Microsoft login failed:", error);
             alert("Microsoft アカウントでのログインに失敗しました。");
@@ -28,7 +32,13 @@ export function useOneDriveUpload() {
             // Check if logged in
             let account = msalInstance.getActiveAccount();
             if (!account) {
-                account = await login();
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    msalInstance.setActiveAccount(accounts[0]);
+                    account = accounts[0];
+                } else {
+                    account = await login();
+                }
                 if (!account) throw new Error("Not logged in to Microsoft");
             }
 

@@ -3,16 +3,35 @@ import { Client } from "@microsoft/microsoft-graph-client";
 import { AuthCodeMSALBrowserAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/authCodeMsalBrowser";
 
 // MSAL configuration
+const rawTenantId = import.meta.env.VITE_AZURE_TENANT_ID;
+const rawClientId = import.meta.env.VITE_AZURE_CLIENT_ID;
+
+// Explicitly handle empty or "undefined" string literal
+const tenantId = (!rawTenantId || rawTenantId === 'undefined' || rawTenantId === '') ? 'common' : rawTenantId;
+const clientId = (!rawClientId || rawClientId === 'undefined' || rawClientId === '') ? '' : rawClientId;
+
+if (tenantId === 'common' || !clientId) {
+    console.warn("Microsoft Graph Configuration Warning:", {
+        tenantId,
+        clientId: clientId ? "Omitted for security" : "MISSING",
+        rawTenantId,
+        rawClientId
+    });
+    console.error("VITE_AZURE_TENANT_ID or VITE_AZURE_CLIENT_ID appears to be unset. Fallback to 'common' might cause issues for single-tenant apps.");
+}
+
 export const msalConfig: Configuration = {
     auth: {
-        clientId: import.meta.env.VITE_AZURE_CLIENT_ID,
-        authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}`,
+        clientId: clientId,
+        authority: `https://login.microsoftonline.com/${tenantId}`,
         redirectUri: import.meta.env.VITE_AZURE_REDIRECT_URI || window.location.origin,
     },
     cache: {
         cacheLocation: "localStorage",
     },
 };
+
+console.log("MSAL initialized with authority:", msalConfig.auth.authority);
 
 // Scopes for API permissions
 export const loginRequest: RedirectRequest = {
