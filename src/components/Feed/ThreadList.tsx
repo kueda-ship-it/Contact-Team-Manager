@@ -248,39 +248,39 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                 {attachments.map((att: any, idx: number) => {
                     const isOneDrive = att.storageProvider === 'onedrive' || att.id;
                     return (
-                        <div key={idx} className="attachment-wrapper" style={{ position: 'relative' }}>
-                            <div onClick={() => window.open(att.url, '_blank')} style={{ cursor: 'pointer' }}>
-                                {att.type?.startsWith('image/') ? (
-                                    <img src={att.url} alt={att.name} className="attachment-thumb-large" style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
-                                ) : (
-                                    <div className="file-link" style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ fontSize: '1.2rem' }}>📄</span>
-                                        <span style={{ fontSize: '0.85rem' }}>{att.name}</span>
-                                    </div>
-                                )}
+                        <div key={idx} className="attachment-group" style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                            <div className="attachment-wrapper" style={{ position: 'relative' }}>
+                                <div onClick={() => window.open(att.url, '_blank')} style={{ cursor: 'pointer' }}>
+                                    {att.type?.startsWith('image/') ? (
+                                        <img src={att.thumbnailUrl || att.url} alt={att.name} className="attachment-thumb-large" style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                                    ) : (
+                                        <div className="file-link" style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ fontSize: '1.2rem' }}>📄</span>
+                                            <span style={{ fontSize: '0.85rem' }}>{att.name}</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             {isOneDrive && att.id && (
                                 <button
-                                    className="btn-download-mini"
+                                    className="btn-download-orange"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         downloadFileFromOneDrive(att.id, att.name!);
                                     }}
+                                    title="ダウンロード"
                                     style={{
-                                        position: 'absolute',
-                                        top: '4px',
-                                        right: '4px',
-                                        background: 'rgba(0,0,0,0.7)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        padding: '2px 6px',
-                                        fontSize: '10px',
-                                        cursor: 'pointer',
-                                        zIndex: 10
+                                        marginTop: '4px',
+                                        height: '32px',
+                                        width: '32px',
+                                        padding: 0
                                     }}
                                 >
-                                    📥 ﾀﾞｳﾝﾛｰﾄﾞ
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
                                 </button>
                             )}
                         </div>
@@ -647,7 +647,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                                         {replyAttachments[thread.id].map((att, idx) => (
                                                             <div key={idx} className="attachment-item" style={{ position: 'relative', width: '40px', height: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                                 {att.type.startsWith('image/') ? (
-                                                                    <img src={att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                    <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                                 ) : (
                                                                     <span style={{ fontSize: '14px' }}>📄</span>
                                                                 )}
@@ -688,6 +688,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                                 </button>
                                                 <button
                                                     className="btn-send-blue"
+                                                    title="送信"
                                                     style={{
                                                         width: '38px',
                                                         height: '38px',
@@ -697,7 +698,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                                     }}
                                                     onClick={() => handleAddReply(thread.id)}
                                                 >
-                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                                         <line x1="22" y1="2" x2="11" y2="13"></line>
                                                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                                                     </svg>

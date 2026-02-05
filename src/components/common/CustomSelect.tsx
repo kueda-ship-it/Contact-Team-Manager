@@ -25,7 +25,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const selectedOption = options.find(o => String(o.value) === String(value));
+    const selectedOption = options.find(o => String(o.value).toLowerCase() === String(value).toLowerCase());
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

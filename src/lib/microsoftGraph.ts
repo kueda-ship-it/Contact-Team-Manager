@@ -85,7 +85,7 @@ export const getGraphClient = async (): Promise<Client> => {
     const authProvider = new AuthCodeMSALBrowserAuthenticationProvider(msalInstance as any, {
         account: accounts[0],
         scopes: loginRequest.scopes,
-        interactionType: "redirect" as any,
+        interactionType: "popup" as any,
     });
 
     graphClient = Client.initWithMiddleware({ authProvider });

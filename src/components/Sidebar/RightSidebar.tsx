@@ -149,13 +149,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                     <span>{formatDate(t.created_at)}</span>
                                 </div>
 
-                                <div className="quick-reply-form" onClick={(e) => e.stopPropagation()}>
-                                    <div style={{ position: 'relative', width: '100%' }}>
+                                <div className="quick-reply-form" onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                                    <div style={{ position: 'relative', flex: 1 }}>
                                         <div
                                             ref={(el) => { if (el) quickReplyRefs.current[t.id] = el; }}
                                             contentEditable
                                             className="quick-reply-input rich-editor"
-                                            style={{ minHeight: '32px', maxHeight: '80px', overflowY: 'auto', color: 'white' }}
+                                            style={{ minHeight: '32px', maxHeight: '80px', overflowY: 'auto', color: 'white', marginBottom: 0 }}
                                             onInput={(e) => handleInput(e, t.id)}
                                             onKeyDown={(e) => {
                                                 if (isOpen && targetThreadId === t.id) {
@@ -188,11 +188,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                         )}
                                     </div>
                                     <button
-                                        className="quick-reply-btn"
+                                        className="btn-send-blue"
                                         onClick={() => handleQuickReply(t.id)}
                                         title="送信"
+                                        style={{ width: '38px', padding: 0, flexShrink: 0 }}
                                     >
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                             <line x1="22" y1="2" x2="11" y2="13"></line>
                                             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                                         </svg>

@@ -159,7 +159,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                                 {attachments.map((att, index) => (
                                     <div key={index} className="attachment-item" style={{ position: 'relative', width: '60px', height: '60px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         {att.type.startsWith('image/') ? (
-                                            <img src={att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         ) : (
                                             <span style={{ fontSize: '20px' }}>📄</span>
                                         )}

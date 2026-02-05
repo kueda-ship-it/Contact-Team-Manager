@@ -114,6 +114,55 @@ header {
     margin-left: auto;
 }
 
+.logout-btn {
+    border: 1px solid rgba(196, 49, 75, 0.6) !important;
+}
+
+.logout-btn:hover {
+    background: rgba(196, 49, 75, 0.1) !important;
+    border-color: rgba(196, 49, 75, 0.8) !important;
+    opacity: 1 !important;
+    box-shadow: 0 0 10px rgba(196, 49, 75, 0.2);
+}
+
+.settings-btn {
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+.settings-btn:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    color: white !important;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.settings-btn:active,
+.logout-btn:active,
+.reaction-bubble:active {
+    transform: scale(0.92);
+}
+
+/* Purple Reaction Buttons */
+.reaction-bubble {
+    background: rgba(232, 81, 255, 0.05) !important;
+    border: 1px solid rgba(232, 81, 255, 0.3) !important;
+    color: #e851ff !important;
+    transition: all 0.2s ease !important;
+}
+
+.reaction-bubble:hover {
+    background: rgba(232, 81, 255, 0.1) !important;
+    border-color: rgba(232, 81, 255, 0.8) !important;
+    box-shadow: 0 0 12px rgba(232, 81, 255, 0.3);
+}
+
+.reaction-bubble.user-reacted {
+    background: rgba(232, 81, 255, 0.2) !important;
+    border-color: #e851ff !important;
+    box-shadow: 0 0 15px rgba(232, 81, 255, 0.4);
+}
+
+
 #logout-btn {
     background: rgba(232, 17, 35, 0.15) !important;
     border: 1px solid rgba(232, 17, 35, 0.3) !important;
@@ -301,6 +350,24 @@ body {
     opacity: 1;
 }
 
+.team-settings-icon {
+    display: none;
+    opacity: 0.5;
+    cursor: pointer;
+    margin-left: auto;
+    padding: 2px;
+    align-items: center;
+    transition: opacity 0.2s;
+}
+
+.team-settings-icon:hover {
+    opacity: 1;
+}
+
+.teams-sidebar:hover .team-settings-icon {
+    display: flex;
+}
+
 /* --- Side Panel Specifics --- */
 .side-panel .task-card {
     position: relative;
@@ -385,25 +452,29 @@ body {
 }
 
 /* Submenu - Only visible on hover */
-.sidebar-submenu {
+.sidebar-submenu-container {
     display: none;
-    /* Hide by default */
+}
+
+.teams-sidebar:hover .sidebar-submenu-container {
+    display: block;
+}
+
+.sidebar-submenu {
+    display: flex;
     flex-direction: column;
     width: 100%;
     padding-left: 12px;
-    /* Indent slightly less than before to save space */
     padding-bottom: 8px;
     gap: 4px;
     margin-top: 4px;
-    /* Space between header and menu */
 }
 
-.teams-sidebar:hover .sidebar-submenu {
+.sidebar-submenu.children-list {
     display: flex;
-    /* Show flex on hover */
-    flex-direction: column;
-    gap: 4px;
 }
+
+/* Submenu items visibility handled by container */
 
 .team-icon img {
     width: 100%;
@@ -1093,6 +1164,30 @@ body {
     transform: scale(0.92);
 }
 
+.btn-download-orange {
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    color: white !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px !important;
+    cursor: pointer;
+}
+
+.btn-download-orange:hover {
+    background: rgba(255, 140, 0, 0.1) !important;
+    border-color: #FF8C00 !important;
+    color: #FF8C00 !important;
+    box-shadow: 0 0 10px rgba(255, 140, 0, 0.2);
+}
+
+.btn-download-orange:active {
+    transform: scale(0.92);
+}
+
 /* --- Send Button (Blue) --- */
 .btn-send-blue {
     background: transparent !important;
@@ -1366,16 +1461,7 @@ textarea.input-field {
     /* Gap between menu and submenu */
 }
 
-.submenu::before {
-    content: '';
-    position: absolute;
-    top: -20px;
-    bottom: -20px;
-    left: 100%;
-    width: 40px;
-    background: transparent;
-    z-index: -1;
-}
+/* Bridge removed from here due to overflow-y clipping issues */
 
 .menu-item:hover .submenu {
     display: block;
@@ -2294,9 +2380,21 @@ html {
     transition: background 0.2s;
 }
 
-.dot-menu-trigger:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
+.task-card:hover {
+    background: #2D2C2B;
+    border-color: rgba(255, 255, 255, 0.2);
+    /* Raise the entire card when hovered so its submenus stay on top of subsequent cards */
+    z-index: 1100;
+}
+
+.dot-menu-container:hover {
+    opacity: 1 !important;
+    z-index: 1101;
+}
+
+.task-card:hover .dot-menu-container,
+.reply-item:hover .dot-menu-container {
+    opacity: 1;
 }
 
 .dot-menu {
@@ -2309,13 +2407,37 @@ html {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     border-radius: 6px;
     padding: 4px;
-    display: none;
-    /* Controlled by hover */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
     z-index: 1010;
+    /* Longer transition delay for maximum safety */
+    transition: opacity 0.15s ease, visibility 0s 1s;
 }
 
-.dot-menu-container:hover .dot-menu {
-    display: block;
+/* Hover Shield: Extends hover area significantly in all directions */
+.dot-menu::before {
+    content: '';
+    position: absolute;
+    top: -500px;
+    bottom: -500px;
+    right: 100%;
+    width: 300px;
+    background: transparent;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.dot-menu-container:hover .dot-menu,
+.dot-menu:hover {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.15s ease, visibility 0s 0s;
+}
+
+.dot-menu:hover::before {
+    pointer-events: auto;
 }
 
 .menu-item {
@@ -2323,12 +2445,43 @@ html {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
-    font-size: 0.85rem;
-    color: var(--text-main);
+    padding: 10px 15px;
+    /* Restoring slightly more comfortable padding */
     cursor: pointer;
-    border-radius: 4px;
-    transition: background 0.2s;
+    transition: background 0.15s;
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+/* Submenu for team move dropdown */
+.submenu {
+    position: absolute;
+    right: 100%;
+    top: 0;
+    margin-right: -1px;
+    /* Overlap slightly with parent to ensure no gap */
+    min-width: 170px;
+    max-height: 350px;
+    overflow-y: auto;
+    background: #2B2D31;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    padding: 6px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(5px);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 1030;
+}
+
+.move-team-item:hover .submenu,
+.submenu:hover {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    pointer-events: auto;
 }
 
 .menu-item:hover {

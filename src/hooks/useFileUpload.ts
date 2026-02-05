@@ -5,6 +5,7 @@ export interface Attachment {
     id?: string;
     name: string;
     url: string;
+    thumbnailUrl?: string; // Support for OneDrive thumbnails
     type: string;
     size: number;
     storageProvider?: 'supabase' | 'onedrive';

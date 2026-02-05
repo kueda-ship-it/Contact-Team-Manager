@@ -249,10 +249,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>表示チーム:</span>
                         </div>
                         <CustomSelect
-                            options={[
-                                { value: '', label: 'すべてのチーム' },
-                                ...teams.map(t => ({ value: t.id, label: t.name }))
-                            ]}
+                            options={(() => {
+                                const isAdmin = profile?.role === 'Admin';
+                                const myTeamIds = memberships.map(m => m.team_id);
+                                const visibleTeams = teams.filter(t => isAdmin || myTeamIds.includes(t.id));
+
+                                return [
+                                    ...(isAdmin ? [{ value: '', label: 'すべてのチーム' }] : []),
+                                    ...visibleTeams.map(t => ({ value: t.id, label: t.name }))
+                                ];
+                            })()}
                             value={currentTeamId || ''}
                             onChange={(val: string | number) => onSelectTeam(val || null)}
                             style={{

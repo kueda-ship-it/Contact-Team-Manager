@@ -16,9 +16,9 @@ export function useOneDriveUpload() {
                 return result.account;
             }
             return null;
-        } catch (error) {
+        } catch (error: any) {
             console.error("Microsoft login failed:", error);
-            alert("Microsoft アカウントでのログインに失敗しました。");
+            alert(`Microsoft アカウントでのログインに失敗しました。\nエラー: ${error.message || error}`);
             return null;
         }
     };
@@ -80,10 +80,27 @@ export function useOneDriveUpload() {
                     scope: "anonymous" // Or "organization" depending on policy
                 });
 
+            // 4. Fetch thumbnails for images
+            let thumbnailUrl = undefined;
+            if (file.type.startsWith('image/')) {
+                try {
+                    const thumbResponse = await client.api(`/me/drive/items/${driveItem.id}/thumbnails`).get();
+                    if (thumbResponse.value && thumbResponse.value.length > 0) {
+                        // Priority: large > medium > small
+                        const thumb = thumbResponse.value[0];
+                        thumbnailUrl = thumb.large?.url || thumb.medium?.url || thumb.small?.url;
+                        console.log("Thumbnail URL fetched:", thumbnailUrl);
+                    }
+                } catch (thumbError) {
+                    console.warn("Failed to fetch thumbnails:", thumbError);
+                }
+            }
+
             const newAttachment: Attachment = {
                 id: driveItem.id,
                 name: file.name,
                 url: linkResponse.link.webUrl,
+                thumbnailUrl: thumbnailUrl,
                 type: file.type,
                 size: file.size,
                 storageProvider: 'onedrive'

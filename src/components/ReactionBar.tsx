@@ -5,7 +5,7 @@ interface ReactionPickerProps {
     onClose: () => void;
 }
 
-const COMMON_EMOJIS = ['👍', '❤️', '😊', '🎉', '👏', '🔥', '✅', '💯'];
+const COMMON_EMOJIS = ['👍', '❤️', '🎉', '🔥'];
 
 export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, onClose }) => {
     return (
@@ -15,14 +15,14 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, onClos
                 position: 'absolute',
                 bottom: '100%',
                 left: 0,
-                background: 'var(--bg-elevated, #2b2d31)', // Solid background
-                border: '1px solid var(--border-color)',
+                background: '#1F1E1D',
+                border: '1px solid rgba(232, 81, 255, 0.3)',
                 borderRadius: '8px',
-                padding: '8px',
+                padding: '6px',
                 display: 'flex',
                 gap: '4px',
                 zIndex: 1000,
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                boxShadow: '0 4px 15px rgba(232, 81, 255, 0.2)'
             }}
             onClick={(e) => e.stopPropagation()}
         >
@@ -33,20 +33,29 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, onClos
                     style={{
                         background: 'transparent',
                         border: 'none',
-                        fontSize: '20px',
+                        color: '#e851ff',
                         cursor: 'pointer',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        transition: 'background 0.2s'
+                        padding: '8px',
+                        borderRadius: '6px',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                     }}
                     onClick={() => {
                         onSelect(emoji);
                         onClose();
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(232, 81, 255, 0.1)';
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.transform = 'scale(1)';
+                    }}
                 >
-                    {emoji}
+                    <span style={{ fontSize: '20px' }}>{emoji}</span>
                 </button>
             ))}
         </div>
@@ -67,18 +76,18 @@ interface ReactionBarProps {
     style?: React.CSSProperties;
 }
 
-export const ReactionBar: React.FC<ReactionBarProps> = ({
-    reactions,
-    profiles,
-    currentUserId,
-    currentProfile,
-    onAdd,
-    onRemove,
-    style
-}) => {
+export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
+    const {
+        reactions,
+        profiles,
+        currentUserId,
+        currentProfile,
+        onAdd,
+        onRemove,
+        style
+    } = props;
     const [showPicker, setShowPicker] = useState(false);
 
-    // Group reactions by emoji
     const groupedReactions = reactions.reduce((acc, reaction) => {
         if (!acc[reaction.emoji]) {
             acc[reaction.emoji] = [];
@@ -100,12 +109,9 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
         return reactionList.map(r => {
             const profile = profiles.find(p => p.id === r.user_id);
             if (profile) return profile.display_name || profile.email;
-
-            // Fallback for current user if their profile isn't in 'profiles' yet
             if (currentUserId && r.user_id === currentUserId && currentProfile) {
                 return currentProfile.display_name || currentProfile.email || 'You';
             }
-
             return 'Unknown';
         }).join(', ');
     };
@@ -113,7 +119,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
     return (
         <div
             className="reaction-bar"
-            style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap', position: 'relative', ...style }}
+            style={Object.assign({ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', position: 'relative' }, style || {})}
             onMouseLeave={() => setShowPicker(false)}
         >
             {Object.entries(groupedReactions).map(([emoji, reactionList]) => {
@@ -125,42 +131,23 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
                         key={emoji}
                         className={`reaction-bubble ${hasUserReacted ? 'user-reacted' : ''}`}
                         style={{
-                            background: hasUserReacted ? '#004578' : 'rgba(255, 255, 255, 0.05)',
-                            border: `2px solid ${hasUserReacted ? '#0078D4' : 'rgba(255, 255, 255, 0.2)'}`,
-                            boxShadow: hasUserReacted ? '0 0 12px rgba(0, 120, 212, 0.5)' : 'none',
-                            borderRadius: '12px',
-                            padding: '2px 10px',
-                            fontSize: '14px',
+                            borderRadius: '20px',
+                            padding: '4px 10px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '5px',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                            color: hasUserReacted ? '#fff' : 'var(--text-main)',
                             transformOrigin: 'center'
                         }}
                         onClick={() => handleReactionClick(emoji, reactionList)}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.08)';
-                            if (!hasUserReacted) {
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            if (!hasUserReacted) {
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                            }
-                        }}
                         title={tooltipNames}
                     >
-                        <span style={{ filter: hasUserReacted ? 'drop-shadow(0 0 2px rgba(255,255,255,0.5))' : 'none' }}>{emoji}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', fontSize: '14px' }}>
+                            {emoji}
+                        </span>
                         <span style={{
                             fontSize: '11px',
-                            fontWeight: hasUserReacted ? '700' : '500',
-                            color: hasUserReacted ? '#fff' : 'var(--text-muted)'
+                            fontWeight: '700'
                         }}>
                             {reactionList.length}
                         </span>
@@ -170,33 +157,33 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
 
             <div style={{ position: 'relative' }}>
                 <button
-                    className="add-reaction-btn"
+                    className="reaction-bubble"
                     style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        borderRadius: '50%',
-                        width: '24px',
+                        borderRadius: '20px',
+                        width: '32px',
                         height: '24px',
-                        fontSize: '14px',
                         cursor: 'pointer',
-                        color: 'var(--text-muted)',
-                        transition: 'all 0.2s',
                         display: 'grid',
                         placeItems: 'center',
-                        lineHeight: '1',
-                        padding: '0'
+                        padding: '0',
+                        opacity: 0.8
                     }}
                     onClick={() => setShowPicker(!showPicker)}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--accent)';
-                        e.currentTarget.style.color = 'var(--accent)';
+                        e.currentTarget.style.background = 'rgba(232, 81, 255, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(232, 81, 255, 0.8)';
+                        e.currentTarget.style.boxShadow = '0 0 12px rgba(232, 81, 255, 0.3)';
                     }}
                     onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                        e.currentTarget.style.color = 'var(--text-muted)';
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.borderColor = 'rgba(232, 81, 255, 0.4)';
+                        e.currentTarget.style.boxShadow = 'none';
                     }}
                 >
-                    +
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
                 </button>
                 {showPicker && (
                     <ReactionPicker

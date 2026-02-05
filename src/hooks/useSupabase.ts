@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from './useAuth';
 
 // Inlined types to bypass persistent module resolution issues
 interface Profile {
@@ -13,7 +14,7 @@ interface Profile {
 }
 
 interface Team {
-    id: number;
+    id: string;
     name: string;
     description?: string;
     icon?: string;
@@ -21,6 +22,7 @@ interface Team {
     icon_color?: string;
     created_at: string;
     order_index?: number;
+    parent_id?: string | null;
 }
 
 interface TagData {
@@ -74,6 +76,8 @@ interface Thread {
 }
 
 export function useThreads(teamId: number | string | null) {
+    const { user, profile } = useAuth();
+    const { memberships } = useUserMemberships(user?.id);
     const [threads, setThreads] = useState<Thread[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
@@ -82,48 +86,65 @@ export function useThreads(teamId: number | string | null) {
         try {
             console.log('[useThreads] Fetching with teamId:', teamId);
             if (!silent) setLoading(true);
+
             let query = supabase
                 .from('threads')
                 .select(`
-          *,
-          replies:replies(*)
-        `)
+                  *,
+                  replies:replies(*)
+                `)
                 .order('created_at', { ascending: true });
 
+            const isAdmin = profile?.role === 'Admin';
+
             if (teamId !== null && teamId !== '') {
-                console.log('[useThreads] Applying filter for team_id:', teamId);
-                // Supabase supports both number and string (UUID) equality
+                // If specific team is selected, apply direct filter
                 query = query.eq('team_id', teamId);
-            } else {
-                console.log('[useThreads] Fetching all teams (teamId is null or empty)');
+            } else if (!isAdmin) {
+                // If "All Teams" is selected but not an admin, filter by user memberships
+                const memberTeamIds = memberships.map(m => m.team_id);
+                if (memberTeamIds.length > 0) {
+                    query = query.in('team_id', memberTeamIds);
+                } else {
+                    // No memberships = no threads (security fallback)
+                    setThreads([]);
+                    setLoading(false);
+                    return;
+                }
             }
 
-            const { data, error: fetchError } = await query;
-            if (fetchError) throw fetchError;
-            console.log('[useThreads] Received threads count:', data?.length || 0);
-            setThreads(data || []);
-        } catch (err) {
-            setError(err as Error);
-            console.error('Error fetching threads:', err);
+            const { data, error } = await query;
+            if (error) throw error;
+            setThreads((data || []) as Thread[]);
+        } catch (error: any) {
+            console.error('Error fetching threads:', error);
+            setError(error);
         } finally {
-            if (!silent) setLoading(false);
+            setLoading(false);
         }
-    }, [teamId]);
+    }, [teamId, profile, memberships]);
 
     useEffect(() => {
         fetchThreads();
 
-        // Use simple, stable channel names like legacy app.js
-        const threadsChannel = supabase.channel('public:threads')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'threads' }, (payload) => {
-                console.log('[useThreads] Realtime threads change:', payload);
+        const threadsChannel = supabase
+            .channel('public:threads')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'threads'
+            }, () => {
                 fetchThreads(true);
             })
             .subscribe();
 
-        const repliesChannel = supabase.channel('public:replies')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'replies' }, (payload) => {
-                console.log('[useThreads] Realtime replies change:', payload);
+        const repliesChannel = supabase
+            .channel('public:replies')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'replies'
+            }, () => {
                 fetchThreads(true);
             })
             .subscribe();
@@ -132,36 +153,56 @@ export function useThreads(teamId: number | string | null) {
             supabase.removeChannel(threadsChannel);
             supabase.removeChannel(repliesChannel);
         };
-    }, [fetchThreads]); // fetchThreads changes with teamId, correctly resetting subscription if needed.
+    }, [fetchThreads]);
 
     return { threads, loading, error, refetch: fetchThreads };
 }
 
 export function useTeams() {
+    const { user, profile } = useAuth();
+    const { memberships } = useUserMemberships(user?.id);
     const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function fetchTeams() {
-            try {
-                const { data, error } = await supabase
-                    .from('teams')
-                    .select('*')
-                    .order('name', { ascending: true });
+    const fetchTeams = useCallback(async () => {
+        try {
+            const { data, error } = await supabase
+                .from('teams')
+                .select('*')
+                .order('name', { ascending: true });
 
-                if (error) throw error;
-                console.log('Fetched teams:', data);
+            if (error) throw error;
+
+            const isAdmin = profile?.role === 'Admin';
+            if (isAdmin) {
                 setTeams(data || []);
-            } catch (error) {
-                console.error('Error fetching teams (Details):', error);
-            } finally {
-                setLoading(false);
-            }
-        }
+            } else {
+                // Filter for non-admins: Only teams they belong to, or their children/parents
+                const myTeamIds = new Set(memberships.map(m => String(m.team_id)));
 
+                // For a proper sidebar tree, we might need parent teams too. 
+                // Let's include everything the user is a member of, plus parents of those.
+                const filtered = (data || []).filter((t: Team) => {
+                    const isMember = myTeamIds.has(String(t.id));
+                    // Check if user is member of any child of this team (to show parent in tree)
+                    const isParentOfMember = (data || []).some((child: Team) =>
+                        child.parent_id === t.id && myTeamIds.has(String(child.id))
+                    );
+                    return isMember || isParentOfMember;
+                });
+
+                setTeams(filtered);
+            }
+        } catch (error) {
+            console.error('Error fetching teams:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [profile, memberships]);
+
+    useEffect(() => {
         fetchTeams();
 
-        // Subscribe to realtime changes
         const subscription = supabase
             .channel('teams')
             .on('postgres_changes', {
@@ -174,7 +215,7 @@ export function useTeams() {
         return () => {
             subscription.unsubscribe();
         };
-    }, []);
+    }, [fetchTeams]);
 
     return { teams, loading };
 }
@@ -384,5 +425,139 @@ export function useTeamMembers(teamId: number | string | null) {
     };
 
     return { members, loading, addMember, updateMemberRole, removeMember, refetch: fetchMembers };
+}
+
+export function useUserMemberships(userId: string | undefined) {
+    const [memberships, setMemberships] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    const fetchMemberships = useCallback(async () => {
+        if (!userId) {
+            setMemberships([]);
+            return;
+        }
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('team_members')
+                .select('*')
+                .eq('user_id', userId);
+
+            if (error) throw error;
+            setMemberships(data || []);
+        } catch (error) {
+            console.error('Error fetching user memberships:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [userId]);
+
+    useEffect(() => {
+        fetchMemberships();
+    }, [fetchMemberships]);
+
+    const updateLastRead = async (teamId: string) => {
+        if (!userId) return;
+        try {
+            const { error } = await supabase
+                .from('team_members')
+                .update({ last_read_at: new Date().toISOString() })
+                .eq('user_id', userId)
+                .eq('team_id', teamId);
+            if (error) throw error;
+            // Optimistic update
+            setMemberships(prev => prev.map(m =>
+                m.team_id === teamId ? { ...m, last_read_at: new Date().toISOString() } : m
+            ));
+        } catch (error) {
+            console.error('Error updating last read at:', error);
+        }
+    };
+
+    return { memberships, loading, refetch: fetchMemberships, updateLastRead };
+}
+
+export function useUnreadCounts(userId: string | undefined, memberships: any[]) {
+    const [unreadTeams, setUnreadTeams] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (!userId || memberships.length === 0) return;
+
+        const checkUnread = async () => {
+            // Fetch latest created_at for all teams
+            const { data, error } = await supabase
+                .from('threads')
+                .select('team_id, created_at')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error fetching unread status:', error);
+                return;
+            }
+
+            const latestActivity: { [teamId: string]: string } = {};
+            data.forEach(t => {
+                const tid = String(t.team_id);
+                if (!latestActivity[tid] || t.created_at > latestActivity[tid]) {
+                    latestActivity[tid] = t.created_at;
+                }
+            });
+
+            const unread = new Set<string>();
+            memberships.forEach(m => {
+                const tid = String(m.team_id);
+                const lastRead = m.last_read_at || '1970-01-01T00:00:00Z';
+                if (latestActivity[tid] && latestActivity[tid] > lastRead) {
+                    unread.add(tid);
+                }
+            });
+            setUnreadTeams(unread);
+        };
+
+        checkUnread();
+        // Set up real-time sub for threads to update unread status
+        const channel = supabase
+            .channel('unread-updates')
+            .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'threads' }, () => {
+                checkUnread();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [userId, memberships]);
+
+    return { unreadTeams };
+}
+
+export function usePermissions(teamId: string | number | null) {
+    const { profile } = useAuth();
+    const { memberships } = useUserMemberships(profile?.id);
+
+    const getEffectiveRole = useCallback(() => {
+        if (!profile) return 'Viewer';
+        if (profile.role === 'Admin') return 'Admin';
+
+        if (!teamId) return profile.role;
+
+        const membership = memberships.find(m => String(m.team_id) === String(teamId));
+        if (membership) {
+            // Priority: Admin > Manager > Member > Viewer
+            const roles = ['Viewer', 'Member', 'Manager', 'Admin'];
+            const globalIdx = roles.indexOf(profile.role);
+            const teamIdx = roles.indexOf(membership.role);
+            return roles[Math.max(globalIdx, teamIdx)] as Profile['role'];
+        }
+
+        return profile.role;
+    }, [profile, teamId, memberships]);
+
+    const role = getEffectiveRole();
+    const canEdit = role === 'Admin' || role === 'Manager';
+    const isAdmin = role === 'Admin';
+    const isManager = role === 'Manager';
+
+    return { role, canEdit, isAdmin, isManager };
 }
 
