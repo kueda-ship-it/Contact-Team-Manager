@@ -149,8 +149,8 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
     return (
         <div className="teams-sidebar">
             <div className="teams-list">
-                {/* Dashboard Link - Admin Only */}
-                {profile?.role === 'Admin' && (
+                {/* Dashboard Link - All Users */}
+                {profile && (
                     <div
                         className={`team-list-item ${viewMode === 'dashboard' ? 'active' : ''}`}
                         title="ダッシュボード"
@@ -170,7 +170,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                     </div>
                 )}
 
-                {profile?.role === 'Admin' && <div className="sidebar-divider"></div>}
+                {profile && <div className="sidebar-divider"></div>}
 
                 {/* Global (All Teams) - Admin Only */}
                 {profile?.role === 'Admin' && (

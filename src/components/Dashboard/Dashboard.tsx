@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CustomSelect } from '../common/CustomSelect';
-import { useProfiles } from '../../hooks/useSupabase';
+import { useProfiles, useUserMemberships } from '../../hooks/useSupabase';
+import { useAuth } from '../../hooks/useAuth';
 
 
 interface DashboardProps {
@@ -12,6 +13,8 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, teams, onSelectTeam, isLoading }) => {
+    const { profile, user } = useAuth();
+    const { memberships } = useUserMemberships(user?.id);
     const { profiles } = useProfiles();
     const [period, setPeriod] = useState<'all' | 'year' | 'month' | 'week' | 'day'>('all');
 

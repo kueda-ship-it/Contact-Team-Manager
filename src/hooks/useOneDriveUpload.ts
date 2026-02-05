@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { msalInstance, loginRequest, getGraphClient, ensureMsalInitialized } from '../lib/microsoftGraph';
+import { msalInstance, getGraphClient, ensureMsalInitialized, login as msLogin } from '../lib/microsoftGraph';
 import { Attachment } from './useFileUpload';
 
 export function useOneDriveUpload() {
@@ -8,14 +8,7 @@ export function useOneDriveUpload() {
 
     const login = async () => {
         try {
-            await ensureMsalInitialized();
-            // Using popup to avoid page reload which disrupts the user's draft
-            const result = await msalInstance.loginPopup(loginRequest);
-            if (result) {
-                msalInstance.setActiveAccount(result.account);
-                return result.account;
-            }
-            return null;
+            return await msLogin();
         } catch (error: any) {
             console.error("Microsoft login failed:", error);
             alert(`Microsoft アカウントでのログインに失敗しました。\nエラー: ${error.message || error}`);
