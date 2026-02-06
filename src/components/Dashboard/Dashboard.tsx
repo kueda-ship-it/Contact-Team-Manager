@@ -53,18 +53,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
         isLoading
     });
 
-    // Filter threads if needed (though passed threads are usually already filtered by App/useThreads)
-    // Actually App passes threads from useThreads(currentTeamId), so 'threads' here are already filtered.
-    // However, if currentTeamId is null (All Teams), we might want to aggregate overall stats.
-
     const totalThreads = displayThreads.length;
     const completedThreads = displayThreads.filter(t => t.status === 'completed').length;
-    // const pendingThreads = displayThreads.filter(t => t.status !== 'completed').length; // or 'pending'
 
     const completionRate = totalThreads > 0 ? Math.round((completedThreads / totalThreads) * 100) : 0;
 
     // User Activity Stats
-    // Time Metrics & User Details
     const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
     const calculateAvgTime = (userThreads: any[]) => {
@@ -86,13 +80,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
         return `${days}日 ${hours}時間`;
     };
 
-    /**
-     * Estimates daily activity duration (span from first action to last action each day)
-     */
     const calculateDailyActivitySpan = (userThreads: any[]) => {
         if (userThreads.length === 0) return 'N/A';
 
-        // Group by date
         const byDate: { [date: string]: number[] } = {};
         userThreads.forEach(t => {
             const dates = [t.created_at, t.completed_at].filter(Boolean);
@@ -122,29 +112,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
     const userStats: { [key: string]: { name: string; count: number; completedCount: number; avgTime: string; completionRate: number; dailySpan: string } } = {};
 
     displayThreads.forEach(t => {
-        const author = t.author_name || t.author || 'Unknown'; // Ensure we have a display name preferably
+        const author = t.author_name || t.author || 'Unknown';
         if (!userStats[author]) {
             userStats[author] = { name: author, count: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A' };
         }
         userStats[author].count++;
+
         if (t.status === 'completed') {
-            userStats[author].completedCount++;
+            const completerProfile = t.completed_by ? (profiles.find((p: any) => p.id === t.completed_by)) : null;
+            const completerName = completerProfile?.display_name || completerProfile?.email || t.author_name || t.author || 'Unknown';
+
+            if (!userStats[completerName]) {
+                userStats[completerName] = { name: completerName, count: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A' };
+            }
+            userStats[completerName].completedCount++;
         }
     });
 
-    // Calculate derived stats for each user
-    Object.keys(userStats).forEach(author => {
-        const stats = userStats[author];
-        // For stats, we still want to see the user's threads as author for some metrics,
-        // but for "Completed Count", we should ideally use completed_by if it's for performance tracking.
-        // However, existing logic uses threads where they are the author.
-        const userThreadsAsAuthor = displayThreads.filter(t => (t.author_name || t.author || 'Unknown') === author);
-        stats.completionRate = stats.count > 0 ? Math.round((stats.completedCount / stats.count) * 100) : 0;
+    Object.keys(userStats).forEach(userName => {
+        const stats = userStats[userName];
+        const userThreadsAsAuthor = displayThreads.filter(t => (t.author_name || t.author || 'Unknown') === userName);
+        const myThreadsCompleted = userThreadsAsAuthor.filter(t => t.status === 'completed').length;
+        stats.completionRate = stats.count > 0 ? Math.round((myThreadsCompleted / stats.count) * 100) : 0;
         stats.avgTime = calculateAvgTime(userThreadsAsAuthor);
         stats.dailySpan = calculateDailyActivitySpan(userThreadsAsAuthor);
     });
 
-    // RE-AGGREGATE Completion Count based on WHO completed it (for the "Completions by Member" chart)
     const completerStats: { [name: string]: number } = {};
     displayThreads.forEach(t => {
         if (t.status === 'completed') {
@@ -160,11 +153,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
         .sort((a, b) => b.completedCount - a.completedCount);
     const maxCompletions = Math.max(...sortedByCompletions.map(s => s.completedCount), 1);
 
-    // Team Stats for aggregation
     const teamStats: { [key: string]: { id: number | string; name: string; completedCount: number } } = {};
     displayThreads.forEach(t => {
         if (t.status === 'completed') {
-            // Use the thread's team_id if available, otherwise fallback
             const tId = t.team_id || 'no-team';
             const teamIdStr = String(tId);
             if (!teamStats[teamIdStr]) {
@@ -178,12 +169,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
             teamStats[teamIdStr].completedCount++;
         }
     });
-    console.log('Team Aggregation Results:', teamStats);
     const sortedTeamStats = Object.values(teamStats).sort((a, b) => b.completedCount - a.completedCount);
     const maxTeamCompletions = Math.max(...sortedTeamStats.map(s => s.completedCount), 1);
 
-    // Calculate Dash Offset for SVG Pie/Circle Chart
-    // Circumference = 2 * PI * r
     const radius = 40;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (completionRate / 100) * circumference;
@@ -197,7 +185,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
         );
     }
 
-    // Safer team lookup
     const currentTeam = teams && Array.isArray(teams) && currentTeamId
         ? teams.find(t => String(t.id) === String(currentTeamId))
         : null;
@@ -302,7 +289,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-                        {/* Task Progress (Completions) Chart - Members */}
                         <div className="task-card" style={{ padding: '25px' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>完了数（メンバー別）</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -327,7 +313,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                             </div>
                         </div>
 
-                        {/* Task Progress (Completions) Chart - Teams (Show when "All Teams" or multiple results) */}
                         <div className="task-card" style={{ padding: '25px' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>完了数（チーム別）</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -356,7 +341,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                             </div>
                         </div>
 
-                        {/* Completion Rate Chart */}
                         <div className="task-card" style={{ padding: '25px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '25px', width: '100%', color: 'var(--text-muted)' }}>全体の完了率</h3>
                             <div style={{ position: 'relative', width: '160px', height: '160px' }}>
@@ -388,7 +372,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                             </div>
                         </div>
 
-                        {/* User Activity List */}
                         <div className="task-card" style={{ padding: '25px', gridColumn: 'span 1' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>活動ユーザー一覧</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto' }} className="custom-scrollbar">
@@ -434,10 +417,110 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                             </div>
                         </div>
                     </div>
+
+                    <div className="task-card" style={{ padding: '25px', marginTop: '20px' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>チームバランス分析 (活動タイプと目標)</h3>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)' }}>
+                                        <th style={{ padding: '10px', textAlign: 'left' }}>メンバー</th>
+                                        <th style={{ padding: '10px', textAlign: 'center' }}>タイプ</th>
+                                        <th style={{ padding: '10px', textAlign: 'center' }}>総活動量</th>
+                                        <th style={{ padding: '10px', textAlign: 'right' }}>投稿 (実績/目標)</th>
+                                        <th style={{ padding: '10px', textAlign: 'right' }}>完了 (実績/目標)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(() => {
+                                        const activeUserCount = sortedUserStats.length;
+                                        if (activeUserCount === 0) return <tr><td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>データなし</td></tr>;
+
+                                        const totalPosts = displayThreads.length;
+                                        const totalCompletions = displayThreads.filter(t => t.status === 'completed').length;
+
+                                        const totalActivity = totalPosts + totalCompletions;
+                                        const teamPostRatio = totalActivity > 0 ? totalPosts / totalActivity : 0;
+                                        const teamCompletionRatio = totalActivity > 0 ? totalCompletions / totalActivity : 0;
+
+                                        return sortedUserStats.map(stat => {
+                                            const userActivity = stat.count + stat.completedCount;
+
+                                            // Base Quota
+                                            let postQuota = userActivity * teamPostRatio;
+                                            let completionQuota = userActivity * teamCompletionRatio;
+
+                                            const isContactBase = stat.completedCount >= stat.count;
+
+                                            let typeLabel = 'Unknown';
+                                            let typeColor = 'var(--text-muted)';
+
+                                            if (isContactBase) {
+                                                typeLabel = '連絡ベース';
+                                                typeColor = 'var(--accent)';
+                                                // Contact Base: High Completion capability.
+                                                // "FC goal (Post Goal) should be fewer".
+                                                postQuota = postQuota * 0.6;
+                                            } else {
+                                                typeLabel = 'FCベース';
+                                                typeColor = 'var(--success)';
+                                                // FC Base: High Post capability.
+                                                // "Contact goal (Completion Goal) should be fewer".
+                                                completionQuota = completionQuota * 0.6;
+                                            }
+
+                                            const postDiff = stat.count - postQuota;
+                                            const completionDiff = stat.completedCount - completionQuota;
+
+                                            return (
+                                                <tr key={stat.name} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    <td style={{ padding: '12px 10px', fontWeight: 600 }}>{stat.name}</td>
+                                                    <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                                                        <span style={{
+                                                            fontSize: '0.75rem',
+                                                            padding: '4px 8px',
+                                                            borderRadius: '4px',
+                                                            background: `${typeColor}20`,
+                                                            color: typeColor,
+                                                            border: `1px solid ${typeColor}40`
+                                                        }}>
+                                                            {typeLabel}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 10px', textAlign: 'center', fontWeight: 600 }}>
+                                                        {userActivity}
+                                                    </td>
+                                                    <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                                            <span>{stat.count} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>/ {postQuota.toFixed(1)}</span></span>
+                                                            <span style={{ fontSize: '0.75rem', color: postDiff >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                                                {postDiff > 0 ? '+' : ''}{postDiff.toFixed(1)}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                                            <span>{stat.completedCount} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>/ {completionQuota.toFixed(1)}</span></span>
+                                                            <span style={{ fontSize: '0.75rem', color: completionDiff >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                                                {completionDiff > 0 ? '+' : ''}{completionDiff.toFixed(1)}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        });
+                                    })()}
+                                </tbody>
+                            </table>
+                            <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                                ※ 達成目標は「個人の総活動量 × チーム全体の比率」が基準です。<br />
+                                ※ タイプに応じて、非注力分野（連絡ベースなら投稿、FCベースなら完了）の目標値は緩和（60%）されています。
+                            </div>
+                        </div>
+                    </div>
                 </>
             )}
 
-            {/* Member Detail Modal */}
             {selectedUser && (
                 <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setSelectedUser(null)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%', animation: 'modalFadeIn 0.3s ease-out' }}>
@@ -497,4 +580,3 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
         </div>
     );
 };
-

@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import './styles/style.css';
+import { useState, useEffect } from 'react';
 import { TeamsSidebar } from './components/Sidebar/TeamsSidebar';
 import { RightSidebar } from './components/Sidebar/RightSidebar';
 import { ThreadList } from './components/Feed/ThreadList';
@@ -9,18 +8,39 @@ import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Login';
 import { useAuth } from './hooks/useAuth';
 import { useThreads, useTeams, useUserMemberships, useUnreadCounts } from './hooks/useSupabase';
-import { useEffect } from 'react';
+import './styles/style.css';
 
 function App() {
   const { user, profile, loading: authLoading, signOut } = useAuth();
+
   const [currentTeamId, setCurrentTeamId] = useState<number | string | null>(null);
   const [viewMode, setViewMode] = useState<'feed' | 'dashboard'>('feed');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'mentions'>('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
   const { threads, loading: threadsLoading, error: threadsError, refetch } = useThreads(currentTeamId as any);
   const { teams } = useTeams();
   const { memberships, loading: membershipsLoading, updateLastRead } = useUserMemberships(user?.id);
   const { unreadTeams } = useUnreadCounts(user?.id, memberships);
+
+  // Filter threads based on search query
+  const filteredThreads = threads.filter(thread => {
+    if (!searchQuery) return true;
+    const lowerQuery = searchQuery.toLowerCase();
+    return (
+      (thread.title && thread.title.toLowerCase().includes(lowerQuery)) ||
+      (thread.content && thread.content.toLowerCase().includes(lowerQuery)) ||
+      (thread.author && thread.author.toLowerCase().includes(lowerQuery))
+    );
+  });
+
+  const threadsData = {
+    threads: filteredThreads,
+    loading: threadsLoading,
+    error: threadsError,
+    refetch
+  };
 
   // Redirect non-admins to their first team if no team is selected
   useEffect(() => {
@@ -31,6 +51,9 @@ function App() {
       }
     }
   }, [user, profile, memberships, membershipsLoading, authLoading, currentTeamId]);
+
+  // Clear hash from URL behavior removed to prevent conflict with MSAL popup handling
+  // MSAL handles hash processing and clearing automatically.
 
   // Update last_read_at when currentTeamId changes
   useEffect(() => {
@@ -58,8 +81,6 @@ function App() {
     };
   }, [unreadTeams]);
 
-  console.log('App state:', { currentTeamId, viewMode, threadsCount: threads.length });
-
   // Helper to get current team name
   const currentTeam = teams.find(t => String(t.id) === String(currentTeamId));
   const currentTeamName = currentTeam?.name || 'チーム未選択';
@@ -71,7 +92,7 @@ function App() {
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
-        background: 'var(--bg-primary)'
+        background: 'var(--bg-dark)'
       }}>
         <div style={{ color: 'var(--text-main)' }}>Loading...</div>
       </div>
@@ -83,77 +104,87 @@ function App() {
   }
 
   return (
-    <>
+    <div className="app-container">
       <header>
-        <div
-          className="logo"
-          onClick={() => setViewMode('feed')}
-          style={{ cursor: 'pointer' }}
-          title="フィードに戻る"
-        >
-          <img src={`${import.meta.env.BASE_URL}favicon-v2.png`} alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} />
-          <span>Contact Team Manager</span>
+        <div className="logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ background: 'rgba(0,183,195,0.1)', padding: '4px', borderRadius: '4px' }}>
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Contact Team Manager
         </div>
+
         <div className="header-search-container">
-          <input type="text" className="input-field search-input" placeholder="検索 (CTRL+E)" />
+          <input
+            type="text"
+            className="search-input"
+            placeholder="検索 (CTRL+E)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
+
         <div className="user-profile">
           <button
-            className="btn-icon settings-btn"
-            title="設定"
+            className="btn gear-btn-unified"
             onClick={() => setIsSettingsOpen(true)}
+            title="設定"
             style={{
-              marginRight: '10px',
               background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              color: 'white',
+              padding: '6px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '4px',
-              transition: 'all 0.2s ease'
+              borderRadius: '4px',
+              cursor: 'pointer'
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l-.15-.09a2 2 0 0 0-.73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
           </button>
-          <div className="avatar" style={{ width: '28px', height: '28px' }}>
-            {profile?.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : (profile?.display_name || user.email)?.[0]}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {profile?.avatar_url && (
+              <img
+                src={profile.avatar_url}
+                alt={profile.display_name}
+                style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+              />
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{profile?.display_name || user.email}</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--accent)' }}>{profile?.role || 'User'}</span>
+            </div>
           </div>
-          <div>
-            <span className="username" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600 }}>
-              {profile?.display_name || user.email}
-            </span>
-            <span style={{ fontSize: '0.65rem', color: 'var(--accent)' }}>{profile?.role || 'User'}</span>
-          </div>
+
           <button
-            className="btn-icon logout-btn"
+            id="logout-btn"
+            className="btn"
+            onClick={() => signOut()}
             title="ログアウト"
-            onClick={async () => {
-              if (window.confirm('ログアウトしますか？')) {
-                await signOut();
-              }
-            }}
             style={{
-              marginLeft: '12px',
-              background: 'transparent',
-              border: '1px solid rgba(196, 49, 75, 0.6)',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              color: 'var(--danger)',
+              padding: '6px',
+              fontSize: '0.8rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '4px',
-              opacity: 0.8,
-              transition: 'all 0.2s ease'
+              background: 'transparent',
+              border: '1px solid rgba(232, 17, 35, 0.4)',
+              color: '#FF6666',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              width: '34px',
+              height: '34px',
+              transition: 'all 0.2s'
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
               <polyline points="16 17 21 12 16 7"></polyline>
               <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -162,75 +193,76 @@ function App() {
         </div>
       </header>
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        currentTeamId={currentTeamId !== null ? String(currentTeamId) : null}
-        currentTeamName={currentTeamName}
-        initialTab="profile" // Default
-      />
-
       <div className="main-wrapper">
-        <aside className="teams-sidebar">
-          <div className="teams-list">
-            <TeamsSidebar
-              currentTeamId={currentTeamId as string | null}
-              onSelectTeam={(id) => {
-                setCurrentTeamId(id);
-                // ALWAYS switch to feed when clicking a team in the sidebar
-                setViewMode('feed');
-              }}
-              viewMode={viewMode}
-              onSelectDashboard={() => setViewMode('dashboard')}
-              statusFilter={statusFilter}
-              onSelectStatus={(status) => {
-                setStatusFilter(status);
-                setViewMode('feed');
-              }}
-              onEditTeam={(teamId) => {
-                setCurrentTeamId(teamId); // Ensure team is selected
-                setIsSettingsOpen(true);
-              }}
-              unreadTeams={unreadTeams}
-            />
-          </div>
-        </aside>
+        <TeamsSidebar
+          currentTeamId={currentTeamId}
+          onSelectTeam={(id) => {
+            setCurrentTeamId(id);
+            setViewMode('feed');
+          }}
+          viewMode={viewMode}
+          onSelectDashboard={() => setViewMode('dashboard')}
+          statusFilter={statusFilter}
+          onSelectStatus={setStatusFilter}
+          onEditTeam={() => setIsSettingsOpen(true)}
+          unreadTeams={unreadTeams}
+        />
 
         <div className="dashboard-layout">
           <main className="main-feed-area">
-            {viewMode === 'dashboard' ? (
-              <Dashboard
-                currentTeamId={currentTeamId}
-                threads={threads}
-                teams={teams}
-                onSelectTeam={(id) => setCurrentTeamId(id)}
-                isLoading={threadsLoading}
-              />
-            ) : (
-              <>
-                <div className="feed-list">
+            {viewMode === 'feed' && (
+              <div
+                className="feed-list-flex-container"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100%',
+                  overflow: 'hidden'
+                }}
+              >
+                <div style={{ flex: 1, overflow: 'hidden' }}>
                   <ThreadList
                     currentTeamId={currentTeamId}
-                    threadsData={{ threads, loading: threadsLoading, error: threadsError, refetch }}
+                    threadsData={threadsData}
                     statusFilter={statusFilter}
                     onStatusChange={setStatusFilter}
                   />
                 </div>
-                <PostForm
-                  teamId={currentTeamId}
-                  onSuccess={() => refetch(true)}
-                />
-              </>
+                <div style={{ flexShrink: 0 }}>
+                  <PostForm
+                    teamId={currentTeamId}
+                    onSuccess={() => refetch(true)}
+                  />
+                </div>
+              </div>
+            )}
+            {viewMode === 'dashboard' && (
+              <Dashboard
+                currentTeamId={currentTeamId}
+                threads={threads}
+                teams={teams}
+                onSelectTeam={setCurrentTeamId}
+                isLoading={threadsLoading}
+              />
             )}
           </main>
 
           <RightSidebar
             currentTeamId={currentTeamId}
-            threadsData={{ threads, loading: threadsLoading, error: threadsError, refetch }}
+            threadsData={threadsData}
           />
         </div>
       </div>
-    </>
+
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          currentTeamId={currentTeamId ? String(currentTeamId) : null}
+          currentTeamName={currentTeamName}
+        />
+      )}
+    </div>
   );
 }
 

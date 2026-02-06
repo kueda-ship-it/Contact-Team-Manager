@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useTeamMembers, useProfiles, useTeams, usePermissions, useUserMemberships } from '../../hooks/useSupabase';
 import { CustomSelect } from '../common/CustomSelect';
+import { msalInstance, login as msLogin, logout as msLogout, ensureMsalInitialized } from '../../lib/microsoftGraph';
+import type { AccountInfo } from '@azure/msal-browser';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -89,6 +91,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const [mgmtTeamIconUrl, setMgmtTeamIconUrl] = useState('');
     const [mgmtParentId, setMgmtParentId] = useState<string | null>(null);
     const [isCreatingTeam, setIsCreatingTeam] = useState(false);
+
+    // Microsoft Graph Status
+    const [msAccount, setMsAccount] = useState<AccountInfo | null>(null);
+    const [msLoading, setMsLoading] = useState(false);
+
+    useEffect(() => {
+        const checkMsAccount = async () => {
+            await ensureMsalInitialized();
+            setMsAccount(msalInstance.getActiveAccount());
+        };
+        if (isOpen) {
+            checkMsAccount();
+        }
+    }, [isOpen]);
+
+    const handleMsLogin = async () => {
+        setMsLoading(true);
+        try {
+            await ensureMsalInitialized();
+            const account = await msLogin();
+            setMsAccount(account);
+            alert("Microsoft 連携に成功しました。");
+        } catch (err: any) {
+            // Error is already alerted in msLogin or can be handled here
+            if (err.message && !err.message.includes("ポップアップ")) {
+                alert("Microsoft 連携に失敗しました: " + err.message);
+            }
+        } finally {
+            setMsLoading(false);
+        }
+    };
+
+    const handleMsLogout = async () => {
+        if (!window.confirm("Microsoft 連携を解除しますか？OneDrive へのアップロードができなくなります。")) return;
+        setMsLoading(true);
+        try {
+            await msLogout();
+            setMsAccount(null);
+        } catch (err: any) {
+            alert("解除に失敗しました: " + err.message);
+        } finally {
+            setMsLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (profile) {
@@ -338,6 +384,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                 <button className="btn btn-primary" onClick={handleSaveProfile}>保存</button>
+                            </div>
+
+                            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '10px 0' }} />
+
+                            <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <svg width="18" height="18" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <rect width="11" height="11" fill="#F25022" />
+                                        <rect x="12" width="11" height="11" fill="#7FBA00" />
+                                        <rect y="12" width="11" height="11" fill="#00A4EF" />
+                                        <rect x="12" y="12" width="11" height="11" fill="#FFB900" />
+                                    </svg>
+                                    Microsoft Graph (OneDrive) 連携
+                                </h4>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
+                                    ファイルを OneDrive にアップロードしたり、添付ファイルをダウンロードしたりするために必要です。
+                                </p>
+
+                                {msAccount ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '10px 15px', borderRadius: '8px' }}>
+                                        <div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{msAccount.name || msAccount.username}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{msAccount.username}</div>
+                                        </div>
+                                        <button
+                                            className="btn btn-sm"
+                                            style={{ color: 'var(--danger)', background: 'rgba(196, 49, 75, 0.1)', border: '1px solid rgba(196, 49, 75, 0.2)' }}
+                                            onClick={handleMsLogout}
+                                            disabled={msLoading}
+                                        >
+                                            連携解除
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div style={{ textAlign: 'center', padding: '10px' }}>
+                                        <button
+                                            className="btn btn-primary"
+                                            style={{ background: '#2F2F2F', color: 'white', border: '1px solid #444' }}
+                                            onClick={handleMsLogin}
+                                            disabled={msLoading}
+                                        >
+                                            {msLoading ? '接続中...' : 'Microsoft 連携を開始する'}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

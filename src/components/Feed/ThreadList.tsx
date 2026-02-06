@@ -10,6 +10,7 @@ import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
+import { msalInstance, ensureMsalInitialized, login } from '../../lib/microsoftGraph';
 
 interface ThreadListProps {
     currentTeamId: number | string | null;
@@ -168,6 +169,35 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
         }
     };
 
+    const handleReplyAttachClick = async (threadId: string) => {
+        // Check if Microsoft is logged in BEFORE opening file chooser
+        await ensureMsalInitialized();
+        const account = msalInstance.getActiveAccount();
+
+        if (!account) {
+            const shouldLogin = window.confirm(
+                "ファイルを添付するには Microsoft アカウントでのサインインが必要です。\n" +
+                "今すぐサインインしますか？\n\n" +
+                "(設定画面からもサインインできます)"
+            );
+
+            if (shouldLogin) {
+                try {
+                    await login();
+                    // After successful login, trigger file input for this thread
+                    const fileInput = document.querySelector(`input[data-reply-thread="${threadId}"]`) as HTMLInputElement;
+                    fileInput?.click();
+                } catch (error: any) {
+                    console.error("Microsoft login failed:", error);
+                }
+            }
+        } else {
+            // Already logged in, open file chooser
+            const fileInput = document.querySelector(`input[data-reply-thread="${threadId}"]`) as HTMLInputElement;
+            fileInput?.click();
+        }
+    };
+
     const removeReplyAttachment = (threadId: string, index: number) => {
         setReplyAttachments(prev => ({
             ...prev,
@@ -187,13 +217,20 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
 
     const handleUpdateThread = async (threadId: string) => {
         const el = editRefs.current[threadId];
-        if (!el) return;
+        if (!el) {
+            console.error("Edit ref not found for thread:", threadId);
+            return;
+        }
         const content = el.innerHTML;
+        console.log("Updating thread:", threadId, "Content length:", content.length);
 
-        const { error } = await supabase.from('threads').update({ content: content, is_edited: true }).eq('id', threadId);
+        const { data, error } = await supabase.from('threads').update({ content: content }).eq('id', threadId).select();
+
         if (error) {
+            console.error("Update failed:", error);
             alert('更新に失敗しました: ' + error.message);
         } else {
+            console.log("Update success:", data);
             setEditingThreadId(null);
             refetch(true);
         }
@@ -291,7 +328,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
     };
 
     return (
-        <div className="thread-list" ref={threadListRef} style={{ overflowY: 'auto', height: '100%' }}>
+        <div className="feed-list" ref={threadListRef} style={{ overflowY: 'auto', height: '100%' }}>
             <div className="feed-header-sticky">
                 <div className="feed-header-left">
                     <CustomSelect
@@ -626,6 +663,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                                             handleAddReply(thread.id);
                                                         }
                                                     }}
+                                                    onPaste={(e: React.ClipboardEvent) => {
+                                                        e.preventDefault();
+                                                        const text = e.clipboardData.getData('text/plain');
+                                                        document.execCommand('insertText', false, text);
+                                                    }}
                                                 />
                                                 {isOpen && targetThreadId === thread.id && (
                                                     <MentionList
@@ -667,7 +709,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                                 <button
                                                     className="btn-sm btn-clip-yellow"
                                                     style={{ padding: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                                                    onClick={() => fileInputRefs.current[thread.id]?.click()}
+                                                    onClick={() => handleReplyAttachClick(thread.id)}
                                                     disabled={replyUploading[thread.id]}
                                                 >
                                                     {replyUploading[thread.id] ? (
@@ -677,15 +719,16 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                                                             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
                                                         </svg>
                                                     )}
-                                                    <input
-                                                        type="file"
-                                                        ref={el => { fileInputRefs.current[thread.id] = el; }}
-                                                        style={{ display: 'none' }}
-                                                        multiple
-                                                        onChange={(e) => handleReplyFileChange(thread.id, e)}
-                                                        disabled={replyUploading[thread.id]}
-                                                    />
                                                 </button>
+                                                <input
+                                                    type="file"
+                                                    ref={el => { fileInputRefs.current[thread.id] = el; }}
+                                                    data-reply-thread={thread.id}
+                                                    style={{ display: 'none' }}
+                                                    multiple
+                                                    onChange={(e) => handleReplyFileChange(thread.id, e)}
+                                                    disabled={replyUploading[thread.id]}
+                                                />
                                                 <button
                                                     className="btn-send-blue"
                                                     title="送信"

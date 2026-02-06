@@ -5,6 +5,7 @@ import { useMentions } from '../../hooks/useMentions';
 import { useProfiles, useTags } from '../../hooks/useSupabase';
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { MentionList } from '../common/MentionList';
+import { msalInstance, ensureMsalInitialized, login as msLogin } from '../../lib/microsoftGraph';
 
 interface PostFormProps {
     teamId: number | string | null;
@@ -19,7 +20,19 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
 
     const { profiles } = useProfiles();
     const { tags } = useTags();
-    const { attachments, uploading, uploadFile, removeFile, clearFiles } = useOneDriveUpload();
+
+    // New hook interface
+    const {
+        attachments,
+        uploading,
+        statusMessage,
+        uploadFile,
+        removeFile,
+        clearFiles,
+        // checkLoginStatus, // We will use direct instance check for sync behavior
+        // login // We will use direct login for control
+    } = useOneDriveUpload();
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const {
@@ -32,6 +45,11 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         handleKeyDown,
         insertMention,
     } = useMentions({ profiles, tags, currentTeamId: teamId });
+
+    // Ensure MSAL is initialized on mount so we can check it synchronously later
+    React.useEffect(() => {
+        ensureMsalInitialized().catch(console.error);
+    }, []);
 
     const handleSubmit = async () => {
         if (!title.trim() || !contentRef.current?.innerText.trim()) {
@@ -76,12 +94,20 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
 
+        // Reset input value locally to allow re-selecting same file if needed in future,
+        // but carefully to not break current loop
+
         for (const file of files) {
             await uploadFile(file);
         }
 
-        // Reset input
         if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handleAttachClick = () => {
+        // Always open file picker immediately as requested by user.
+        // Auth will be handled during the upload process (in handleFileChange -> uploadFile).
+        fileInputRef.current?.click();
     };
 
     return (
@@ -97,30 +123,50 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                         onChange={(e) => setTitle(e.target.value)}
                         disabled={loading}
                     />
-                    <button
-                        type="button"
-                        className="btn btn-clip-yellow"
-                        title="ファイル添付"
-                        style={{ padding: 0, width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                        disabled={loading || uploading}
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        {uploading ? (
-                            <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                        ) : (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                            </svg>
+
+                    {/* Attach Button with Status */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {uploading && (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', animation: 'fadeIn 0.2s' }}>
+                                {statusMessage}
+                            </span>
                         )}
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            style={{ display: 'none' }}
-                            multiple
-                            onChange={handleFileChange}
+                        <button
+                            type="button"
+                            className="btn btn-clip-yellow"
+                            title="ファイル添付"
+                            style={{
+                                padding: 0,
+                                width: '36px',
+                                height: '36px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                opacity: uploading ? 0.7 : 1,
+                                cursor: uploading ? 'default' : 'pointer'
+                            }}
                             disabled={loading || uploading}
-                        />
-                    </button>
+                            onClick={handleAttachClick}
+                        >
+                            {uploading ? (
+                                <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                            ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                </svg>
+                            )}
+                        </button>
+                    </div>
+
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        multiple
+                        onChange={handleFileChange}
+                        disabled={loading || uploading}
+                    />
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
@@ -141,9 +187,6 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                             }}
                             onInput={(e) => {
                                 handleInput(e, 'post-form');
-                                if (!e.currentTarget.innerText.trim() && !e.currentTarget.innerHTML) {
-                                    // Fallback
-                                }
                             }}
                             onKeyDown={(e) => {
                                 if (isOpen) {
@@ -152,6 +195,11 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                                         return;
                                     }
                                 }
+                            }}
+                            onPaste={(e: React.ClipboardEvent) => {
+                                e.preventDefault();
+                                const text = e.clipboardData.getData('text/plain');
+                                document.execCommand('insertText', false, text);
                             }}
                         />
                         {attachments.length > 0 && (

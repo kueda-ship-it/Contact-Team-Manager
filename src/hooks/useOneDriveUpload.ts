@@ -1,60 +1,109 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { msalInstance, getGraphClient, ensureMsalInitialized, login as msLogin } from '../lib/microsoftGraph';
 import { Attachment } from './useFileUpload';
 
 export function useOneDriveUpload() {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [uploading, setUploading] = useState(false);
+    const [statusMessage, setStatusMessage] = useState<string>('');
 
+    // Check if logged in without prompting
+    const checkLoginStatus = useCallback(async () => {
+        await ensureMsalInitialized();
+        const account = msalInstance.getActiveAccount();
+        return !!account;
+    }, []);
+
+    // Perform Login
     const login = async () => {
         try {
             return await msLogin();
         } catch (error: any) {
             console.error("Microsoft login failed:", error);
-            alert(`Microsoft アカウントでのログインに失敗しました。\nエラー: ${error.message || error}`);
+            if (error.message && !error.message.includes("ポップアップ")) {
+                alert(`Microsoft アカウントでのログインに失敗しました。\nエラー: ${error.message || error}`);
+            }
             return null;
         }
     };
 
     const uploadFile = async (file: File): Promise<Attachment | null> => {
         setUploading(true);
-        try {
-            // Wait for MSAL to be ready (including processing redirects)
-            await ensureMsalInitialized();
+        setStatusMessage('準備中...');
 
-            // Check if logged in
-            let account = msalInstance.getActiveAccount();
-            if (!account) {
-                const accounts = msalInstance.getAllAccounts();
-                if (accounts.length > 0) {
-                    msalInstance.setActiveAccount(accounts[0]);
-                    account = accounts[0];
-                } else {
-                    account = await login();
-                }
-                if (!account) throw new Error("Not logged in to Microsoft");
+        try {
+            // 1. Auth Check & Client with simple retry
+            let client;
+            try {
+                client = await getGraphClient();
+                // Test token validity immediately with a lightweight call
+                await client.api('/me/drive').select('id').get();
+            } catch (authError) {
+                console.warn("Auth check failed, attempting interactive login...", authError);
+                await login();
+                client = await getGraphClient();
             }
 
-            const client = await getGraphClient();
+            setStatusMessage('フォルダ確認中...');
 
-            // Upload to a dedicated folder
-            const fileName = `${Date.now()}_${file.name}`;
-            const folderPath = "/Apps/TeamsTaskManager/Attachments";
-            const itemPath = `${folderPath}/${fileName}`;
+            // 2. Ensure Target Folder Exists
+            // Strategy: Use a flat simple folder structure to avoid complex traversal issues.
+            // "Apps" folder can be problematic if not pre-provisioned. Using root folder for reliability.
+            const targetFolderPath = "TeamsTaskManager_Attachments";
 
-            // 1. Create upload session (better for all file sizes)
+            // Helper to get-or-create folder by path robustly
+            const getOrCreateFolder = async (client: any, path: string) => {
+                const parts = path.split('/');
+                let parentId = 'root'; // Start at root
+
+                for (const part of parts) {
+                    try {
+                        // Check children of current parent
+                        const response = await client.api(`/me/drive/items/${parentId}/children`)
+                            .filter(`name eq '${part}' and folder ne null`)
+                            .select('id')
+                            .get();
+
+                        if (response.value && response.value.length > 0) {
+                            parentId = response.value[0].id;
+                        } else {
+                            // Does not exist, create it
+                            console.log(`Creating folder: ${part} in ${parentId}`);
+                            const newFolder = await client.api(`/me/drive/items/${parentId}/children`).post({
+                                name: part,
+                                folder: {},
+                                "@microsoft.graph.conflictBehavior": "rename"
+                            });
+                            parentId = newFolder.id;
+                        }
+                    } catch (e: any) {
+                        console.error(`Folder error for ${part}`, e);
+                        throw new Error(`フォルダ「${part}」の作成に失敗しました: ${e.message}`);
+                    }
+                }
+                return parentId;
+            };
+
+            const folderId = await getOrCreateFolder(client, targetFolderPath);
+
+            // 3. Create Upload Session
+            setStatusMessage('アップロード開始...');
+            // Sanitize filename
+            const cleanName = file.name.replace(/[:\\/*?"<>|]/g, '_');
+            const fileName = `${Date.now()}_${cleanName}`;
+
             const uploadSession = await client
-                .api(`/me/drive/root:${itemPath}:/createUploadSession`)
+                .api(`/me/drive/items/${folderId}:/${fileName}:/createUploadSession`)
                 .post({
                     item: {
-                        "@microsoft.graph.conflictBehavior": "rename"
+                        "@microsoft.graph.conflictBehavior": "rename",
+                        name: fileName
                     }
                 });
 
-            // 2. Perform the upload
-            // Note: For production, you might want to slice large files.
-            // For now, simpler implementation:
-            const response = await fetch(uploadSession.uploadUrl, {
+            // 4. Upload byte stream
+            const uploadUrl = uploadSession.uploadUrl;
+            const response = await fetch(uploadUrl, {
                 method: 'PUT',
                 body: file,
                 headers: {
@@ -62,37 +111,46 @@ export function useOneDriveUpload() {
                 }
             });
 
-            if (!response.ok) throw new Error("Upload failed");
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Upload fetch failed: ${response.status} ${response.statusText} - ${errText}`);
+            }
+
             const driveItem = await response.json();
+            console.log("Upload success, Item ID:", driveItem.id);
 
-            // 3. Create a sharing link (view link)
-            const linkResponse = await client
-                .api(`/me/drive/items/${driveItem.id}/createLink`)
-                .post({
+            // 5. Create Sharing Link
+            setStatusMessage('リンク生成中...');
+            let sharingUrl = driveItem.webUrl; // Default to direct link (requires auth) if sharing fails
+
+            try {
+                // Try Organization View Link first (most robust for internal teams)
+                const linkRes = await client.api(`/me/drive/items/${driveItem.id}/createLink`).post({
                     type: "view",
-                    scope: "anonymous" // Or "organization" depending on policy
+                    scope: "organization"
                 });
+                sharingUrl = linkRes.link.webUrl;
+            } catch (linkError) {
+                console.warn("Organization link failed", linkError);
+                // If org link fails, maybe try anonymous? or just keep webUrl
+            }
 
-            // 4. Fetch thumbnails for images
+            // 6. Thumbnails
             let thumbnailUrl = undefined;
             if (file.type.startsWith('image/')) {
                 try {
-                    const thumbResponse = await client.api(`/me/drive/items/${driveItem.id}/thumbnails`).get();
-                    if (thumbResponse.value && thumbResponse.value.length > 0) {
-                        // Priority: large > medium > small
-                        const thumb = thumbResponse.value[0];
-                        thumbnailUrl = thumb.large?.url || thumb.medium?.url || thumb.small?.url;
-                        console.log("Thumbnail URL fetched:", thumbnailUrl);
+                    const thumbRes = await client.api(`/me/drive/items/${driveItem.id}/thumbnails`).get();
+                    if (thumbRes.value && thumbRes.value.length > 0) {
+                        const t = thumbRes.value[0];
+                        thumbnailUrl = t.large?.url || t.medium?.url || t.small?.url;
                     }
-                } catch (thumbError) {
-                    console.warn("Failed to fetch thumbnails:", thumbError);
-                }
+                } catch (e) { console.warn("No thumbnail", e); }
             }
 
             const newAttachment: Attachment = {
                 id: driveItem.id,
                 name: file.name,
-                url: linkResponse.link.webUrl,
+                url: sharingUrl,
                 thumbnailUrl: thumbnailUrl,
                 type: file.type,
                 size: file.size,
@@ -100,14 +158,23 @@ export function useOneDriveUpload() {
             };
 
             setAttachments(prev => [...prev, newAttachment]);
+            setStatusMessage('');
             return newAttachment;
 
         } catch (error: any) {
-            console.error("OneDrive upload error:", error);
-            alert("OneDrive へのアップロードに失敗しました: " + error.message);
+            console.error("OneDrive Upload Error:", error);
+
+            // Helpful alerts
+            if (error.message.includes("InteractionRequired") || error.message.includes("ui_required")) {
+                alert("認証情報の更新が必要です。もう一度添付ボタンを押してサインインしてください。");
+            } else {
+                alert(`アップロードエラーが発生しました:\n${error.message || JSON.stringify(error)}`);
+            }
+            setStatusMessage('');
             return null;
         } finally {
             setUploading(false);
+            setStatusMessage('');
         }
     };
 
@@ -119,36 +186,14 @@ export function useOneDriveUpload() {
         setAttachments([]);
     };
 
-    const downloadFileFromOneDrive = async (itemId: string, fileName: string) => {
-        try {
-            await ensureMsalInitialized();
-            const client = await getGraphClient();
-
-            // Get the item which includes the @microsoft.graph.downloadUrl
-            const item = await client.api(`/me/drive/items/${itemId}`).get();
-            const downloadUrl = item["@microsoft.graph.downloadUrl"];
-
-            if (!downloadUrl) throw new Error("Download URL not found");
-
-            // Trigger download
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (error: any) {
-            console.error("Download failed:", error);
-            alert("ダウンロードに失敗しました: " + error.message);
-        }
-    };
-
     return {
         attachments,
         uploading,
+        statusMessage,
         uploadFile,
         removeFile,
         clearFiles,
-        downloadFileFromOneDrive
+        checkLoginStatus,
+        login,
     };
 }

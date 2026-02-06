@@ -164,17 +164,17 @@ header {
 
 
 #logout-btn {
-    background: rgba(232, 17, 35, 0.15) !important;
-    border: 1px solid rgba(232, 17, 35, 0.3) !important;
+    background: transparent !important;
+    border: 1px solid rgba(232, 17, 35, 0.4) !important;
     color: #FF6666 !important;
     transition: all 0.2s ease;
 }
 
 #logout-btn:hover {
-    background: #E81123 !important;
-    color: white !important;
-    border-color: #E81123 !important;
-    box-shadow: 0 0 10px rgba(232, 17, 35, 0.5);
+    background: rgba(232, 17, 35, 0.1) !important;
+    color: #FF6666 !important;
+    border-color: rgba(232, 17, 35, 1) !important;
+    box-shadow: 0 0 15px rgba(232, 17, 35, 0.4);
 }
 
 /* --- Dashboard Layout ---*/
@@ -395,6 +395,14 @@ body {
     /* Force smaller font (approx -2px from 14px) */
     line-height: 1.3;
     opacity: 0.9;
+}
+
+/* Force removal of background colors from pasted text */
+.task-content *,
+.reply-content *,
+.rich-editor * {
+    background-color: transparent !important;
+    color: #FFFFFF !important;
 }
 
 /* Quick Reply Form on Hover */
@@ -704,14 +712,22 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--primary-light);
-    border-color: rgba(98, 100, 167, 0.3);
+    color: white;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 4px;
     transition: all 0.2s;
 }
 
 .gear-btn-unified:hover {
-    background: rgba(98, 100, 167, 0.1);
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 1);
+    box-shadow:
+        0 0 8px rgba(255, 255, 255, 0.8),
+        0 0 15px rgba(255, 255, 255, 0.6),
+        0 0 25px rgba(255, 255, 255, 0.4),
+        inset 0 0 10px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
 }
 
 .gear-btn-unified:hover svg {
