@@ -52,10 +52,14 @@ jobs:
           CI: false
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_AZURE_CLIENT_ID: ${{ secrets.VITE_AZURE_CLIENT_ID }}
+          VITE_AZURE_TENANT_ID: ${{ secrets.VITE_AZURE_TENANT_ID }}
+          VITE_AZURE_REDIRECT_URI: ${{ secrets.VITE_AZURE_REDIRECT_URI }}
 
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3
         with:
+          name: contact-team-manager-build
           path: ${{ steps.detect.outputs.dir }}/dist/
 
   deploy:
@@ -68,3 +72,5 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: contact-team-manager-build
