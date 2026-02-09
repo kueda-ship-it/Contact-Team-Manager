@@ -70,8 +70,11 @@ export const Login: React.FC = () => {
                 provider: 'azure',
                 options: {
                     scopes: 'email openid profile offline_access',
-                    // Correctly handle production base path
-                    redirectTo: (window.location.origin + import.meta.env.BASE_URL).replace(/\/$/, "") + (import.meta.env.BASE_URL === '/' ? '' : '/'),
+                    scopes: 'email openid profile offline_access',
+                    // Force the correct path if we are on GitHub Pages
+                    redirectTo: window.location.hostname.includes('github.io')
+                        ? 'https://kueda-ship-it.github.io/Contact-Team-Manager/'
+                        : window.location.origin,
                 }
             });
 
