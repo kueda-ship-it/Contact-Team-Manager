@@ -8,26 +8,34 @@ import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Login';
 import { useAuth } from './hooks/useAuth';
 import { useThreads, useTeams, useUserMemberships, useUnreadCounts } from './hooks/useSupabase';
+import { useNotifications } from './hooks/useNotifications';
 import './styles/style.css';
 
 import { initializeMsal } from './lib/microsoftGraph';
 
 function App() {
   const { user, profile, loading: authLoading, signOut } = useAuth();
+  useNotifications(); // Initialize notifications
+
 
   const [currentTeamId, setCurrentTeamId] = useState<number | string | null>(null);
   const [viewMode, setViewMode] = useState<'feed' | 'dashboard'>('feed');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'mentions'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'mentions' | 'myposts'>('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [threadsLimit, setThreadsLimit] = useState(50);
+  const [sortAscending, setSortAscending] = useState(true);
 
-  const { threads, loading: threadsLoading, error: threadsError, refetch } = useThreads(currentTeamId as any);
   const { teams } = useTeams();
+  // Ensure we fetch ALL pending items if that filter is active, regardless of default limit
+  const fetchLimit = (statusFilter === 'pending' || statusFilter === 'mentions') ? 2000 : threadsLimit;
+  const threadsData = useThreads(currentTeamId, fetchLimit, sortAscending, statusFilter);
+  const { threads: rawThreads, loading: threadsLoading, error: threadsError, refetch } = threadsData;
   const { memberships, loading: membershipsLoading, updateLastRead } = useUserMemberships(user?.id);
   const { unreadTeams } = useUnreadCounts(user?.id, memberships);
 
   // Filter threads based on search query
-  const filteredThreads = threads.filter(thread => {
+  const filteredThreads = rawThreads.filter(thread => {
     if (!searchQuery) return true;
     const lowerQuery = searchQuery.toLowerCase();
     return (
@@ -37,7 +45,7 @@ function App() {
     );
   });
 
-  const threadsData = {
+  const threadsDataFiltered = {
     threads: filteredThreads,
     loading: threadsLoading,
     error: threadsError,
@@ -135,22 +143,11 @@ function App() {
 
         <div className="user-profile">
           <button
-            className="btn gear-btn-unified"
+            className="btn icon-btn gear-btn-unified"
             onClick={() => setIsSettingsOpen(true)}
             title="設定"
-            style={{
-              background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.4)',
-              color: 'white',
-              padding: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
@@ -210,7 +207,10 @@ function App() {
           viewMode={viewMode}
           onSelectDashboard={() => setViewMode('dashboard')}
           statusFilter={statusFilter}
-          onSelectStatus={setStatusFilter}
+          onSelectStatus={(status) => {
+            setStatusFilter(status);
+            setViewMode('feed');
+          }}
           onEditTeam={() => setIsSettingsOpen(true)}
           unreadTeams={unreadTeams}
         />
@@ -230,9 +230,12 @@ function App() {
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   <ThreadList
                     currentTeamId={currentTeamId}
-                    threadsData={threadsData}
+                    threadsData={threadsDataFiltered}
                     statusFilter={statusFilter}
                     onStatusChange={setStatusFilter}
+                    sortAscending={sortAscending}
+                    onToggleSort={() => setSortAscending(prev => !prev)}
+                    onLoadMore={() => setThreadsLimit(prev => prev + 50)}
                   />
                 </div>
                 <div style={{ flexShrink: 0 }}>
@@ -246,10 +249,11 @@ function App() {
             {viewMode === 'dashboard' && (
               <Dashboard
                 currentTeamId={currentTeamId}
-                threads={threads}
-                teams={teams}
                 onSelectTeam={setCurrentTeamId}
-                isLoading={threadsLoading}
+                onSelectStatus={(status) => {
+                  setStatusFilter(status as any);
+                  setViewMode('feed');
+                }}
               />
             )}
           </main>

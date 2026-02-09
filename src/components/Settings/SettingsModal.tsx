@@ -5,13 +5,14 @@ import { useTeamMembers, useProfiles, useTeams, usePermissions, useUserMembershi
 import { CustomSelect } from '../common/CustomSelect';
 import { msalInstance, signIn, signOut, initializeMsal } from '../../lib/microsoftGraph';
 import type { AccountInfo } from '@azure/msal-browser';
+import { CHANGELOG } from '../../data/changelog';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     currentTeamId: string | null;
     currentTeamName: string;
-    initialTab?: 'profile' | 'team' | 'admin' | 'team-mgmt';
+    initialTab?: 'profile' | 'team' | 'admin' | 'team-mgmt' | 'history';
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId, currentTeamName, initialTab = 'profile' }) => {
@@ -23,7 +24,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
     // Permission checks
     const { canEdit: canEditCurrentTeam, isAdmin: isGlobalAdmin } = usePermissions(currentTeamId);
-    const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt'>(initialTab as any);
+    const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history'>(initialTab as any);
     const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -296,6 +297,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         }
     };
 
+    // Helper to render changelog with basic markdown styling
+    const renderChangelog = (text: string) => {
+        return text.split('\n').map((line, index) => {
+            // Headers (## )
+            if (line.startsWith('## ')) {
+                return (
+                    <h4 key={index} style={{
+                        margin: '20px 0 10px 0',
+                        fontSize: '1rem',
+                        color: 'var(--accent)',
+                        borderBottom: '1px solid rgba(255,255,255,0.1)',
+                        paddingBottom: '5px'
+                    }}>
+                        {line.replace('## ', '')}
+                    </h4>
+                );
+            }
+            // List items (- )
+            if (line.trim().startsWith('- ')) {
+                const content = line.trim().replace('- ', '');
+                // Handle bold (**text**)
+                const parts = content.split(/(\*\*.*?\*\*)/g);
+                return (
+                    <div key={index} style={{
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'flex-start',
+                        marginBottom: '6px',
+                        fontSize: '0.9rem',
+                        lineHeight: '1.5',
+                        color: '#e0e0e0',
+                        paddingLeft: '5px'
+                    }}>
+                        <span style={{ color: 'var(--accent)', flexShrink: 0 }}>✓</span>
+                        <span>
+                            {parts.map((part, i) => {
+                                if (part.startsWith('**') && part.endsWith('**')) {
+                                    return <strong key={i} style={{ color: '#fff' }}>{part.slice(2, -2)}</strong>;
+                                }
+                                return part;
+                            })}
+                        </span>
+                    </div>
+                );
+            }
+            // Normal text (ignore empty lines or just render them as spacers)
+            if (!line.trim()) {
+                return <div key={index} style={{ height: '8px' }}></div>;
+            }
+            return <div key={index} style={{ fontSize: '0.9rem', color: '#ccc' }}>{line}</div>;
+        });
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -340,6 +394,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                             チーム管理
                         </button>
                     )}
+                    <button
+                        className={`btn btn-sm ${activeTab === 'history' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 'none' }}
+                        onClick={() => setActiveTab('history')}
+                    >
+                        更新履歴
+                    </button>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '12px', minHeight: 0 }}>
@@ -811,8 +872,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                             <div style={{ height: '180px' }}></div>
                         </div>
                     )}
+
+                    {activeTab === 'history' && (
+                        <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            {renderChangelog(CHANGELOG)}
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

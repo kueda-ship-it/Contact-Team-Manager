@@ -1,22 +1,35 @@
 import React, { useState } from 'react';
 import { CustomSelect } from '../common/CustomSelect';
-import { useProfiles, useUserMemberships } from '../../hooks/useSupabase';
+import { useProfiles, useUserMemberships, useTeams, useThreads, useUnreadCounts } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
-
 
 interface DashboardProps {
     currentTeamId: number | string | null;
-    threads: any[];
-    teams: any[];
     onSelectTeam: (id: number | string | null) => void;
-    isLoading: boolean;
+    onSelectStatus: (status: string | null) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, teams, onSelectTeam, isLoading }) => {
-    const { profile, user } = useAuth();
+export const Dashboard: React.FC<DashboardProps> = ({
+    currentTeamId,
+    onSelectTeam,
+    onSelectStatus
+}) => {
+    const { teams } = useTeams();
+    const { user, profile } = useAuth();
     const { memberships } = useUserMemberships(user?.id);
+    // Fetch more threads for accurate dashboard stats (limit 1000)
+    // useThreads(teamId, limit, ascending)
+    const { threads, loading: threadsLoading, error, refetch } = useThreads(currentTeamId, 1000, false);
     const { profiles } = useProfiles();
-    const [period, setPeriod] = useState<'all' | 'year' | 'month' | 'week' | 'day'>('all');
+    const [period, setPeriod] = useState<'all' | 'year' | 'month' | 'week' | 'day' | 'custom'>('all');
+    // User Activity Stats State - Moved up to avoid hook order errors
+    const [selectedUser, setSelectedUser] = useState<string | null>(null);
+    const [startDate, setStartDate] = useState<string>('');
+    const [endDate, setEndDate] = useState<string>('');
+    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+    const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+
+    if (threadsLoading) return <div style={{ padding: '20px', color: 'var(--text-main)' }}>統計データを読み込み中...</div>;
 
     const getFilteredThreads = () => {
         if (period === 'all') return threads;
@@ -25,12 +38,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
 
         return threads.filter(t => {
             const date = new Date(t.completed_at || t.created_at).getTime();
+            const d = new Date(date);
+
             if (period === 'year') {
-                return new Date(date).getFullYear() === now.getFullYear();
+                return d.getFullYear() === selectedYear;
             }
             if (period === 'month') {
-                const d = new Date(date);
-                return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+                return d.getFullYear() === selectedYear && (d.getMonth() + 1) === selectedMonth;
             }
             if (period === 'week') {
                 const oneWeekAgo = startOfDay - (7 * 24 * 60 * 60 * 1000);
@@ -39,19 +53,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
             if (period === 'day') {
                 return date >= startOfDay;
             }
+            if (period === 'custom' && startDate && endDate) {
+                const start = new Date(startDate).getTime();
+                const end = new Date(endDate).getTime() + (24 * 60 * 60 * 1000) - 1; // End of selected day
+                return date >= start && date <= end;
+            }
             return true;
         });
     };
 
     const displayThreads = getFilteredThreads();
 
-    console.log('Dashboard Render:', {
-        currentTeamId,
-        period,
-        totalThreads: displayThreads.length,
-        completedThreads: displayThreads.filter(t => t.status === 'completed').length,
-        isLoading
-    });
+    // Generate Year Options (current year +/- 5)
+    const currentYear = new Date().getFullYear();
+    const yearOptions = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
+    const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
     const totalThreads = displayThreads.length;
     const completedThreads = displayThreads.filter(t => t.status === 'completed').length;
@@ -59,8 +75,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
     const completionRate = totalThreads > 0 ? Math.round((completedThreads / totalThreads) * 100) : 0;
 
     // User Activity Stats
-    const [selectedUser, setSelectedUser] = useState<string | null>(null);
-
     const calculateAvgTime = (userThreads: any[]) => {
         const completed = userThreads.filter(t => t.status === 'completed' && t.completed_at && t.created_at);
         if (completed.length === 0) return 'N/A';
@@ -176,7 +190,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (completionRate / 100) * circumference;
 
-    if (isLoading) {
+    if (threadsLoading) {
         return (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                 <div className="loading-spinner" style={{ marginBottom: '20px' }}></div>
@@ -188,6 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
     const currentTeam = teams && Array.isArray(teams) && currentTeamId
         ? teams.find(t => String(t.id) === String(currentTeamId))
         : null;
+    // ... (Render part)
 
     return (
         <div style={{ padding: '20px', color: 'var(--text-main)', height: '100%', overflowY: 'auto', position: 'relative', animation: 'fadeIn 0.3s ease-in-out' }}>
@@ -207,7 +222,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                                 { id: 'year', label: '年' },
                                 { id: 'month', label: '月' },
                                 { id: 'week', label: '週' },
-                                { id: 'day', label: '日' }
+                                { id: 'day', label: '日' },
+                                { id: 'custom', label: '期間指定' }
                             ].map(p => (
                                 <button
                                     key={p.id}
@@ -227,6 +243,89 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                                 </button>
                             ))}
                         </div>
+
+                        {period === 'year' && (
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    background: 'rgba(0,0,0,0.2)',
+                                    color: 'white',
+                                    fontSize: '0.8rem',
+                                    marginLeft: '10px'
+                                }}
+                            >
+                                {yearOptions.map(y => <option key={y} value={y} style={{ color: 'black' }}>{y}年</option>)}
+                            </select>
+                        )}
+
+                        {period === 'month' && (
+                            <div style={{ display: 'flex', gap: '5px', marginLeft: '10px' }}>
+                                <select
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        color: 'white',
+                                        fontSize: '0.8rem'
+                                    }}
+                                >
+                                    {yearOptions.map(y => <option key={y} value={y} style={{ color: 'black' }}>{y}年</option>)}
+                                </select>
+                                <select
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        color: 'white',
+                                        fontSize: '0.8rem'
+                                    }}
+                                >
+                                    {monthOptions.map(m => <option key={m} value={m} style={{ color: 'black' }}>{m}月</option>)}
+                                </select>
+                            </div>
+                        )}
+
+                        {period === 'custom' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '10px' }}>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        color: 'white',
+                                        fontSize: '0.8rem'
+                                    }}
+                                />
+                                <span style={{ color: 'var(--text-muted)' }}>~</span>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        color: 'white',
+                                        fontSize: '0.8rem'
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: 'rgba(255,255,255,0.08)', padding: '8px 20px', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -259,6 +358,45 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentTeamId, threads, te
                         />
                     </div>
                 </div>
+            </div>
+
+            {/* Team Balance / Ratios Header Display */}
+            <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                {(() => {
+                    const totalPosts = displayThreads.length;
+                    const totalCompletions = displayThreads.filter(t => t.status === 'completed').length;
+                    const totalActivity = totalPosts + totalCompletions;
+
+                    if (totalActivity === 0) return null;
+
+                    const postRatio = Math.round((totalPosts / totalActivity) * 100);
+                    const completionRatio = Math.round((totalCompletions / totalActivity) * 100);
+
+                    // Determine Team Type based on majority
+                    let teamType = 'バランス型';
+                    if (postRatio >= 60) teamType = 'FCベース (投稿主体)';
+                    if (completionRatio >= 60) teamType = '連絡ベース (完了主体)';
+
+                    return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', background: 'rgba(255,255,255,0.05)', padding: '10px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>チーム傾向</span>
+                                <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{teamType}</span>
+                            </div>
+                            <div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.1)' }}></div>
+                            <div style={{ display: 'flex', gap: '15px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>投稿 (FC)</span>
+                                    <span style={{ fontWeight: 700, color: 'var(--success)' }}>{postRatio}%</span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>完了 (連絡)</span>
+                                    <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{completionRatio}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
 
             {threads.length === 0 ? (

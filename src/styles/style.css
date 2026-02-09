@@ -352,21 +352,32 @@ body {
 
 .team-settings-icon {
     display: none;
-    opacity: 0.5;
+    opacity: 0.8;
     cursor: pointer;
     margin-left: auto;
-    padding: 2px;
+    padding: 0;
     align-items: center;
-    transition: opacity 0.2s;
+    justify-content: center;
+    transition: all 0.2s;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
 }
 
 .team-settings-icon:hover {
     opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #fff;
+    box-shadow: 0 0 0 1px #fff;
+    /* Sharp 1px glow/border expansion */
 }
 
 .teams-sidebar:hover .team-settings-icon {
     display: flex;
 }
+
 
 /* --- Side Panel Specifics --- */
 .side-panel .task-card {
@@ -405,24 +416,95 @@ body {
     color: #FFFFFF !important;
 }
 
-/* Quick Reply Form on Hover */
-.quick-reply-form {
+/* Reaction Bubble Styles */
+/* Unified Gear Icon Style */
+.gear-btn-unified {
+    width: 34px;
+    height: 34px;
+    padding: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    color: white !important;
+    border-radius: 6px;
+    margin-right: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.gear-btn-unified:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8) !important;
+    /* Stronger glow */
+    border-color: #ffffff !important;
+}
+
+/* Reaction Bubble Styles - Force higher specificity */
+.reaction-bar .reaction-bubble,
+.reaction-bubble {
+    /* Fallback */
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: rgba(255, 255, 255, 0.8) !important;
+    transition: all 0.2s ease;
+}
+
+.reaction-bar .reaction-bubble:hover,
+.reaction-bubble:hover {
+    background: rgba(255, 0, 255, 0.15) !important;
+    /* Magenta Hover */
+    border-color: rgba(255, 0, 255, 0.8) !important;
+    /* Magenta Border */
+    box-shadow: 0 0 8px rgba(255, 0, 255, 0.6) !important;
+    /* Magenta Glow */
+    color: #ffffff !important;
+}
+
+/* User reacted style (active state) - Force Override */
+.reaction-bar .reaction-bubble.user-reacted,
+.reaction-bubble.user-reacted {
+    background: rgba(0, 183, 195, 0.2) !important;
+    border-color: rgba(0, 183, 195, 0.5) !important;
+    color: #00B7C3 !important;
+}
+
+.reaction-bar .reaction-bubble.user-reacted:hover,
+.reaction-bubble.user-reacted:hover {
+    background: rgba(0, 183, 195, 0.3) !important;
+    border-color: rgba(0, 183, 195, 0.8) !important;
+}
+
+/* Icon Button Hover Glow (Legacy) */
+.btn.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Sidebar Quick Reply Hover Focus */
+.task-card .quick-reply-form.hover-reveal {
     display: none;
+    margin-top: 0;
+    gap: 8px;
+    /* Restored from inline */
+    align-items: stretch;
+    /* Restored from inline */
+}
+
+.task-card:hover .quick-reply-form.hover-reveal,
+.task-card:focus-within .quick-reply-form.hover-reveal {
+    display: flex;
     margin-top: 8px;
     background: #1E1F22;
     /* Slightly darker than card */
     padding: 8px;
     border-radius: 4px;
-    gap: 5px;
     position: relative;
     z-index: 100;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.side-panel .task-card:hover .quick-reply-form {
-    display: flex;
-    /* Expand card to show form */
-}
+/* Expand card to show form */
 
 .quick-reply-input {
     flex: 1;
@@ -714,24 +796,39 @@ body {
     justify-content: center;
     color: white;
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
     border-radius: 4px;
     transition: all 0.2s;
+    cursor: pointer;
 }
 
 .gear-btn-unified:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 1);
-    box-shadow:
-        0 0 8px rgba(255, 255, 255, 0.8),
-        0 0 15px rgba(255, 255, 255, 0.6),
-        0 0 25px rgba(255, 255, 255, 0.4),
-        inset 0 0 10px rgba(255, 255, 255, 0.1);
-    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #fff;
+    box-shadow: 0 0 0 1px #fff;
+    /* Sharp 1px glow/border expansion */
 }
 
 .gear-btn-unified:hover svg {
     transform: rotate(30deg);
+}
+
+.btn-load-more {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--accent);
+    padding: 8px 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    border-radius: 20px;
+    /* Added explicit border-radius */
+}
+
+.btn-load-more:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent);
+    box-shadow: 0 0 5px rgba(0, 183, 195, 0.3);
 }
 
 
@@ -771,6 +868,30 @@ body {
     padding-bottom: 20px;
     scrollbar-width: thin;
     scrollbar-gutter: stable;
+}
+
+/* Compact Reply Form - Show only on hover or focus */
+/* Compact Reply Form - Show only on hover or focus */
+.feed-list .task-card .reply-form {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    transform: scaleY(0);
+    transform-origin: top;
+    /* transition removed for instant response */
+}
+
+.feed-list .task-card:hover .reply-form,
+.feed-list .task-card:focus-within .reply-form {
+    max-height: initial;
+    /* Use specific height if causing layout shift issues, but initial/auto is best for varying content */
+    opacity: 1;
+    overflow: visible;
+    margin-top: 10px !important;
+    padding: initial !important;
+    transform: scaleY(1);
 }
 
 /* Modal Base - slightly tighter */

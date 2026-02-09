@@ -7,9 +7,9 @@ export interface TeamsSidebarProps {
     onSelectTeam: (id: number | string | null) => void;
     viewMode: 'feed' | 'dashboard';
     onSelectDashboard: () => void;
-    statusFilter: 'all' | 'pending' | 'completed' | 'mentions';
-    onSelectStatus: (status: 'all' | 'pending' | 'completed' | 'mentions') => void;
-    onEditTeam: (teamId: string) => void;
+    statusFilter: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts';
+    onSelectStatus: (status: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts') => void;
+    onEditTeam: (teamId: number) => void;
     unreadTeams?: Set<string>;
 }
 

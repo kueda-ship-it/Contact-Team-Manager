@@ -73,9 +73,15 @@ interface Thread {
     updated_at: string;
     replies?: Reply[];
     reactions?: Reaction[];
+    user_id: string;
 }
 
-export function useThreads(teamId: number | string | null) {
+export function useThreads(
+    teamId: number | string | null,
+    limit: number = 50,
+    ascending: boolean = true,
+    filter: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts' = 'all'
+) {
     const { user, profile } = useAuth();
     const { memberships } = useUserMemberships(user?.id);
     const [threads, setThreads] = useState<Thread[]>([]);
@@ -84,7 +90,12 @@ export function useThreads(teamId: number | string | null) {
 
     const fetchThreads = useCallback(async (silent = false) => {
         try {
-            console.log('[useThreads] Fetching with teamId:', teamId);
+            // Override limit if filtering for pending or mentions (User wants to see all)
+            // Force high limit for pending items to ensure all are shown
+            const effectiveLimit = (filter === 'pending' || filter === 'mentions') ? 2000 : limit;
+
+            console.log(`[useThreads] Fetching. Filter: ${filter}, Limit: ${limit}, Effective: ${effectiveLimit}`);
+
             if (!silent) setLoading(true);
 
             let query = supabase
@@ -92,8 +103,22 @@ export function useThreads(teamId: number | string | null) {
                 .select(`
                   *,
                   replies:replies(*)
-                `)
-                .order('created_at', { ascending: true });
+                `);
+
+            // Apply limit
+            query = query.order('created_at', { ascending: false }).limit(effectiveLimit);
+
+            // Server-side filtering for 'pending' to ensure we get ALL pending tasks, not just pending ones within the latest N
+            if (filter === 'pending') {
+                query = query.eq('status', 'pending');
+            } else if (filter === 'completed') {
+                query = query.eq('status', 'completed');
+            } else if (filter === 'myposts') {
+                // For myposts, we filter by user_id
+                query = query.eq('user_id', user?.id);
+            }
+            // Note: 'mentions' matches complicate server-side query due to JSON/Text search needs on 'content' or 'replies'.
+            // For now, 'mentions' relies on the high effectiveLimit (1000) and client-side filtering.
 
             const isAdmin = profile?.role === 'Admin';
 
@@ -115,14 +140,21 @@ export function useThreads(teamId: number | string | null) {
 
             const { data, error } = await query;
             if (error) throw error;
-            setThreads((data || []) as Thread[]);
+
+            // If ascending is true, we wanted the LATEST limit but in ASC order (oldest to newest)
+            // So we fetched DESC limit, and now we reverse the result.
+            let result = data || [];
+            if (ascending) {
+                result = [...result].reverse();
+            }
+            setThreads(result as Thread[]);
         } catch (error: any) {
             console.error('Error fetching threads:', error);
             setError(error);
         } finally {
             setLoading(false);
         }
-    }, [teamId, profile, memberships]);
+    }, [teamId, profile, memberships, limit, ascending, filter]);
 
     useEffect(() => {
         fetchThreads();

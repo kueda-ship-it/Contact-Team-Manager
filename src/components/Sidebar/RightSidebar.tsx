@@ -18,11 +18,63 @@ interface RightSidebarProps {
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threadsData }) => {
-    const { threads, loading, refetch } = threadsData;
+    // We use main threadsData only for mentions and general structure, but for "Not Finished", 
+    // we must fetch ALL pending tasks independently of the main feed's limit/filter.
+    const { threads: mainThreads, loading: mainLoading, refetch: mainRefetch } = threadsData;
+
+    // Independent state for pending items
+    const [pendingThreads, setPendingThreads] = React.useState<any[]>([]);
+    const [pendingLoading, setPendingLoading] = React.useState(true);
+
     const { profiles } = useProfiles();
     const { tags } = useTags();
     const { user, profile: currentProfile } = useAuth();
     const quickReplyRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+    // Fetch all pending threads separately
+    const fetchPendingThreads = React.useCallback(async () => {
+        if (!user) return;
+        setPendingLoading(true);
+        try {
+            // Fetch pending threads regardless of limit (up to 2000 safe limit)
+            // Filter by currentTeamId if selected, or all if not.
+            let query = supabase
+                .from('threads')
+                .select(`
+                    *,
+                    replies:replies(*)
+                `)
+                .eq('status', 'pending')
+                .order('created_at', { ascending: false })
+                .limit(2000);
+
+            if (currentTeamId) {
+                query = query.eq('team_id', currentTeamId);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+            setPendingThreads(data || []);
+        } catch (e) {
+            console.error("Error fetching pending threads for sidebar:", e);
+        } finally {
+            setPendingLoading(false);
+        }
+    }, [currentTeamId, user]);
+
+    // Initial fetch and on team change
+    React.useEffect(() => {
+        fetchPendingThreads();
+    }, [fetchPendingThreads]);
+
+    // Re-fetch when main threads update (assuming main refetch might indicate a change)
+    // Or we can just rely on manual updates. A bit tricky to sync completely without global state.
+    // For now, we'll re-fetch when mainThreads length changes as a proxy for "something happened".
+    React.useEffect(() => {
+        // Debounce or just trigger?
+        // If we just completed a task in main feed, we want sidebar to update.
+        fetchPendingThreads();
+    }, [threadsData.threads, fetchPendingThreads]);
 
     const {
         isOpen,
@@ -36,7 +88,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         insertMention
     } = useMentions({ profiles, tags, currentTeamId });
 
-    if (loading) {
+    if (mainLoading && pendingLoading) {
         return <aside className="side-panel"><div style={{ padding: '20px', color: 'var(--text-muted)' }}>Loading...</div></aside>;
     }
 
@@ -49,7 +101,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
 
     const handleToggleStatus = async (threadId: string) => {
         if (!user) return;
-        const thread = threads.find(t => t.id === threadId);
+        // Find in pendingThreads or mainThreads
+        const thread = pendingThreads.find(t => t.id === threadId) || mainThreads.find(t => t.id === threadId);
         if (!thread) return;
 
         const newStatus = thread.status === 'completed' ? 'pending' : 'completed';
@@ -66,7 +119,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         if (error) {
             alert('更新に失敗しました: ' + error.message);
         } else {
-            refetch(true);
+            // Refetch both
+            mainRefetch(true);
+            fetchPendingThreads();
         }
     };
 
@@ -92,23 +147,28 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
             alert('返信に失敗しました: ' + error.message);
         } else {
             inputEl.innerHTML = '';
-            refetch(true);
+            mainRefetch(true); // Update main feed
+            // fetchPendingThreads(); // Not strictly necessary unless we re-order by update?
         }
     };
 
-    const pendingThreads = threads
-        .filter(t => t.status === 'pending')
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 10);
+    // Mentions still come from main threads as they are context-dependent?
+    // Or should we fetch mentions separately too? 
+    // User only complained about "Not Finished".
+    // Mentions usually are relevant to "Unread" which is complex.
+    // Let's stick to using mainThreads for Mentions for now, 
+    // as fetching ALL mentions might be heavy.
+    // But filters in main feed might hide mentions... 
+    // For now, keep mentions as is.
 
-    const mentionedThreads = threads
+    const mentionedThreads = mainThreads
         .filter(t => {
             if (t.status === 'completed') return false;
             return hasMention(t.content, currentProfile, user?.email || null) ||
                 (t.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
         })
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 10);
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    // .slice(0, 10); // Limit removed
 
     const scrollToThread = (threadId: string) => {
         const target = document.getElementById(`thread-${threadId}`);
@@ -128,7 +188,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px' }}>未完了のタスクはありません</div>
                     ) : (
                         pendingThreads.map(t => (
-                            <div key={t.id} className="task-card" style={{ cursor: 'pointer' }} onClick={() => scrollToThread(t.id)}>
+                            <div key={t.id} className="task-card mini-job-card" style={{ cursor: 'pointer', position: 'relative' }} onClick={() => scrollToThread(t.id)}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div className="sidebar-title">{t.title}</div>
                                     <button
@@ -149,7 +209,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                     <span>{formatDate(t.created_at)}</span>
                                 </div>
 
-                                <div className="quick-reply-form" onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                                {/* Quick Reply - Hidden by default, shown on hover/focus */}
+                                <div className="quick-reply-form hover-reveal" onClick={(e) => e.stopPropagation()}>
                                     <div style={{ position: 'relative', flex: 1 }}>
                                         <div
                                             ref={(el) => { if (el) quickReplyRefs.current[t.id] = el; }}

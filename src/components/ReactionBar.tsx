@@ -169,16 +169,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
                         opacity: 0.8
                     }}
                     onClick={() => setShowPicker(!showPicker)}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(232, 81, 255, 0.1)';
-                        e.currentTarget.style.borderColor = 'rgba(232, 81, 255, 0.8)';
-                        e.currentTarget.style.boxShadow = '0 0 12px rgba(232, 81, 255, 0.3)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.borderColor = 'rgba(232, 81, 255, 0.4)';
-                        e.currentTarget.style.boxShadow = 'none';
-                    }}
+                    onClick={() => setShowPicker(!showPicker)}
                 >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19"></line>

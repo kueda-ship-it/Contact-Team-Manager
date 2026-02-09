@@ -10,7 +10,6 @@ import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
-import { msalInstance } from '../../lib/microsoftGraph';
 
 interface ThreadListProps {
     currentTeamId: number | string | null;
@@ -20,12 +19,23 @@ interface ThreadListProps {
         error: Error | null;
         refetch: (silent?: boolean) => void;
     };
-    statusFilter: 'all' | 'pending' | 'completed' | 'mentions';
-    onStatusChange: (status: 'all' | 'pending' | 'completed' | 'mentions') => void;
+    statusFilter: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts';
+    onStatusChange: (status: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts') => void;
+    sortAscending: boolean;
+    onToggleSort: () => void;
+    onLoadMore: () => void;
 }
 
-export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsData, statusFilter, onStatusChange }) => {
-    const { threads, loading, error, refetch } = threadsData;
+export const ThreadList: React.FC<ThreadListProps> = ({
+    currentTeamId,
+    threadsData,
+    statusFilter,
+    onStatusChange,
+    sortAscending,
+    onToggleSort,
+    onLoadMore
+}) => {
+    const { threads, loading: threadsLoading, error, refetch } = threadsData;
     const { teams } = useTeams();
     const { profiles } = useProfiles();
     const { tags } = useTags();
@@ -55,16 +65,89 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
         insertMention
     } = useMentions({ profiles, tags, currentTeamId });
 
-    // Auto-scroll to bottom of thread list on load/update
+    // Auto-scroll to proper end of thread list on load/update
     const threadListRef = React.useRef<HTMLDivElement>(null);
     const replyRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
-    React.useEffect(() => {
-        if (threadListRef.current) {
-            threadListRef.current.scrollTop = threadListRef.current.scrollHeight;
-        }
-    }, [threads.length, currentTeamId]);
 
-    if (loading) {
+    // Get the last thread ID to detect meaningful updates
+    // const lastThreadId = threads.length > 0 ? (sortAscending ? threads[threads.length - 1].id : threads[0].id) : null;
+
+
+    // Scroll position management for infinite scroll
+    const [prevScrollHeight, setPrevScrollHeight] = React.useState<number | null>(null);
+
+    React.useLayoutEffect(() => {
+        if (threadListRef.current) {
+            const el = threadListRef.current;
+
+            if (prevScrollHeight !== null && threads.length > 0) {
+                // If we loaded more items (inserted at top), restore relative position
+                const heightDesc = el.scrollHeight - prevScrollHeight;
+                if (heightDesc > 0) {
+                    el.scrollTop = heightDesc;
+                }
+                setPrevScrollHeight(null);
+            } else if (sortAscending && prevScrollHeight === null) {
+                // Initial load only for Chat Mode: Scroll to bottom
+                // We utilize a small timeout or just run it if we are sure it's initial
+                // But we need to distinguish "Initial Load" from "Update".
+                // For simplified "Chat Mode", we usually want to stay at bottom unless user scrolled up.
+                // Here we force bottom on mount or major refresh logic if at top? 
+                // Let's stick to the previous behavior: Initial mount scroll to bottom.
+                // We can use a ref to track if initial scroll is done?
+            }
+        }
+    }, [threads.length, prevScrollHeight, sortAscending]);
+
+    const initialScrollDone = React.useRef(false);
+
+    // Reset initial scroll state when team changes
+    React.useEffect(() => {
+        initialScrollDone.current = false;
+    }, [currentTeamId]);
+
+    // Initial scroll to bottom for Chat Mode
+    React.useEffect(() => {
+        // Wait until loading is finished and we have threads
+        if (!threadsLoading && threadListRef.current && sortAscending && threads.length > 0) {
+            const el = threadListRef.current;
+            // Only scroll to bottom if it's the initial load for this team
+            if (!initialScrollDone.current) {
+                // Use a timeout to ensure DOM is fully rendered after loading state clears
+                // We need a slightly longer timeout because the "Loading..." div is replaced by the list
+                setTimeout(() => {
+                    el.scrollTop = el.scrollHeight;
+                    initialScrollDone.current = true;
+                }, 200);
+            }
+        }
+    }, [currentTeamId, sortAscending, threads.length, threadsLoading]);
+    // Actually user wants "Default is bottom is newest".
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const el = e.currentTarget;
+        // Check for top reach for "Load More" (Chat Mode)
+        if (sortAscending && el.scrollTop === 0 && threads.length >= 50) {
+            // Reached top, load more
+            setPrevScrollHeight(el.scrollHeight);
+            onLoadMore();
+        }
+    };
+
+    const displayThreads = React.useMemo(() => {
+        if (!threads) return [];
+        // Chat Mode (sortAscending = true): Oldest -> Newest (Newest at Bottom)
+        // News Mode (sortAscending = false): Newest -> Oldest (Newest at Top)
+        return [...threads].sort((a, b) => {
+            const dateA = new Date(a.created_at).getTime(); // Use created_at for strict chronological order
+            const dateB = new Date(b.created_at).getTime();
+            // Ascending (Chat): A - B
+            // Descending (News): B - A
+            return sortAscending ? dateA - dateB : dateB - dateA;
+        });
+    }, [threads, sortAscending]);
+
+    if (threadsLoading) {
         return <div style={{ padding: '20px', textAlign: 'center' }}>Loading threads...</div>;
     }
 
@@ -142,6 +225,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
         if (error) {
             alert('返信に失敗しました: ' + error.message);
         } else {
+            // Update parent thread updated_at to bump it to top
+            await supabase.from('threads').update({ updated_at: new Date().toISOString() }).eq('id', threadId);
+
             inputEl.innerHTML = '';
             setReplyAttachments(prev => ({ ...prev, [threadId]: [] }));
             refetch(true);
@@ -321,7 +407,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
     };
 
     return (
-        <div className="feed-list" ref={threadListRef} style={{ overflowY: 'auto', height: '100%' }}>
+        <div
+            className="feed-list"
+            ref={threadListRef}
+            style={{ overflowY: 'auto', height: '100%' }}
+            onScroll={handleScroll}
+        >
             <div className="feed-header-sticky">
                 <div className="feed-header-left">
                     <CustomSelect
@@ -329,7 +420,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                             { value: 'all', label: 'すべて表示' },
                             { value: 'pending', label: '未完了' },
                             { value: 'completed', label: '完了済み' },
-                            { value: 'mentions', label: '自分宛て' }
+                            { value: 'mentions', label: '自分宛て' },
+                            { value: 'myposts', label: '自分の投稿' }
                         ]}
                         value={statusFilter}
                         onChange={(val: string | number) => onStatusChange(val as any)}
@@ -347,17 +439,37 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                     </h2>
                 </div>
                 <div className="feed-header-right">
-                    <button className="btn-sort-toggle">降順</button>
+                    <button className="btn-sort-toggle" onClick={onToggleSort} style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: 'white',
+                        padding: '4px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem'
+                    }}>
+                        {sortAscending ? 'チャット形式 (最新が下)' : 'ニュース形式 (最新が上)'}
+                    </button>
                 </div>
             </div>
 
-            {threads
+            {/* Load More Trigger / Loading Indicator could go here */}
+            {sortAscending && threadsLoading && threads.length > 0 && (
+                <div style={{ padding: '10px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    読み込み中...
+                </div>
+            )}
+
+            {displayThreads
                 .filter(thread => {
                     if (statusFilter === 'pending') return thread.status === 'pending';
                     if (statusFilter === 'completed') return thread.status === 'completed';
                     if (statusFilter === 'mentions') {
                         return hasMention(thread.content, currentProfile, user?.email || null) ||
                             (thread.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
+                    }
+                    if (statusFilter === 'myposts') {
+                        return thread.user_id === user?.id;
                     }
                     return true;
                 })
@@ -366,13 +478,16 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                     表示する投稿がありません。
                 </div>
             ) : (
-                threads
+                displayThreads
                     .filter(thread => {
                         if (statusFilter === 'pending') return thread.status === 'pending';
                         if (statusFilter === 'completed') return thread.status === 'completed';
                         if (statusFilter === 'mentions') {
                             return hasMention(thread.content, currentProfile, user?.email || null) ||
                                 (thread.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
+                        }
+                        if (statusFilter === 'myposts') {
+                            return thread.user_id === user?.id;
                         }
                         return true;
                     })
@@ -783,6 +898,17 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
                         );
                     })
             )}
-        </div >
+
+            {!sortAscending && (
+                <div style={{ padding: '20px', display: 'flex', justifyContent: 'center' }}>
+                    <button
+                        onClick={onLoadMore}
+                        className="btn-load-more"
+                    >
+                        以前の投稿を読み込む (現在 {threads.length} 件表示)
+                    </button>
+                </div>
+            )}
+        </div>
     );
 };
