@@ -70,7 +70,8 @@ export const Login: React.FC = () => {
                 provider: 'azure',
                 options: {
                     scopes: 'email openid profile offline_access',
-                    redirectTo: window.location.origin,
+                    // Correctly handle production base path
+                    redirectTo: (window.location.origin + import.meta.env.BASE_URL).replace(/\/$/, "") + (import.meta.env.BASE_URL === '/' ? '' : '/'),
                 }
             });
 
