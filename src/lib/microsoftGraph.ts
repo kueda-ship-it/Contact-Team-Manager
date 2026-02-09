@@ -1,93 +1,143 @@
-import { PublicClientApplication, Configuration, InteractionRequiredAuthError } from "@azure/msal-browser";
+import { PublicClientApplication, Configuration, LogLevel, AccountInfo } from "@azure/msal-browser";
 import { Client } from "@microsoft/microsoft-graph-client";
+import { AuthCodeMSALBrowserAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/authCodeMsalBrowser";
 
-// --- Configuration ---
-const tenantId = import.meta.env.VITE_AZURE_TENANT_ID || 'common';
-const clientId = import.meta.env.VITE_AZURE_CLIENT_ID || '';
-const redirectUri = import.meta.env.VITE_AZURE_REDIRECT_URI || (window.location.origin + import.meta.env.BASE_URL).replace(/\/$/, "") + (import.meta.env.BASE_URL === '/' ? '' : '/');
-// Robust fallback: 
-// 1. Env var defined? Use it.
-// 2. Else construct from Origin + Base.
-// Note: Azure settings often have inconsistent trailing slashes. 
-// Local: http://localhost:5173 (no slash)
-// Prod: .../Contact-Team-Manager/ (with slash)
-// The logic above attempts to handle this, but for absolute safety:
-// If base is '/', we strip slash -> origin.
-// If base is '/foo/', we keep slash -> origin/foo/
+// 1. 環境変数の取得と検証
+const clientId = import.meta.env.VITE_AZURE_CLIENT_ID?.trim();
+const tenantId = import.meta.env.VITE_AZURE_TENANT_ID?.trim();
+const redirectUri = window.location.origin + import.meta.env.BASE_URL;
 
-
-if (!clientId) {
-    console.warn("Microsoft Graph: Client ID is missing. Please check your .env file.");
+if (!clientId || !tenantId) {
+    console.error("Azure Client ID or Tenant ID is missing in .env");
 }
 
-export const msalConfig: Configuration = {
+console.log(`[MSAL Config] ClientID=${clientId}, TenantID=${tenantId}, RedirectURI=${redirectUri}`);
+
+// 2. MSAL設定
+const msalConfig: Configuration = {
     auth: {
-        clientId: clientId,
+        clientId: clientId || "",
         authority: `https://login.microsoftonline.com/${tenantId}`,
         redirectUri: redirectUri,
+        navigateToLoginRequestUrl: false,
     },
     cache: {
         cacheLocation: "localStorage",
-        // storeAuthStateInCookie: false, // Removed to fix lint type error
+        storeAuthStateInCookie: false,
     },
+    system: {
+        loggerOptions: {
+            loggerCallback: (level, message, containsPii) => {
+                if (containsPii) return;
+                switch (level) {
+                    case LogLevel.Error:
+                        console.error(message);
+                        return;
+                    case LogLevel.Warning:
+                        console.warn(message);
+                        return;
+                    case LogLevel.Info:
+                        // console.info(message);
+                        return;
+                    case LogLevel.Verbose:
+                        console.debug(message);
+                        return;
+                }
+            },
+            logLevel: LogLevel.Verbose,
+        }
+    }
 };
 
-// Scopes
+// スコープ定義 (標準的な読み書き権限)
 export const loginRequest = {
-    scopes: ["User.Read", "Files.ReadWrite"],
+    scopes: ["User.Read", "Files.ReadWrite"]
 };
 
-// --- Singleton Instance ---
+// MSALインスタンス作成
 export const msalInstance = new PublicClientApplication(msalConfig);
 
-// Initialize usually happens in main/App, but we can expose a helper if needed.
-// However, MSAL v2 is async init.
-// Initialize usually happens in main/App, but we can expose a helper if needed.
-// However, MSAL v2 is async init.
+// 初期化フラグ
+let isInitialized = false;
 let initPromise: Promise<void> | null = null;
 
+// MSAL初期化関数
 export const initializeMsal = async () => {
+    if (isInitialized) return;
+
     if (!initPromise) {
         initPromise = (async () => {
             await msalInstance.initialize();
 
-            // Check if we returned from a redirect
+            // リダイレクトからの復帰を処理
             try {
-                await msalInstance.handleRedirectPromise();
-            } catch (e) {
-                console.error("MSAL Redirect Handle Error:", e);
+                const response = await msalInstance.handleRedirectPromise();
+                if (response) {
+                    console.log("Redirect Login Success:", response);
+                    msalInstance.setActiveAccount(response.account);
+                }
+            } catch (error) {
+                console.error("Redirect Handle Error:", error);
             }
 
-            // Restore account from cache if available
+            // アカウントの復元
             const accounts = msalInstance.getAllAccounts();
             if (accounts.length > 0 && !msalInstance.getActiveAccount()) {
                 msalInstance.setActiveAccount(accounts[0]);
             }
+
+            isInitialized = true;
         })();
     }
+
     await initPromise;
 };
 
-// --- Auth Helpers ---
+// サインイン関数
+let isLoggingIn = false;
+export const signIn = async (promptType: "select_account" | "consent" = "select_account"): Promise<AccountInfo | null> => {
+    if (isLoggingIn) {
+        console.warn("Login already in progress, ignoring duplicate request.");
+        return null;
+    }
 
-/**
- * Sign in using Popup. 
- */
-export const signIn = async () => {
     await initializeMsal();
+
+    const activeAccount = msalInstance.getActiveAccount();
+    // If we are forcing consent, we ignore the active account check and proceed to interactive login
+    if (activeAccount && promptType !== "consent") {
+        return activeAccount;
+    }
+
     try {
+        isLoggingIn = true;
+        console.log(`Attempting Popup Login with prompt: ${promptType}...`);
         const result = await msalInstance.loginPopup({
             ...loginRequest,
-            prompt: "select_account"
+            prompt: promptType
         });
         msalInstance.setActiveAccount(result.account);
         return result.account;
-    } catch (error) {
-        console.error("Login Failed:", error);
-        throw error;
+    } catch (error: any) {
+        if (error.errorCode !== "interaction_in_progress") {
+            console.warn("Popup Login failed, attempting Redirect...", error);
+            // ポップアップが失敗した場合はリダイレクトで試行
+            try {
+                await msalInstance.loginRedirect({
+                    ...loginRequest,
+                    prompt: promptType
+                });
+                return null;
+            } catch (redirectError) {
+                console.error("Redirect Login failed:", redirectError);
+                throw redirectError;
+            }
+        }
+        return null;
+    } finally {
+        isLoggingIn = false;
     }
 };
-
 /**
  * Sign out
  */
@@ -125,21 +175,22 @@ export const getToken = async (): Promise<string | null> => {
     }
 };
 
-/**
- * Get Authenticated Microsoft Graph Client
- */
-export const getGraphClient = async (): Promise<Client> => {
+// Graphクライアントの取得
+export const getGraphClient = async () => {
     await initializeMsal();
-    const token = await getToken();
 
-    if (!token) {
-        throw new Error("InteractionRequired");
-        // Caller should catch this and call signIn()
+    const account = msalInstance.getActiveAccount();
+    if (!account) {
+        throw new Error("User not signed in");
     }
 
-    return Client.init({
-        authProvider: (done) => {
-            done(null, token);
-        }
+    const authProvider = new AuthCodeMSALBrowserAuthenticationProvider(msalInstance, {
+        account: account,
+        scopes: loginRequest.scopes,
+        interactionType: 0, // InteractionType.Redirect
+    });
+
+    return Client.initWithMiddleware({
+        authProvider,
     });
 };

@@ -173,23 +173,19 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
         // useOneDriveUpload hook now provides isAuthenticated state
         // detailed logic: 
         // 1. If authenticated, OPEN FILE PICKER IMMEDIATELY (sync)
-        // 2. If not, show confirm -> login -> alert
+        // 2. If not, attempt login (which opens popup)
 
         if (isAuthenticated) {
             const fileInput = document.querySelector(`input[data-reply-thread="${threadId}"]`) as HTMLInputElement;
             fileInput?.click();
         } else {
-            const shouldLogin = window.confirm(
-                "ファイルを添付するには Microsoft アカウントでのサインインが必要です。\n" +
-                "今すぐサインインしますか？\n\n" +
-                "(設定画面からもサインインできます)"
-            );
-
-            if (shouldLogin) {
-                const account = await login();
-                if (account) {
-                    alert("サインインしました。もう一度添付ボタンを押してください。");
-                }
+            // Trigger login directly on click to avoid "popup blocked" issues caused by async delays or window.confirm
+            // The login function itself handles the popup
+            const account = await login();
+            if (account) {
+                // If login successful, auto-click the file input
+                const fileInput = document.querySelector(`input[data-reply-thread="${threadId}"]`) as HTMLInputElement;
+                fileInput?.click();
             }
         }
     };

@@ -29,8 +29,8 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         uploadFile,
         removeFile,
         clearFiles,
-        // checkLoginStatus, // We will use direct instance check for sync behavior
-        // login // We will use direct login for control
+        isAuthenticated, // Added
+        login // Added
     } = useOneDriveUpload();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -104,10 +104,19 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const handleAttachClick = () => {
-        // Always open file picker immediately as requested by user.
-        // Auth will be handled during the upload process (in handleFileChange -> uploadFile).
-        fileInputRef.current?.click();
+    const handleAttachClick = async () => {
+        // Auth check before opening file picker to avoid "popup blocked" issues during upload
+        // 1. If authenticated, OPEN FILE PICKER IMMEDIATELY
+        // 2. If not, trigger login (popup) synchronously
+
+        if (isAuthenticated) {
+            fileInputRef.current?.click();
+        } else {
+            const account = await login();
+            if (account) {
+                fileInputRef.current?.click();
+            }
+        }
     };
 
     return (
