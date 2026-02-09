@@ -5,7 +5,7 @@ import { useMentions } from '../../hooks/useMentions';
 import { useProfiles, useTags } from '../../hooks/useSupabase';
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { MentionList } from '../common/MentionList';
-import { msalInstance, ensureMsalInitialized, login as msLogin } from '../../lib/microsoftGraph';
+import { initializeMsal } from '../../lib/microsoftGraph';
 
 interface PostFormProps {
     teamId: number | string | null;
@@ -48,7 +48,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
 
     // Ensure MSAL is initialized on mount so we can check it synchronously later
     React.useEffect(() => {
-        ensureMsalInitialized().catch(console.error);
+        initializeMsal().catch(console.error);
     }, []);
 
     const handleSubmit = async () => {

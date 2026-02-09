@@ -307,7 +307,7 @@ interface Reaction {
     emoji: string;
     thread_id?: string;
     reply_id?: string;
-    user_id: string;
+    profile_id: string;
     created_at: string;
 }
 

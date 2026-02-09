@@ -1,23 +1,46 @@
 import { useState, useCallback } from 'react';
-import { msalInstance, getGraphClient, ensureMsalInitialized, login as msLogin } from '../lib/microsoftGraph';
+import { msalInstance, getGraphClient, initializeMsal, signIn } from '../lib/microsoftGraph';
 import { Attachment } from './useFileUpload';
 
 export function useOneDriveUpload() {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [uploading, setUploading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string>('');
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-    // Check if logged in without prompting
+    // Initial check on mount
+    useState(() => {
+        // We use a self-executing async function or effect
+        const init = async () => {
+            try {
+                await initializeMsal();
+                const account = msalInstance.getActiveAccount();
+                setIsAuthenticated(!!account);
+            } catch (e) {
+                console.error("OneDrive init check failed:", e);
+            }
+        };
+        init();
+        // Also listen for account changes if needed, but manual check is usually enough for this scope
+    });
+
+    // Check if logged in without prompting (helper)
     const checkLoginStatus = useCallback(async () => {
-        await ensureMsalInitialized();
+        await initializeMsal();
         const account = msalInstance.getActiveAccount();
-        return !!account;
+        const isAuth = !!account;
+        setIsAuthenticated(isAuth);
+        return isAuth;
     }, []);
 
     // Perform Login
     const login = async () => {
         try {
-            return await msLogin();
+            const account = await signIn();
+            if (account) {
+                setIsAuthenticated(true);
+            }
+            return account;
         } catch (error: any) {
             console.error("Microsoft login failed:", error);
             if (error.message && !error.message.includes("ポップアップ")) {
@@ -32,16 +55,17 @@ export function useOneDriveUpload() {
         setStatusMessage('準備中...');
 
         try {
-            // 1. Auth Check & Client with simple retry
-            let client;
             try {
+                // 1. Auth Check & Client
                 client = await getGraphClient();
                 // Test token validity immediately with a lightweight call
                 await client.api('/me/drive').select('id').get();
             } catch (authError) {
-                console.warn("Auth check failed, attempting interactive login...", authError);
-                await login();
-                client = await getGraphClient();
+                console.warn("Auth check failed:", authError);
+                // DO NOT attempt interactive login here. It causes timeouts/popup issues during upload.
+                // Reset auth state and prompt user to retry.
+                setIsAuthenticated(false);
+                throw new Error("InteractionRequired");
             }
 
             setStatusMessage('フォルダ確認中...');
@@ -186,6 +210,25 @@ export function useOneDriveUpload() {
         setAttachments([]);
     };
 
+    const downloadFileFromOneDrive = async (fileId: string, fileName: string) => {
+        try {
+            const client = await getGraphClient();
+            const response = await client.api(`/me/drive/items/${fileId}`).select('@microsoft.graph.downloadUrl').get();
+            const downloadUrl = response['@microsoft.graph.downloadUrl'];
+
+            if (downloadUrl) {
+                // Determine if we can force download or just open
+                // For simplicity, opening in new tab usually triggers download for these URLs
+                window.open(downloadUrl, '_blank');
+            } else {
+                alert('ダウンロードリンクが見つかりませんでした。');
+            }
+        } catch (error: any) {
+            console.error("Download Error:", error);
+            alert('ダウンロードに失敗しました: ' + error.message);
+        }
+    };
+
     return {
         attachments,
         uploading,
@@ -195,5 +238,7 @@ export function useOneDriveUpload() {
         clearFiles,
         checkLoginStatus,
         login,
+        downloadFileFromOneDrive,
+        isAuthenticated,
     };
 }

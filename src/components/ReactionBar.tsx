@@ -66,7 +66,7 @@ interface ReactionBarProps {
     reactions: Array<{
         id: string;
         emoji: string;
-        user_id: string;
+        profile_id: string;
     }>;
     profiles: any[];
     currentUserId?: string;
@@ -97,7 +97,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
     }, {} as Record<string, typeof reactions>);
 
     const handleReactionClick = (emoji: string, reactionsByEmoji: typeof reactions) => {
-        const userReaction = reactionsByEmoji.find(r => r.user_id === currentUserId);
+        const userReaction = reactionsByEmoji.find(r => r.profile_id === currentUserId);
         if (userReaction) {
             onRemove(userReaction.id);
         } else {
@@ -107,9 +107,9 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
 
     const getReactionTooltip = (reactionList: typeof reactions) => {
         return reactionList.map(r => {
-            const profile = profiles.find(p => p.id === r.user_id);
+            const profile = profiles.find(p => p.id === r.profile_id);
             if (profile) return profile.display_name || profile.email;
-            if (currentUserId && r.user_id === currentUserId && currentProfile) {
+            if (currentUserId && r.profile_id === currentUserId && currentProfile) {
                 return currentProfile.display_name || currentProfile.email || 'You';
             }
             return 'Unknown';
@@ -123,7 +123,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
             onMouseLeave={() => setShowPicker(false)}
         >
             {Object.entries(groupedReactions).map(([emoji, reactionList]) => {
-                const hasUserReacted = reactionList.some(r => r.user_id === currentUserId);
+                const hasUserReacted = reactionList.some(r => r.profile_id === currentUserId);
                 const tooltipNames = getReactionTooltip(reactionList);
 
                 return (

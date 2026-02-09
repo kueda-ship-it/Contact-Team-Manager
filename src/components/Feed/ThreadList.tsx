@@ -10,7 +10,7 @@ import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
-import { msalInstance, ensureMsalInitialized, login } from '../../lib/microsoftGraph';
+import { msalInstance } from '../../lib/microsoftGraph';
 
 interface ThreadListProps {
     currentTeamId: number | string | null;
@@ -41,7 +41,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
     const [replyAttachments, setReplyAttachments] = React.useState<{ [key: string]: Attachment[] }>({});
     const [replyUploading, setReplyUploading] = React.useState<{ [key: string]: boolean }>({});
 
-    const { uploadFile, downloadFileFromOneDrive } = useOneDriveUpload(); // Use OneDrive instead of Supabase
+    const { uploadFile, downloadFileFromOneDrive, isAuthenticated, login } = useOneDriveUpload(); // Use OneDrive instead of Supabase
 
     const {
         isOpen,
@@ -170,11 +170,15 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
     };
 
     const handleReplyAttachClick = async (threadId: string) => {
-        // Check if Microsoft is logged in BEFORE opening file chooser
-        await ensureMsalInitialized();
-        const account = msalInstance.getActiveAccount();
+        // useOneDriveUpload hook now provides isAuthenticated state
+        // detailed logic: 
+        // 1. If authenticated, OPEN FILE PICKER IMMEDIATELY (sync)
+        // 2. If not, show confirm -> login -> alert
 
-        if (!account) {
+        if (isAuthenticated) {
+            const fileInput = document.querySelector(`input[data-reply-thread="${threadId}"]`) as HTMLInputElement;
+            fileInput?.click();
+        } else {
             const shouldLogin = window.confirm(
                 "ファイルを添付するには Microsoft アカウントでのサインインが必要です。\n" +
                 "今すぐサインインしますか？\n\n" +
@@ -182,19 +186,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
             );
 
             if (shouldLogin) {
-                try {
-                    await login();
-                    // After successful login, trigger file input for this thread
-                    const fileInput = document.querySelector(`input[data-reply-thread="${threadId}"]`) as HTMLInputElement;
-                    fileInput?.click();
-                } catch (error: any) {
-                    console.error("Microsoft login failed:", error);
+                const account = await login();
+                if (account) {
+                    alert("サインインしました。もう一度添付ボタンを押してください。");
                 }
             }
-        } else {
-            // Already logged in, open file chooser
-            const fileInput = document.querySelector(`input[data-reply-thread="${threadId}"]`) as HTMLInputElement;
-            fileInput?.click();
         }
     };
 
@@ -255,7 +251,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
 
         const payload: any = {
             emoji,
-            user_id: user.id
+            profile_id: user.id
         };
 
         if (threadId) payload.thread_id = threadId;
@@ -264,6 +260,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ currentTeamId, threadsDa
         const { error } = await supabase.from('reactions').insert([payload]);
         if (error) {
             console.error('リアクション追加エラー:', error);
+            alert(`リアクション追加に失敗しました: ${error.message}`);
         } else {
             refetchReactions();
         }

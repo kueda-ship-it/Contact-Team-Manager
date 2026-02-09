@@ -10,6 +10,8 @@ import { useAuth } from './hooks/useAuth';
 import { useThreads, useTeams, useUserMemberships, useUnreadCounts } from './hooks/useSupabase';
 import './styles/style.css';
 
+import { initializeMsal } from './lib/microsoftGraph';
+
 function App() {
   const { user, profile, loading: authLoading, signOut } = useAuth();
 
@@ -51,6 +53,11 @@ function App() {
       }
     }
   }, [user, profile, memberships, membershipsLoading, authLoading, currentTeamId]);
+
+  // Initialize MSAL explicitly on mount
+  useEffect(() => {
+    initializeMsal().catch(console.error);
+  }, []);
 
   // Clear hash from URL behavior removed to prevent conflict with MSAL popup handling
   // MSAL handles hash processing and clearing automatically.

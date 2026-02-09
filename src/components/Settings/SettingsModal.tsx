@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useTeamMembers, useProfiles, useTeams, usePermissions, useUserMemberships } from '../../hooks/useSupabase';
 import { CustomSelect } from '../common/CustomSelect';
-import { msalInstance, login as msLogin, logout as msLogout, ensureMsalInitialized } from '../../lib/microsoftGraph';
+import { msalInstance, signIn, signOut, initializeMsal } from '../../lib/microsoftGraph';
 import type { AccountInfo } from '@azure/msal-browser';
 
 interface SettingsModalProps {
@@ -98,7 +98,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
     useEffect(() => {
         const checkMsAccount = async () => {
-            await ensureMsalInitialized();
+            await initializeMsal();
             setMsAccount(msalInstance.getActiveAccount());
         };
         if (isOpen) {
@@ -109,12 +109,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const handleMsLogin = async () => {
         setMsLoading(true);
         try {
-            await ensureMsalInitialized();
-            const account = await msLogin();
+            await initializeMsal();
+            const account = await signIn();
             setMsAccount(account);
             alert("Microsoft 連携に成功しました。");
         } catch (err: any) {
-            // Error is already alerted in msLogin or can be handled here
+            // Error is already alerted in signIn or can be handled here
             if (err.message && !err.message.includes("ポップアップ")) {
                 alert("Microsoft 連携に失敗しました: " + err.message);
             }
@@ -127,7 +127,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         if (!window.confirm("Microsoft 連携を解除しますか？OneDrive へのアップロードができなくなります。")) return;
         setMsLoading(true);
         try {
-            await msLogout();
+            await signOut();
             setMsAccount(null);
         } catch (err: any) {
             alert("解除に失敗しました: " + err.message);
