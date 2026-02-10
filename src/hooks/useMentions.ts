@@ -63,7 +63,18 @@ export const useMentions = ({ profiles, tags, currentTeamId }: UseMentionsProps)
                 type: 'tag' as const
             }));
 
-        setCandidates([...matchedProfiles, ...matchedTags]);
+        // @all candidate
+        const allCandidate: MentionCandidate = {
+            id: 'all',
+            display: 'all',
+            sub: 'チーム全員に通知',
+            type: 'user', // Treat as user for now or add new type if needed
+            avatar: undefined
+        };
+
+        const matchedAll = 'all'.includes(lowerQuery) ? [allCandidate] : [];
+
+        setCandidates([...matchedAll, ...matchedProfiles, ...matchedTags]);
         setActiveIndex(0);
     }, [query, isOpen, profiles, tags, currentTeamId]);
 
@@ -92,7 +103,7 @@ export const useMentions = ({ profiles, tags, currentTeamId }: UseMentionsProps)
                 const rect = range.getBoundingClientRect();
                 const windowHeight = window.innerHeight;
 
-                // Set precise fixed coordinates
+                // User requested: Above half -> show below, Below half -> show above
                 if (rect.top > windowHeight / 2) {
                     setMentionPosition('top');
                     setMentionCoords({ top: rect.top, left: rect.left });

@@ -43,6 +43,10 @@ export function highlightMentions(text: string | null, options: HighlightMention
         highlighted = highlighted.replace(regex, `<span class="${className}">${mentionText}</span>`);
     });
 
+    // @all
+    const allRegex = /@all/g;
+    highlighted = highlighted.replace(allRegex, '<span class="mention mention-all">@all</span>');
+
     // Tags (#TagName)
     options.allTags.forEach(t => {
         const mentionText = `#${t.name}`;

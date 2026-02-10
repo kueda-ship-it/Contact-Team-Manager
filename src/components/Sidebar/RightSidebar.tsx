@@ -15,9 +15,10 @@ interface RightSidebarProps {
         error: Error | null;
         refetch: (silent?: boolean) => void;
     };
+    onThreadClick?: (threadId: string) => void;
 }
 
-export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threadsData }) => {
+export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threadsData, onThreadClick }) => {
     // We use main threadsData only for mentions and general structure, but for "Not Finished", 
     // we must fetch ALL pending tasks independently of the main feed's limit/filter.
     const { threads: mainThreads, loading: mainLoading, refetch: mainRefetch } = threadsData;
@@ -171,11 +172,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
     // .slice(0, 10); // Limit removed
 
     const scrollToThread = (threadId: string) => {
-        const target = document.getElementById(`thread-${threadId}`);
-        if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            target.classList.add('highlight-thread');
-            setTimeout(() => target.classList.remove('highlight-thread'), 2000);
+        if (onThreadClick) {
+            onThreadClick(threadId);
+        } else {
+            // Fallback (though normally onThreadClick should be provided)
+            const target = document.getElementById(`thread-${threadId}`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                target.classList.add('highlight-thread');
+                setTimeout(() => target.classList.remove('highlight-thread'), 2000);
+            }
         }
     };
 
@@ -240,9 +246,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                                     if (el) insertMention(c, el);
                                                 }}
                                                 style={{
-                                                    top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
+                                                    top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
                                                     left: mentionCoords.left,
                                                     position: 'fixed',
+                                                    transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none',
                                                     zIndex: 2000
                                                 }}
                                             />

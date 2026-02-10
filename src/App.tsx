@@ -25,25 +25,19 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [threadsLimit, setThreadsLimit] = useState(50);
   const [sortAscending, setSortAscending] = useState(true);
+  const [scrollToThreadId, setScrollToThreadId] = useState<string | null>(null);
 
   const { teams } = useTeams();
   // Ensure we fetch ALL pending items if that filter is active, regardless of default limit
-  const fetchLimit = (statusFilter === 'pending' || statusFilter === 'mentions') ? 2000 : threadsLimit;
-  const threadsData = useThreads(currentTeamId, fetchLimit, sortAscending, statusFilter);
+  const fetchLimit = (statusFilter === 'pending' || statusFilter === 'mentions' || searchQuery) ? 2000 : threadsLimit;
+  // Pass searchQuery to useThreads for server-side filtering
+  const threadsData = useThreads(currentTeamId, fetchLimit, sortAscending, statusFilter, searchQuery);
   const { threads: rawThreads, loading: threadsLoading, error: threadsError, refetch } = threadsData;
   const { memberships, loading: membershipsLoading, updateLastRead } = useUserMemberships(user?.id);
   const { unreadTeams } = useUnreadCounts(user?.id, memberships);
 
-  // Filter threads based on search query
-  const filteredThreads = rawThreads.filter(thread => {
-    if (!searchQuery) return true;
-    const lowerQuery = searchQuery.toLowerCase();
-    return (
-      (thread.title && thread.title.toLowerCase().includes(lowerQuery)) ||
-      (thread.content && thread.content.toLowerCase().includes(lowerQuery)) ||
-      (thread.author && thread.author.toLowerCase().includes(lowerQuery))
-    );
-  });
+  // Client-side filtering removed in favor of server-side search
+  const filteredThreads = rawThreads;
 
   const threadsDataFiltered = {
     threads: filteredThreads,
@@ -99,6 +93,26 @@ function App() {
   // Helper to get current team name
   const currentTeam = teams.find(t => String(t.id) === String(currentTeamId));
   const currentTeamName = currentTeam?.name || 'チーム未選択';
+
+  const handleSidebarThreadClick = (threadId: string) => {
+    // 1. Ensure we are in feed mode
+    setViewMode('feed');
+    // 2. Ensure we can see the thread (switch to all or pending? 'all' is safest)
+    setStatusFilter('all');
+
+    // 3. Check if thread is currently loaded
+    const isLoaded = rawThreads.some(t => t.id === threadId);
+    if (!isLoaded) {
+      // Expand limit if not loaded (temporary expansion to ensure we find it)
+      // Check if 500 is enough? Maybe 1000?
+      if (threadsLimit < 500) {
+        setThreadsLimit(500);
+      }
+    }
+
+    // 4. Set target to scroll
+    setScrollToThreadId(threadId);
+  };
 
   if (authLoading) {
     return (
@@ -236,6 +250,8 @@ function App() {
                     sortAscending={sortAscending}
                     onToggleSort={() => setSortAscending(prev => !prev)}
                     onLoadMore={() => setThreadsLimit(prev => prev + 50)}
+                    scrollToThreadId={scrollToThreadId}
+                    onScrollComplete={() => setScrollToThreadId(null)}
                   />
                 </div>
                 <div style={{ flexShrink: 0 }}>
@@ -261,6 +277,7 @@ function App() {
           <RightSidebar
             currentTeamId={currentTeamId}
             threadsData={threadsData}
+            onThreadClick={handleSidebarThreadClick}
           />
         </div>
       </div>

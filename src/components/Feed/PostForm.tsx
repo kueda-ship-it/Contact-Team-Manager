@@ -252,9 +252,10 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                                     if (contentRef.current) insertMention(c, contentRef.current);
                                 }}
                                 style={{
-                                    top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
+                                    top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
                                     left: mentionCoords.left,
-                                    position: 'fixed'
+                                    position: 'fixed',
+                                    transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none'
                                 }}
                             />
                         )}

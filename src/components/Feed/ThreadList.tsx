@@ -24,6 +24,8 @@ interface ThreadListProps {
     sortAscending: boolean;
     onToggleSort: () => void;
     onLoadMore: () => void;
+    scrollToThreadId?: string | null;
+    onScrollComplete?: () => void;
 }
 
 export const ThreadList: React.FC<ThreadListProps> = ({
@@ -33,7 +35,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     onStatusChange,
     sortAscending,
     onToggleSort,
-    onLoadMore
+    onLoadMore,
+    scrollToThreadId,
+    onScrollComplete
 }) => {
     const { threads, loading: threadsLoading, error, refetch } = threadsData;
     const { teams } = useTeams();
@@ -146,6 +150,26 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             return sortAscending ? dateA - dateB : dateB - dateA;
         });
     }, [threads, sortAscending]);
+
+    // Handle scroll to specific thread (from sidebar navigation)
+    React.useEffect(() => {
+        if (scrollToThreadId && !threadsLoading && threads.length > 0) {
+            // Find the element
+            const el = document.getElementById(`thread-${scrollToThreadId}`);
+            if (el) {
+                // Scroll into view
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Add highlight class
+                el.classList.add('highlight-thread');
+                setTimeout(() => el.classList.remove('highlight-thread'), 2000);
+
+                // Notify parent that scroll is handled
+                if (onScrollComplete) {
+                    onScrollComplete();
+                }
+            }
+        }
+    }, [scrollToThreadId, threadsLoading, threads.length, onScrollComplete]);
 
     if (threadsLoading) {
         return <div style={{ padding: '20px', textAlign: 'center' }}>Loading threads...</div>;
@@ -613,9 +637,10 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     if (el) insertMention(c, el);
                                                 }}
                                                 style={{
-                                                    top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
+                                                    top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
                                                     left: mentionCoords.left,
-                                                    position: 'fixed'
+                                                    position: 'fixed',
+                                                    transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none'
                                                 }}
                                             />
                                         )}
@@ -786,9 +811,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                             if (el) insertMention(c, el);
                                                         }}
                                                         style={{
-                                                            top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
+                                                            top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
                                                             left: mentionCoords.left,
-                                                            position: 'fixed'
+                                                            position: 'fixed',
+                                                            transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none',
+                                                            zIndex: 10000
                                                         }}
                                                     />
                                                 )}

@@ -8,6 +8,8 @@ interface MentionListProps {
     style?: React.CSSProperties;
 }
 
+import ReactDOM from 'react-dom';
+
 export const MentionList: React.FC<MentionListProps> = ({ candidates, activeIndex, onSelect, style }) => {
     if (candidates.length === 0) return null;
 
@@ -17,7 +19,7 @@ export const MentionList: React.FC<MentionListProps> = ({ candidates, activeInde
         border: '1px solid var(--border-color, #444)',
         borderRadius: '8px',
         boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-        zIndex: 9999,
+        zIndex: 10000, // Ensure highest priority
         width: '280px',
         maxHeight: '200px',
         overflowY: 'auto',
@@ -30,8 +32,6 @@ export const MentionList: React.FC<MentionListProps> = ({ candidates, activeInde
         if (listRef.current) {
             const activeEl = listRef.current.children[activeIndex] as HTMLElement;
             if (activeEl) {
-                // simple scrollIntoView might be too jerky or hidden behind headers, 
-                // but for a simple list it usually works fine with 'block: nearest'
                 activeEl.scrollIntoView({ block: 'nearest' });
             }
         }
@@ -49,7 +49,7 @@ export const MentionList: React.FC<MentionListProps> = ({ candidates, activeInde
         flexShrink: 0
     });
 
-    return (
+    const content = (
         <div className="mention-list" style={listStyle} ref={listRef}>
             {candidates.map((candidate, index) => (
                 <div
@@ -82,4 +82,6 @@ export const MentionList: React.FC<MentionListProps> = ({ candidates, activeInde
             ))}
         </div>
     );
+
+    return ReactDOM.createPortal(content, document.body);
 };

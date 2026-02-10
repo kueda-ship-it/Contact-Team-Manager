@@ -80,7 +80,8 @@ export function useThreads(
     teamId: number | string | null,
     limit: number = 50,
     ascending: boolean = true,
-    filter: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts' = 'all'
+    filter: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts' = 'all',
+    searchQuery: string = ''
 ) {
     const { user, profile } = useAuth();
     const { memberships } = useUserMemberships(user?.id);
@@ -90,11 +91,11 @@ export function useThreads(
 
     const fetchThreads = useCallback(async (silent = false) => {
         try {
-            // Override limit if filtering for pending or mentions (User wants to see all)
-            // Force high limit for pending items to ensure all are shown
-            const effectiveLimit = (filter === 'pending' || filter === 'mentions') ? 2000 : limit;
+            // Override limit if filtering for pending or mentions OR SEARCHING to ensure good results
+            const isSearching = searchQuery.trim().length > 0;
+            const effectiveLimit = (filter === 'pending' || filter === 'mentions' || isSearching) ? 2000 : limit;
 
-            console.log(`[useThreads] Fetching. Filter: ${filter}, Limit: ${limit}, Effective: ${effectiveLimit}`);
+            console.log(`[useThreads] Fetching. Filter: ${filter}, Search: ${searchQuery}, Limit: ${limit}, Effective: ${effectiveLimit}`);
 
             if (!silent) setLoading(true);
 
@@ -105,33 +106,35 @@ export function useThreads(
                   replies:replies(*)
                 `);
 
-            // Apply limit
+            // Apply search filter if present
+            if (isSearching) {
+                const term = `%${searchQuery.trim()}%`;
+                // Search in title and content only (author is UUID, author_name does not exist on table)
+                query = query.or(`title.ilike.${term},content.ilike.${term}`);
+            }
+
+            // Apply limit (applied after filters by PostgREST logic, but definition order in JS chain implies intent)
+            // We want to sort by created_at DESC normally
             query = query.order('created_at', { ascending: false }).limit(effectiveLimit);
 
-            // Server-side filtering for 'pending' to ensure we get ALL pending tasks, not just pending ones within the latest N
+            // Server-side filtering for status
             if (filter === 'pending') {
                 query = query.eq('status', 'pending');
             } else if (filter === 'completed') {
                 query = query.eq('status', 'completed');
             } else if (filter === 'myposts') {
-                // For myposts, we filter by user_id
                 query = query.eq('user_id', user?.id);
             }
-            // Note: 'mentions' matches complicate server-side query due to JSON/Text search needs on 'content' or 'replies'.
-            // For now, 'mentions' relies on the high effectiveLimit (1000) and client-side filtering.
 
             const isAdmin = profile?.role === 'Admin';
 
             if (teamId !== null && teamId !== '') {
-                // If specific team is selected, apply direct filter
                 query = query.eq('team_id', teamId);
             } else if (!isAdmin) {
-                // If "All Teams" is selected but not an admin, filter by user memberships
                 const memberTeamIds = memberships.map(m => m.team_id);
                 if (memberTeamIds.length > 0) {
                     query = query.in('team_id', memberTeamIds);
                 } else {
-                    // No memberships = no threads (security fallback)
                     setThreads([]);
                     setLoading(false);
                     return;
@@ -141,8 +144,6 @@ export function useThreads(
             const { data, error } = await query;
             if (error) throw error;
 
-            // If ascending is true, we wanted the LATEST limit but in ASC order (oldest to newest)
-            // So we fetched DESC limit, and now we reverse the result.
             let result = data || [];
             if (ascending) {
                 result = [...result].reverse();
@@ -154,7 +155,7 @@ export function useThreads(
         } finally {
             setLoading(false);
         }
-    }, [teamId, profile, memberships, limit, ascending, filter]);
+    }, [teamId, profile, memberships, limit, ascending, filter, searchQuery]);
 
     useEffect(() => {
         fetchThreads();
