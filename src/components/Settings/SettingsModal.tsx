@@ -327,14 +327,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         marginBottom: '6px',
                         fontSize: '0.9rem',
                         lineHeight: '1.5',
-                        color: '#e0e0e0',
+                        color: 'var(--text-main)',
                         paddingLeft: '5px'
                     }}>
                         <span style={{ color: 'var(--accent)', flexShrink: 0 }}>✓</span>
                         <span>
                             {parts.map((part, i) => {
                                 if (part.startsWith('**') && part.endsWith('**')) {
-                                    return <strong key={i} style={{ color: '#fff' }}>{part.slice(2, -2)}</strong>;
+                                    return <strong key={i} style={{ color: 'var(--text-main)' }}>{part.slice(2, -2)}</strong>;
                                 }
                                 return part;
                             })}
@@ -346,7 +346,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
             if (!line.trim()) {
                 return <div key={index} style={{ height: '8px' }}></div>;
             }
-            return <div key={index} style={{ fontSize: '0.9rem', color: '#ccc' }}>{line}</div>;
+            return <div key={index} style={{ fontSize: '0.9rem', color: 'var(--text-main)' }}>{line}</div>;
         });
     };
 

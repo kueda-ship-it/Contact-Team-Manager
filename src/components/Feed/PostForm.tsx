@@ -104,6 +104,8 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
+
     const handleAttachClick = async () => {
         // Auth check before opening file picker to avoid "popup blocked" issues during upload
         // 1. If authenticated, OPEN FILE PICKER IMMEDIATELY
@@ -112,9 +114,14 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         if (isAuthenticated) {
             fileInputRef.current?.click();
         } else {
-            const account = await login();
-            if (account) {
-                fileInputRef.current?.click();
+            setIsLoggingIn(true);
+            try {
+                const account = await login();
+                if (account) {
+                    fileInputRef.current?.click();
+                }
+            } finally {
+                setIsLoggingIn(false);
             }
         }
     };
@@ -214,7 +221,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                         {attachments.length > 0 && (
                             <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
                                 {attachments.map((att, index) => (
-                                    <div key={index} className="attachment-item" style={{ position: 'relative', width: '60px', height: '60px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div key={index} className="attachment-item" style={{ position: 'relative', width: '120px', height: '120px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         {att.type.startsWith('image/') ? (
                                             <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         ) : (
@@ -284,7 +291,38 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                         )}
                     </button>
                 </div>
-            </section>
-        </div>
+                {/* Login Overlay */}
+                {
+                    isLoggingIn && (
+                        <div style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 9999,
+                            backdropFilter: 'blur(5px)'
+                        }}>
+                            <div className="spinner-large" style={{
+                                width: '50px',
+                                height: '50px',
+                                border: '4px solid rgba(255,255,255,0.3)',
+                                borderTopColor: '#0078d4',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite',
+                                marginBottom: '20px'
+                            }}></div>
+                            <h3 style={{ color: 'white', marginBottom: '10px' }}>Microsoftへログイン中...</h3>
+                            <p style={{ color: 'rgba(255,255,255,0.8)' }}>ポップアップウィンドウでログインしてください</p>
+                        </div>
+                    )
+                }
+            </section >
+        </div >
     );
 };

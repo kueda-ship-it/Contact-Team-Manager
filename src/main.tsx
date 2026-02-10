@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
+import { ThemeProvider } from './context/ThemeContext';
 import { initializeMsal } from './lib/microsoftGraph';
 
 // Initialize MSAL before rendering
@@ -26,7 +27,9 @@ initializeMsal().then(() => {
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
     </StrictMode>,
   )
 }).catch(e => {

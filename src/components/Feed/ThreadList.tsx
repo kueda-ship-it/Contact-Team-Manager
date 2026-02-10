@@ -392,7 +392,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                             <div className="attachment-wrapper" style={{ position: 'relative' }}>
                                 <div onClick={() => window.open(att.url, '_blank')} style={{ cursor: 'pointer' }}>
                                     {att.type?.startsWith('image/') ? (
-                                        <img src={att.thumbnailUrl || att.url} alt={att.name} className="attachment-thumb-large" style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                                        <img src={att.thumbnailUrl || att.url} alt={att.name} className="attachment-thumb-large" style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
                                     ) : (
                                         <div className="file-link" style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <span style={{ fontSize: '1.2rem' }}>📄</span>

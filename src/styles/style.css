@@ -15,6 +15,369 @@
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+body.light-mode {
+    --bg-dark: #f0f2f5;
+    --card-bg: #ffffff;
+    --text-main: #333333;
+    --text-muted: #666666;
+    --primary: #5b5fc7;
+    /* Teams-like purple */
+    --primary-light: #7f85f5;
+    --primary-dark: #444b93;
+    --glass: rgba(0, 0, 0, 0.05);
+    /* Darker glass for light mode */
+    --border-color: #e1e1e1;
+    --bg-elevated: #ffffff;
+}
+
+/* Specific overrides for light mode components */
+body.light-mode header {
+    background: #ffffff;
+    border-bottom: 1px solid #e1e1e1;
+    color: #333333;
+}
+
+body.light-mode .input-field,
+body.light-mode .search-input {
+    background: #f5f5f5 !important;
+    border: 1px solid #e1e1e1 !important;
+    color: #333333 !important;
+}
+
+body.light-mode .sidebar {
+    background: #f0f2f5;
+    border-right: 1px solid #e1e1e1;
+}
+
+body.light-mode .sidebar-right {
+    background: #ffffff;
+    border-left: 1px solid #e1e1e1;
+}
+
+body.light-mode .task-card,
+body.light-mode .reply-item {
+    background: #ffffff;
+    border: 1px solid #e1e1e1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .reply-section {
+    background: #f8f9fa;
+    border-top: 1px solid #e1e1e1;
+}
+
+body.light-mode .logo {
+    color: #333333;
+}
+
+/* Light Mode Overrides for Sidebars */
+body.light-mode .teams-sidebar {
+    background: #e8eaed !important;
+    border-right: 1px solid #d1d1d1 !important;
+}
+
+body.light-mode .teams-sidebar:hover {
+    background: #e8eaed !important;
+}
+
+body.light-mode .side-panel {
+    background: #f0f2f5 !important;
+}
+
+body.light-mode .side-panel-title {
+    color: #555555 !important;
+    text-shadow: none !important;
+}
+
+/* Update Post Form and Task Cards in Light Mode */
+body.light-mode .form-container,
+body.light-mode .post-form-container,
+body.light-mode .task-card,
+body.light-mode .reply-item {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    color: #333333 !important;
+}
+
+/* Explicitly remove background/border for static container to prevent "white box" */
+body.light-mode .static-form-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+body.light-mode .side-panel .task-card {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+}
+
+/* Fix Rich Editor Background */
+body.light-mode .rich-editor,
+body.light-mode .input-field {
+    background: #ffffff !important;
+    color: #333333 !important;
+    border-color: #e1e1e1 !important;
+}
+
+/* Fix floating post form if it exists */
+body.light-mode .floating-post-form {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+}
+
+/* Light Mode Button Overrides */
+body.light-mode .btn,
+body.light-mode .icon-btn,
+body.light-mode .quick-reply-btn,
+body.light-mode .reaction-bubble,
+body.light-mode .gear-btn-unified,
+body.light-mode .team-settings-icon {
+    color: #555555 !important;
+    border-color: #cccccc !important;
+}
+
+body.light-mode .btn:hover,
+body.light-mode .icon-btn:hover,
+body.light-mode .quick-reply-btn:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: #333333 !important;
+}
+
+/* Specific button fixes */
+body.light-mode .quick-reply-input {
+    background: #f5f5f5 !important;
+    border: 1px solid #e1e1e1 !important;
+    color: #333333 !important;
+}
+
+/* Removed conflicting reaction-bubble rule to allow later definition to take precedence */
+
+body.light-mode .reaction-bubble.user-reacted {
+    background: rgba(91, 95, 199, 0.1) !important;
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+}
+
+/* Fix Team Icons in Light Mode */
+body.light-mode .team-icon {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: transparent !important;
+    /* Transparent background */
+    color: #555555 !important;
+    /* High visibility gray */
+}
+
+/* Knowledge/Log Dashboard Icons etc */
+body.light-mode .team-list-item .team-icon {
+    background: #e1e1e1 !important;
+    /* Light gray background for icons */
+    color: #555555 !important;
+}
+
+body.light-mode .team-name-label {
+    color: #333333 !important;
+}
+
+/* Light Mode Highlight for active/hover */
+body.light-mode .team-list-item.active .team-icon,
+body.light-mode .team-item-header:hover .team-icon {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+/* Light Mode Button Overrides - General - Gray by default */
+body.light-mode .btn,
+body.light-mode .icon-btn,
+body.light-mode .quick-reply-btn,
+body.light-mode .reaction-bubble,
+body.light-mode .gear-btn-unified,
+body.light-mode .team-settings-icon,
+body.light-mode .btn-send-blue,
+body.light-mode .btn-clip-yellow {
+    color: #666666 !important;
+    /* Default gray */
+    border-color: #cccccc !important;
+    background: transparent !important;
+}
+
+/* Hover states - Color on hover */
+body.light-mode .btn:hover,
+body.light-mode .icon-btn:hover,
+body.light-mode .gear-btn-unified:hover,
+body.light-mode .team-settings-icon:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: #333333 !important;
+}
+
+/* Specific restoration of colors ON HOVER only */
+/* Clip Button - Gray default -> Yellow Hover */
+body.light-mode .btn-clip-yellow:hover {
+    color: #fce100 !important;
+    /* Yellow on hover */
+    background: rgba(252, 225, 0, 0.1) !important;
+    border-color: #fce100 !important;
+    /* Optional: colored border on hover */
+}
+
+/* Send Button - Blue on hover/active, gray default */
+body.light-mode .btn-send-blue:hover {
+    color: #0078d4 !important;
+    background: rgba(0, 120, 212, 0.1) !important;
+    border-color: #0078d4 !important;
+}
+
+/* Check/Complete Button - Green on hover */
+body.light-mode .btn-complete:hover,
+body.light-mode .check-btn:hover {
+    color: #107c10 !important;
+    background: rgba(16, 124, 16, 0.1) !important;
+    border-color: #107c10 !important;
+}
+
+body.light-mode .btn-complete:hover svg,
+body.light-mode .check-btn:hover svg {
+    stroke: #107c10 !important;
+}
+
+/* Delete/Trash Button - Red on hover */
+body.light-mode .btn-delete:hover {
+    color: #d13438 !important;
+    background: rgba(209, 52, 56, 0.1) !important;
+    border-color: #d13438 !important;
+}
+
+/* Specific button fixes for Right Sidebar (Not Finished) */
+body.light-mode .quick-reply-input {
+    background: #f5f5f5 !important;
+    border: 1px solid #e1e1e1 !important;
+    color: #333333 !important;
+}
+
+body.light-mode .quick-reply-input::placeholder {
+    color: #888888 !important;
+}
+
+body.light-mode .quick-reply-btn {
+    border: 1px solid #cccccc !important;
+    background: transparent !important;
+    /* Explicitly transparent default */
+    color: #666666 !important;
+}
+
+/* Fix Dot Menu / Popups in Light Mode */
+body.light-mode .dot-menu,
+body.light-mode .reaction-menu,
+body.light-mode .reaction-picker,
+body.light-mode .submenu {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    color: #333333 !important;
+}
+
+body.light-mode .menu-item {
+    color: #333333 !important;
+}
+
+body.light-mode .menu-item:hover {
+    background: #f5f5f5 !important;
+    color: #000000 !important;
+}
+
+/* Fix Submenu alignment and visibility */
+body.light-mode .move-team-item .submenu {
+    background: #ffffff !important;
+    color: #333333 !important;
+}
+
+/* Fix Quick Reply Form Container in Sidebars */
+body.light-mode .task-card:hover .quick-reply-form.hover-reveal,
+body.light-mode .task-card:focus-within .quick-reply-form.hover-reveal {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Right Sidebar Header - ensure high contrast */
+body.light-mode .side-panel-title,
+body.light-mode .sidebar-title {
+    color: #333333 !important;
+    font-weight: 800 !important;
+    text-shadow: none !important;
+    background: transparent !important;
+    /* Ensure no dark bg leaks */
+}
+
+/* Fix Select / Dropdowns */
+body.light-mode select {
+    background: #ffffff !important;
+    color: #333333 !important;
+    border: 1px solid #cccccc !important;
+}
+
+body.light-mode select option {
+    background: #ffffff !important;
+    color: #333333 !important;
+}
+
+/* Specific fix for PostForm rich-editor to override inline styles if needed via !important class */
+body.light-mode .input-field.rich-editor,
+body.light-mode .quick-reply-input {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+    color: #333333 !important;
+}
+
+/* Ensure placeholder text is visible */
+body.light-mode .input-field::placeholder,
+body.light-mode .quick-reply-input::placeholder {
+    color: #888888 !important;
+}
+
+/* Reaction Bubble */
+body.light-mode .reaction-bubble {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+    color: #666666 !important;
+}
+
+body.light-mode .reaction-bubble.user-reacted {
+    background: rgba(91, 95, 199, 0.1) !important;
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+}
+
+/* Input Fields */
+body.light-mode textarea,
+body.light-mode input[type="text"] {
+    background: #ffffff !important;
+    color: #333333 !important;
+    border-color: #e1e1e1 !important;
+}
+
+body.light-mode textarea::placeholder,
+body.light-mode input::placeholder {
+    color: #888888 !important;
+}
+
+/* Icons within buttons */
+body.light-mode button svg,
+body.light-mode .btn svg {
+    stroke: currentColor;
+}
+
+/* Sidebar submenu items */
+body.light-mode .sidebar-submenu-item {
+    color: #555555;
+}
+
+body.light-mode .sidebar-submenu-item:hover,
+body.light-mode .sidebar-submenu-item.active {
+    background: rgba(0, 0, 0, 0.05);
+    color: #000000;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -53,20 +416,120 @@ textarea:-webkit-autofill:focus {
     transition: background-color 5000s ease-in-out 0s;
 }
 
-/* --- Fixed Top Header --- */
+/* --- Fixed Top Header Buttons Hover --- */
+header .icon-btn:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+}
+
+body.light-mode header .icon-btn:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: #333333 !important;
+}
+
+/* Light Mode Variables for Mentions - Ensure they are applied to :root or body.light-mode specifically for the portal */
+body.light-mode {
+    --bg-elevated: #ffffff !important;
+    --border-color: #e1e1e1 !important;
+    --text-main: #333333 !important;
+    --text-muted: #666666 !important;
+    --primary-alpha: rgba(91, 95, 199, 0.1) !important;
+}
+
+/* Fix Mention List text color in Light Mode explicitly */
+body.light-mode .mention-item {
+    color: #333333 !important;
+}
+
+body.light-mode .mention-name {
+    color: #333333 !important;
+}
+
+body.light-mode .mention-email {
+    color: #666666 !important;
+}
+
+/* Sidebar Header Fixing Overlap */
+.side-panel {
+    width: 260px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding-top: 20px !important;
+    height: 100%;
+    overflow: hidden;
+}
+
+.side-panel-title {
+    flex-shrink: 0;
+    padding-bottom: 10px;
+    background: var(--bg-dark);
+    z-index: 10;
+}
+
+body.light-mode .side-panel-title {
+    background: #f0f2f5 !important;
+    /* Match sidebar bg */
+}
+
+/* Main Header Style - Restored */
 header {
+    height: 50px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: var(--bg-dark);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    height: 50px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 20px;
-    background: #11100F;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    z-index: 2000;
+    z-index: 1000;
+}
+
+/* Remove square frame below post form usually caused by empty container artifacts */
+.post-form-container:empty,
+.floating-post-form:empty,
+.reply-form:empty {
+    display: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 0 !important;
+}
+
+/* Fix Complete Button Hover in Light Mode - Use Dark Mode Color (Success Green) + Glow */
+body.light-mode .btn-complete:hover,
+body.light-mode .check-btn:hover,
+body.light-mode .action-btn-complete:hover,
+body.light-mode .btn-status:hover {
+    color: #1bffa4 !important;
+    /* Neon Mint / Dark Mode Glow */
+    background: rgba(27, 255, 164, 0.1) !important;
+    border-color: #1bffa4 !important;
+    box-shadow: 0 0 10px rgba(27, 255, 164, 0.4) !important;
+    /* Mint Glow */
+}
+
+/* Ensure the icon inside also changes color */
+body.light-mode .btn-complete:hover svg,
+body.light-mode .check-btn:hover svg,
+body.light-mode .action-btn-complete:hover svg,
+body.light-mode .btn-status:hover svg {
+    stroke: #1bffa4 !important;
+}
+
+/* Return (Undo) Button Hover in Light Mode */
+body.light-mode .btn-revert:hover {
+    color: #0078d4 !important;
+    background: rgba(0, 120, 212, 0.1) !important;
+    border-color: #0078d4 !important;
+}
+
+body.light-mode .btn-revert:hover svg {
+    stroke: #0078d4 !important;
 }
 
 .logo {
@@ -87,6 +550,45 @@ header {
     align-items: center;
     margin-top: 0 !important;
     /* Shifted to the top as requested */
+}
+
+.custom-select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: var(--card-bg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+body.light-mode .custom-select-dropdown {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.custom-select-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--text-main);
+    font-size: 0.9rem;
+}
+
+.custom-select-option:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.light-mode .custom-select-option {
+    color: #333333 !important;
+}
+
+body.light-mode .custom-select-option:hover {
+    background: #f5f5f5 !important;
 }
 
 .search-input {
@@ -213,13 +715,11 @@ body {
 /* ---/* Right Sidebar (Pending / Mentions) */
 .side-panel {
     width: 260px;
-    /* Fixed width */
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    /* Gap is handled above */
     padding-top: 0 !important;
-    /* Force to top as per user request */
 }
 
 .side-panel-title {
@@ -413,6 +913,18 @@ body {
 .reply-content *,
 .rich-editor * {
     background-color: transparent !important;
+}
+
+/* Text color adaptation */
+body.light-mode .task-content *,
+body.light-mode .reply-content *,
+body.light-mode .rich-editor * {
+    color: #333333 !important;
+}
+
+body:not(.light-mode) .task-content *,
+body:not(.light-mode) .reply-content *,
+body:not(.light-mode) .rich-editor * {
     color: #FFFFFF !important;
 }
 
@@ -1451,6 +1963,9 @@ body {
     position: relative;
     z-index: 5001;
     /* Lift higher than thread reactions */
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .input-field {
@@ -1498,9 +2013,31 @@ select.input-field option {
 .compact-form .input-field,
 .reply-form .input-field {
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    /* Force visible border */
+    /* Restore visible border */
     background: rgba(0, 0, 0, 0.2) !important;
-    /* Darker background for contrast */
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.compact-form .input-field:hover,
+.reply-form .input-field:hover,
+.compact-form .input-field:focus,
+.reply-form .input-field:focus {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+body.light-mode .compact-form .input-field,
+body.light-mode .reply-form .input-field {
+    background: rgba(0, 0, 0, 0.03) !important;
+    border: 1px solid #e1e1e1 !important;
+    /* Restore border */
+}
+
+body.light-mode .compact-form .input-field:hover,
+body.light-mode .reply-form .input-field:hover,
+body.light-mode .compact-form .input-field:focus,
+body.light-mode .reply-form .input-field:focus {
+    border-color: #e1e1e1 !important;
+    background: #ffffff !important;
 }
 
 .input-field:focus {
@@ -1720,6 +2257,19 @@ textarea.input-field {
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
     box-sizing: border-box;
     margin: 0 !important;
+    /* Ensure no extra margin */
+    display: none;
+    /* Start hidden, show only if active/needed or handle via React state. 
+       Actually user wants bottom frame GONE. 
+       If this is the main post form, it should be visible BUT maybe user means the empty space below it?
+       Or the container ITSELF has a border? 
+       Let's allow the input to have the border and make this container transparent?
+       Wait, the user said "input frame is missing, please add it" AND "remove the square button frame at the bottom".
+       If I make the compact-form transparent, the input field inside will still have a border.
+    */
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .static-form-container .input-field {
@@ -1767,10 +2317,19 @@ textarea.input-field {
 
 /* --- Others --- */
 /* メインスレッド・共通のメンション（紫色） */
+/* メインスレッド・共通のメンション（紫色） */
 .mention {
     color: var(--primary-light) !important;
     font-weight: bold !important;
     cursor: pointer;
+}
+
+/* Force override for light mode generic text color rule */
+body.light-mode .task-content .mention,
+body.light-mode .reply-content .mention,
+body.light-mode .rich-editor .mention {
+    color: var(--primary) !important;
+    /* Restore color in light mode */
 }
 
 /* 右サイドバー内のみ、ティール色（水色）で強調 */
@@ -1806,9 +2365,9 @@ textarea.input-field {
 /* --- Mention List (Teams Candidate UI) --- */
 .mention-list {
     position: absolute;
-    background: #1a1a1a !important;
-    /* Extremely solid and dark */
-    background-color: #1a1a1a !important;
+    background: #1a1a1a;
+    /* Default dark */
+    background-color: #1a1a1a;
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.8);
     border-radius: 4px;
@@ -1820,6 +2379,13 @@ textarea.input-field {
     min-width: 280px;
     opacity: 1 !important;
     backdrop-filter: none !important;
+}
+
+body.light-mode .mention-list {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
 .mention-item {

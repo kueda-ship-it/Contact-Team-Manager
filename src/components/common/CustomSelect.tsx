@@ -41,10 +41,10 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         <div
             ref={containerRef}
             className={`custom-select-container ${className || ''}`}
-            style={{ position: 'relative', width: '200px', userSelect: 'none', ...style }}
+            style={{ position: 'relative', width: '200px', ...style }}
         >
             <div
-                className="input-field"
+                className="input-field custom-select-trigger"
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
                     display: 'flex',
@@ -54,10 +54,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                     margin: 0,
                     height: '36px',
                     padding: '0 12px',
-                    borderRadius: style?.borderRadius || '8px',
-                    background: '#000000',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    color: '#FFFFFF'
+                    borderRadius: style?.borderRadius || '8px'
                 }}
             >
                 <span style={{ fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -73,23 +70,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
             </div>
 
             {isOpen && (
-                <div
-                    className="custom-select-dropdown"
-                    style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 5px)',
-                        left: 0,
-                        right: 0,
-                        background: '#0a0a0a',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        borderRadius: '8px',
-                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.8)',
-                        zIndex: 10000,
-                        maxHeight: '250px',
-                        overflowY: 'auto',
-                        padding: '4px'
-                    }}
-                >
+                <div className="custom-select-dropdown">
                     {options.map((option) => (
                         <div
                             key={option.value}
@@ -97,23 +78,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                                 onChange(option.value);
                                 setIsOpen(false);
                             }}
-                            className="custom-select-option"
-                            style={{
-                                padding: '8px 12px',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '0.9rem',
-                                color: String(option.value) === String(value) ? 'var(--accent)' : '#FFFFFF',
-                                background: 'transparent',
-                                transition: 'background 0.2s',
-                                fontWeight: String(option.value) === String(value) ? 700 : 500
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'transparent';
-                            }}
+                            className={`custom-select-option ${String(option.value) === String(value) ? 'selected' : ''}`}
                         >
                             {option.label}
                         </div>

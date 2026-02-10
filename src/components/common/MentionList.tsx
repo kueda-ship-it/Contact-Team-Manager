@@ -15,10 +15,8 @@ export const MentionList: React.FC<MentionListProps> = ({ candidates, activeInde
 
     const listStyle: React.CSSProperties = {
         position: 'fixed',
-        background: 'var(--bg-elevated, #2b2d31)',
+        background: 'var(--bg-elevated, #2b2d31)', // Fallback for dark mode
         border: '1px solid var(--border-color, #444)',
-        borderRadius: '8px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
         zIndex: 10000, // Ensure highest priority
         width: '280px',
         maxHeight: '200px',
@@ -50,7 +48,7 @@ export const MentionList: React.FC<MentionListProps> = ({ candidates, activeInde
     });
 
     const content = (
-        <div className="mention-list" style={listStyle} ref={listRef}>
+        <div className="mention-list mention-candidate-list" style={listStyle} ref={listRef}>
             {candidates.map((candidate, index) => (
                 <div
                     key={`${candidate.type}-${candidate.id}`}

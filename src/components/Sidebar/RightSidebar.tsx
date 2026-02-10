@@ -222,7 +222,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                             ref={(el) => { if (el) quickReplyRefs.current[t.id] = el; }}
                                             contentEditable
                                             className="quick-reply-input rich-editor"
-                                            style={{ minHeight: '32px', maxHeight: '80px', overflowY: 'auto', color: 'white', marginBottom: 0 }}
+                                            style={{ minHeight: '32px', maxHeight: '80px', overflowY: 'auto', marginBottom: 0 }}
                                             onInput={(e) => handleInput(e, t.id)}
                                             onKeyDown={(e) => {
                                                 if (isOpen && targetThreadId === t.id) {
