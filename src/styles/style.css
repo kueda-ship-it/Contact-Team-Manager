@@ -1468,7 +1468,7 @@ body:not(.light-mode) .rich-editor * {
     border-radius: 8px;
     padding: 10px 14px;
     /* Even more tightened */
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     margin-bottom: 12px;
     position: relative;
     overflow: visible !important;
@@ -1837,6 +1837,18 @@ body:not(.light-mode) .rich-editor * {
     transform: scale(0.92);
 }
 
+/* Light Mode Download Button Fix */
+body.light-mode .btn-download-orange {
+    color: #666666 !important;
+    border: 1px solid #cccccc !important;
+}
+
+body.light-mode .btn-download-orange:hover {
+    color: #FF8C00 !important;
+    border-color: #FF8C00 !important;
+    background: rgba(255, 140, 0, 0.1) !important;
+}
+
 /* --- Send Button (Blue) --- */
 .btn-send-blue {
     background: transparent !important;
@@ -1970,7 +1982,7 @@ body:not(.light-mode) .rich-editor * {
 
 .input-field {
     width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     /* Slightly firmer border */
     background-color: #000000 !important;
     /* Pure black background */
@@ -2258,18 +2270,10 @@ textarea.input-field {
     box-sizing: border-box;
     margin: 0 !important;
     /* Ensure no extra margin */
-    display: none;
-    /* Start hidden, show only if active/needed or handle via React state. 
-       Actually user wants bottom frame GONE. 
-       If this is the main post form, it should be visible BUT maybe user means the empty space below it?
-       Or the container ITSELF has a border? 
-       Let's allow the input to have the border and make this container transparent?
-       Wait, the user said "input frame is missing, please add it" AND "remove the square button frame at the bottom".
-       If I make the compact-form transparent, the input field inside will still have a border.
-    */
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+    /* Ensure visible background and border */
+    background: #1F1E1D !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5) !important;
 }
 
 .static-form-container .input-field {
@@ -2330,6 +2334,13 @@ body.light-mode .reply-content .mention,
 body.light-mode .rich-editor .mention {
     color: var(--primary) !important;
     /* Restore color in light mode */
+}
+
+/* Force override for DARK mode to keep mentions purple/accent, NOT white */
+body:not(.light-mode) .task-content .mention,
+body:not(.light-mode) .reply-content .mention,
+body:not(.light-mode) .rich-editor .mention {
+    color: var(--primary-light) !important;
 }
 
 /* 右サイドバー内のみ、ティール色（水色）で強調 */
@@ -2486,6 +2497,40 @@ html {
 .reaction-container:hover .plus-trigger {
     background: #3D3C3B;
     transform: rotate(90deg) scale(1.1);
+}
+
+/* --- Theme Toggle Button Specifics --- */
+.theme-toggle-btn {
+    transition: none !important;
+    /* Disable animation */
+}
+
+.theme-toggle-btn:hover {
+    color: #ffd600 !important;
+    border-color: #ffd600 !important;
+    background: rgba(255, 214, 0, 0.1) !important;
+    box-shadow: 0 0 10px rgba(255, 214, 0, 0.4) !important;
+    transform: none !important;
+    /* Disable rotation/scale */
+}
+
+.theme-toggle-btn:hover svg {
+    stroke: #ffd600 !important;
+    transform: none !important;
+    /* Disable rotation */
+}
+
+body.light-mode .theme-toggle-btn:hover {
+    color: #0079ff !important;
+    border-color: #0079ff !important;
+    background: rgba(0, 121, 255, 0.1) !important;
+    box-shadow: 0 0 10px rgba(0, 121, 255, 0.4) !important;
+}
+
+body.light-mode .theme-toggle-btn:hover svg {
+    stroke: #0079ff !important;
+    transform: none !important;
+    /* Disable rotation */
 }
 
 .reaction-menu {

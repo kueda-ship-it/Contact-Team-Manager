@@ -8,7 +8,7 @@ import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Login';
 import { useAuth } from './hooks/useAuth';
 import { useThreads, useTeams, useUserMemberships, useUnreadCounts } from './hooks/useSupabase';
-import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { useTheme } from './context/ThemeContext';
 import { useNotifications } from './hooks/useNotifications';
 import './styles/style.css';
 
@@ -19,12 +19,12 @@ const ThemeToggle = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="btn icon-btn"
+      className="btn icon-btn gear-btn-unified theme-toggle-btn"
       title={theme === 'dark' ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
       style={{ marginRight: '8px' }}
     >
       {theme === 'dark' ? (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="5"></circle>
           <line x1="12" y1="1" x2="12" y2="3"></line>
           <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -36,7 +36,7 @@ const ThemeToggle = () => {
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
         </svg>
       ) : (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
         </svg>
       )}

@@ -199,11 +199,27 @@ export function useOneDriveUpload() {
                 console.warn("Organization link creation failed, using webUrl", linkError);
             }
 
+            // 6. サムネイル取得 (画像ファイルの場合)
+            let thumbnailUrl = '';
+            if (file.type.startsWith('image/')) {
+                try {
+                    const thumbResponse = await client.api(`/me/drive/items/${resultItemId}/thumbnails`).select('large').get();
+                    if (thumbResponse.value && thumbResponse.value.length > 0) {
+                        thumbnailUrl = thumbResponse.value[0].large?.url || '';
+                    }
+                } catch (thumbError) {
+                    console.warn("Thumbnail fetch failed", thumbError);
+                }
+            }
+
             const newAttachment: Attachment = {
                 id: resultItemId,
                 url: webUrl, // Fixed property name from path to url
                 name: file.name,
-                type: 'cloud'
+                type: file.type,
+                size: file.size,
+                thumbnailUrl: thumbnailUrl,
+                storageProvider: 'onedrive'
             };
 
             setAttachments(prev => [...prev, newAttachment]);
