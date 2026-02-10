@@ -33,6 +33,13 @@ export function useAuth() {
             setUser(session?.user ?? null);
             if (session?.user) {
                 loadProfile(session.user.id);
+
+                // Attempt Silent SSO for OneDrive if email is available
+                if (session.user.email) {
+                    import('../lib/microsoftGraph').then(({ ssoLogin }) => {
+                        ssoLogin(session.user.email!);
+                    }).catch(err => console.error("Failed to load/execute SSO", err));
+                }
             } else {
                 setProfile(null);
                 setLoading(false);

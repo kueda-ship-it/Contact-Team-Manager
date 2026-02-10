@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { msalInstance, getGraphClient, initializeMsal, signIn } from '../lib/microsoftGraph';
+import { EventType } from "@azure/msal-browser";
 import { Attachment } from './useFileUpload';
 
 export function useOneDriveUpload() {
@@ -8,19 +9,32 @@ export function useOneDriveUpload() {
     const [statusMessage, setStatusMessage] = useState<string>('');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-    // 初期化チェック
-    useState(() => {
-        const init = async () => {
-            try {
-                await initializeMsal();
+    // 初期化 & イベントリスナー (SSO検知用)
+    useEffect(() => {
+        const checkAuth = async () => {
+            await initializeMsal();
+            const account = msalInstance.getActiveAccount();
+            setIsAuthenticated(!!account);
+        };
+
+        checkAuth();
+
+        // 外部(ssoLogin等)でログイン完了した場合に検知してステータス更新
+        const callbackId = msalInstance.addEventCallback((event: any) => {
+            if (
+                event.eventType === EventType.LOGIN_SUCCESS ||
+                event.eventType === EventType.ACQUIRE_TOKEN_SUCCESS ||
+                event.eventType === EventType.ACTIVE_ACCOUNT_CHANGED
+            ) {
                 const account = msalInstance.getActiveAccount();
                 setIsAuthenticated(!!account);
-            } catch (e) {
-                console.error("OneDrive init check failed:", e);
             }
+        });
+
+        return () => {
+            if (callbackId) msalInstance.removeEventCallback(callbackId);
         };
-        init();
-    });
+    }, []);
 
     // ログイン状態確認
     const checkLoginStatus = useCallback(async () => {
@@ -57,7 +71,7 @@ export function useOneDriveUpload() {
 
         try {
             // 1. クライアント取得確認
-            let client;
+            let client: any;
             try {
                 client = await getGraphClient();
             } catch (authError: any) {

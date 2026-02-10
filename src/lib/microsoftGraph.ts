@@ -1,4 +1,4 @@
-import { PublicClientApplication, Configuration, LogLevel, AccountInfo } from "@azure/msal-browser";
+import { PublicClientApplication, Configuration, LogLevel, AccountInfo, InteractionRequiredAuthError, InteractionType } from "@azure/msal-browser";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { AuthCodeMSALBrowserAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/authCodeMsalBrowser";
 
@@ -19,11 +19,9 @@ const msalConfig: Configuration = {
         clientId: clientId || "",
         authority: `https://login.microsoftonline.com/${tenantId}`,
         redirectUri: redirectUri,
-        navigateToLoginRequestUrl: false,
     },
     cache: {
         cacheLocation: "localStorage",
-        storeAuthStateInCookie: false,
     },
     system: {
         loggerOptions: {
@@ -76,8 +74,13 @@ export const initializeMsal = async () => {
                     console.log("Redirect Login Success:", response);
                     msalInstance.setActiveAccount(response.account);
                 }
-            } catch (error) {
-                console.error("Redirect Handle Error:", error);
+            } catch (error: any) {
+                // Supabase hash or other non-MSAL hash can trigger this. Safe to ignore.
+                if (error.errorCode === "no_token_request_cache_error" || error.message?.includes("no_token_request_cache_error")) {
+                    console.debug("Non-MSAL redirect detected (or cache lost):", error);
+                } else {
+                    console.error("Redirect Handle Error:", error);
+                }
             }
 
             // アカウントの復元
@@ -138,6 +141,49 @@ export const signIn = async (promptType: "select_account" | "consent" = "select_
         isLoggingIn = false;
     }
 };
+
+/**
+ * SSO Silent Login using Email Hint
+ */
+export const ssoLogin = async (email: string): Promise<AccountInfo | null> => {
+    if (!email) return null;
+
+    await initializeMsal();
+
+    // Check if we are already logged in with this email
+    const activeAccount = msalInstance.getActiveAccount();
+    if (activeAccount && activeAccount.username.toLowerCase() === email.toLowerCase()) {
+        console.log("[MSAL] Already logged in as", email);
+        return activeAccount;
+    }
+
+    try {
+        console.log(`[MSAL] Attempting Silent SSO for ${email}...`);
+
+        // Try to find an existing account in cache first
+        const accounts = msalInstance.getAllAccounts();
+        const existingAccount = accounts.find(a => a.username.toLowerCase() === email.toLowerCase());
+
+        if (existingAccount) {
+            msalInstance.setActiveAccount(existingAccount);
+            return existingAccount;
+        }
+
+        // If not found, try ssoSilent
+        const result = await msalInstance.ssoSilent({
+            ...loginRequest,
+            loginHint: email
+        });
+
+        console.log("[MSAL] Silent SSO Success:", result);
+        msalInstance.setActiveAccount(result.account);
+        return result.account;
+    } catch (error) {
+        console.warn("[MSAL] Silent SSO Failed:", error);
+        // Fallback or just stay logged out (user will click attachment button later)
+        return null;
+    }
+};
 /**
  * Sign out
  */
@@ -187,7 +233,7 @@ export const getGraphClient = async () => {
     const authProvider = new AuthCodeMSALBrowserAuthenticationProvider(msalInstance, {
         account: account,
         scopes: loginRequest.scopes,
-        interactionType: 0, // InteractionType.Redirect
+        interactionType: InteractionType.Redirect, // Fixed generic usage
     });
 
     return Client.initWithMiddleware({
