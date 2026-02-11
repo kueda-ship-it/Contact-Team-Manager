@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider } from './context/AuthContext';
 import { initializeMsal } from './lib/microsoftGraph';
 
 // Initialize MSAL before rendering
@@ -28,7 +29,9 @@ initializeMsal().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <ThemeProvider>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </ThemeProvider>
     </StrictMode>,
   )

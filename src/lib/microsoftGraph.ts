@@ -222,7 +222,7 @@ export const getToken = async (): Promise<string | null> => {
 };
 
 // Graphクライアントの取得
-export const getGraphClient = async () => {
+export const getGraphClient = async (scopes: string[] = loginRequest.scopes) => {
     await initializeMsal();
 
     const account = msalInstance.getActiveAccount();
@@ -232,7 +232,7 @@ export const getGraphClient = async () => {
 
     const authProvider = new AuthCodeMSALBrowserAuthenticationProvider(msalInstance, {
         account: account,
-        scopes: loginRequest.scopes,
+        scopes: scopes,
         interactionType: InteractionType.Redirect, // Fixed generic usage
     });
 
@@ -240,3 +240,5 @@ export const getGraphClient = async () => {
         authProvider,
     });
 };
+
+

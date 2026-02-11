@@ -5,6 +5,7 @@ import { useMentions } from '../../hooks/useMentions';
 import { useProfiles, useTags } from '../../hooks/useSupabase';
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { MentionList } from '../common/MentionList';
+
 import { initializeMsal } from '../../lib/microsoftGraph';
 
 interface PostFormProps {
@@ -126,6 +127,8 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         }
     };
 
+
+
     return (
         <div className="static-form-container">
             <section className="form-container compact-form" style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -173,6 +176,8 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                                 </svg>
                             )}
                         </button>
+
+
                     </div>
 
                     <input
@@ -322,7 +327,9 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                         </div>
                     )
                 }
-            </section >
-        </div >
+
+
+            </section>
+        </div>
     );
 };

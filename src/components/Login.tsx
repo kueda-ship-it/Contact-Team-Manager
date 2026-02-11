@@ -69,8 +69,7 @@ export const Login: React.FC = () => {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'azure',
                 options: {
-                    scopes: 'email openid profile offline_access',
-                    scopes: 'email openid profile offline_access',
+                    scopes: 'email openid profile offline_access Files.ReadWrite',
                     // Force the correct path if we are on GitHub Pages
                     redirectTo: window.location.hostname.includes('github.io')
                         ? 'https://kueda-ship-it.github.io/Contact-Team-Manager/'
