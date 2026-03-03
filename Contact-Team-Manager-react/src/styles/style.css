@@ -3502,13 +3502,13 @@ html {
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(60px + env(safe-area-inset-bottom, 15px) + 56px);
+        height: calc(60px + env(safe-area-inset-bottom, 15px) + 15px);
         background: #2B2D31;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 9000;
         justify-content: space-around;
         align-items: center;
-        padding-bottom: calc(env(safe-area-inset-bottom, 15px) + 56px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 15px) + 15px);
     }
 
     .nav-item {
@@ -3551,6 +3551,78 @@ html {
 
     .nav-badge.danger {
         background: var(--danger);
+    }
+
+    .desktop-only-postform {
+        display: none !important;
+    }
+
+    /* FAB (Floating Action Button) */
+    .mobile-fab {
+        position: fixed;
+        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 15px + 20px);
+        right: 20px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background-color: var(--accent);
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        z-index: 8900;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.2s, background-color 0.2s;
+    }
+
+    .mobile-fab:active {
+        transform: scale(0.95);
+        background-color: #005a9e;
+    }
+
+    /* Mobile Post Form Modal */
+    .mobile-post-modal {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        top: 0;
+        background: #2B2D31;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        padding: env(safe-area-inset-top, 20px) 0 0 0;
+    }
+
+    .mobile-post-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 15px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background: #1e1f22;
+        font-weight: bold;
+    }
+
+    .mobile-post-modal-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateY(100%);
+        }
+
+        to {
+            transform: translateY(0);
+        }
     }
 }
 
