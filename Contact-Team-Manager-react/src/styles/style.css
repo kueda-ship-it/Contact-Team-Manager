@@ -3451,7 +3451,7 @@ html {
     }
 
     .compact-form {
-        flex-direction: column !important;
+        /* Remove force column direction to allow inline layout */
     }
 
     .compact-form>div {
@@ -3461,15 +3461,21 @@ html {
 
     /* Target the first row (Title & Remind) */
     .compact-form>div>div:first-child {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 5px !important;
+        /* Remove force column to allow horizontal layout for title and date */
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 8px !important;
     }
 
-    .compact-form input[type="text"],
+    .compact-form input[type="text"] {
+        width: auto !important;
+        flex: 1;
+        box-sizing: border-box !important;
+    }
+
     .compact-form input[type="datetime-local"] {
-        width: 100% !important;
-        max-width: 100% !important;
+        width: 140px !important;
+        /* Make it smaller */
         box-sizing: border-box !important;
     }
 
@@ -3496,13 +3502,13 @@ html {
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(60px + env(safe-area-inset-bottom, 15px));
+        height: calc(60px + env(safe-area-inset-bottom, 15px) + 56px);
         background: #2B2D31;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 9000;
         justify-content: space-around;
         align-items: center;
-        padding-bottom: env(safe-area-inset-bottom, 15px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 15px) + 56px);
     }
 
     .nav-item {

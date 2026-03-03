@@ -11,9 +11,10 @@ import { initializeMsal } from '../../lib/microsoftGraph';
 interface PostFormProps {
     teamId: number | string | null;
     onSuccess?: () => void;
+    onCancel?: () => void;
 }
 
-export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
+export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel }) => {
     const { user, profile } = useAuth();
     const [title, setTitle] = useState('');
     const [remindAt, setRemindAt] = useState('');
@@ -253,66 +254,75 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                             />
                         )}
                     </div>
-                </div>
 
-                {/* 右側: ボタン（縦並び） */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'flex-start' }}>
-                    <button
-                        type="button"
-                        className="btn btn-clip-yellow"
-                        title="ファイル添付"
-                        style={{
-                            padding: 0,
-                            width: '38px',
-                            height: '38px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            opacity: uploading ? 0.7 : 1,
-                            cursor: uploading ? 'default' : 'pointer'
-                        }}
-                        disabled={loading || uploading}
-                        onClick={handleAttachClick}
-                    >
-                        {uploading ? (
-                            <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                        ) : (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                            </svg>
-                        )}
-                    </button>
-
-                    <button
-                        type="button"
-                        className="btn-send-blue"
-                        title="投稿"
-                        style={{
-                            padding: 0,
-                            width: '38px',
-                            height: '38px',
-                            flexShrink: 0,
-                            cursor: 'pointer',
-                        }}
-                        onClick={handleSubmit}
-                        disabled={loading || uploading}
-                    >
-                        {loading ? '...' : (
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                            </svg>
-                        )}
-                    </button>
-
-                    {uploading && (
-                        <div style={{ position: 'relative' }}>
-                            <span style={{ position: 'absolute', right: '45px', top: '-30px', whiteSpace: 'nowrap', fontSize: '0.7rem', color: 'var(--text-muted)', animation: 'fadeIn 0.2s' }}>
-                                {statusMessage}
-                            </span>
+                    {/* 下部: ボタン類（横並びでコンパクトに） */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                        <div>
+                            {onCancel && (
+                                <button type="button" className="btn btn-secondary" onClick={onCancel} style={{ padding: '6px 16px', borderRadius: '4px', fontSize: '0.8rem', border: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer' }}>
+                                    キャンセル
+                                </button>
+                            )}
                         </div>
-                    )}
+
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            {uploading && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', animation: 'fadeIn 0.2s', marginRight: '4px' }}>
+                                    {statusMessage}
+                                </span>
+                            )}
+                            <button
+                                type="button"
+                                className="btn btn-clip-yellow"
+                                title="ファイル添付"
+                                style={{
+                                    padding: 0,
+                                    width: '32px',
+                                    height: '32px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                    opacity: uploading ? 0.7 : 1,
+                                    cursor: uploading ? 'default' : 'pointer',
+                                    borderRadius: '50%'
+                                }}
+                                disabled={loading || uploading}
+                                onClick={handleAttachClick}
+                            >
+                                {uploading ? (
+                                    <div className="spinner-small" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                ) : (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                    </svg>
+                                )}
+                            </button>
+
+                            <button
+                                type="button"
+                                className="btn-send-blue"
+                                title="投稿"
+                                style={{
+                                    padding: 0,
+                                    width: '32px',
+                                    height: '32px',
+                                    flexShrink: 0,
+                                    cursor: 'pointer',
+                                    borderRadius: '50%'
+                                }}
+                                onClick={handleSubmit}
+                                disabled={loading || uploading}
+                            >
+                                {loading ? '...' : (
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <input

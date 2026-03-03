@@ -62,6 +62,7 @@ function App() {
   const [sortAscending, setSortAscending] = useState(true);
   const [scrollToThreadId, setScrollToThreadId] = useState<string | null>(null);
   const [activeMobileTab, setActiveMobileTab] = useState<'teams' | 'feed' | 'pending' | 'settings'>('feed');
+  const [isMobilePostFormOpen, setIsMobilePostFormOpen] = useState(false);
 
   const { teams } = useTeams();
   // Ensure we fetch ALL pending items if that filter is active, regardless of default limit
@@ -346,7 +347,8 @@ function App() {
                     />
                   </PullToRefresh>
                 </div>
-                <div style={{ flexShrink: 0 }}>
+                {/* Desktop: Show PostForm inline at bottom */}
+                <div className="desktop-only-postform" style={{ flexShrink: 0 }}>
                   <PostForm
                     teamId={currentTeamId}
                     onSuccess={() => refetch(true)}
@@ -369,6 +371,48 @@ function App() {
           />
         </div>
       </div>
+
+      {/* Mobile Post FAB (Only show when active tab is feed or teams, and form is not open) */}
+      {!isMobilePostFormOpen && (activeMobileTab === 'feed' || activeMobileTab === 'teams') && viewMode !== 'dashboard' && (
+        <button
+          className="mobile-fab"
+          onClick={() => setIsMobilePostFormOpen(true)}
+          title="新規投稿"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      )}
+
+      {/* Mobile Post Form Modal */}
+      {isMobilePostFormOpen && (
+        <div className="mobile-post-modal">
+          <div className="mobile-post-modal-header">
+            <span>新規投稿</span>
+            <button
+              onClick={() => setIsMobilePostFormOpen(false)}
+              style={{ background: 'none', border: 'none', color: 'white', padding: '5px' }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div className="mobile-post-modal-content">
+            <PostForm
+              teamId={currentTeamId}
+              onSuccess={() => {
+                refetch(true);
+                setIsMobilePostFormOpen(false);
+              }}
+              onCancel={() => setIsMobilePostFormOpen(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {isSettingsOpen && (
         <SettingsModal
