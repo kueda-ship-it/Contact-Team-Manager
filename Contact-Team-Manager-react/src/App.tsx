@@ -12,6 +12,7 @@ import { supabase } from './lib/supabase';
 import { useTheme } from './context/ThemeContext';
 import { useNotifications } from './hooks/useNotifications';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
+import { PullToRefresh } from './components/common/PullToRefresh';
 import './styles/style.css';
 
 import { initializeMsal } from './lib/microsoftGraph';
@@ -82,9 +83,13 @@ function App() {
   };
 
   // Redirect non-admins to their first team if no team is selected
+  // Mobile UI improvement (2026-03-03): If no team is selected initially, force the 'teams' tab to open
   useEffect(() => {
-    if (!authLoading && !membershipsLoading && user && profile?.role !== 'Admin' && currentTeamId === null) {
-      if (memberships.length > 0) {
+    if (!authLoading && !membershipsLoading && user && currentTeamId === null) {
+      // Switch tab to 'teams' to enforce team selection first on mobile
+      setActiveMobileTab('teams');
+
+      if (profile?.role !== 'Admin' && memberships.length > 0) {
         console.log('Redirecting non-admin to first team:', memberships[0].team_id);
         setCurrentTeamId(memberships[0].team_id);
       }
@@ -327,17 +332,19 @@ function App() {
                 }}
               >
                 <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <ThreadList
-                    currentTeamId={currentTeamId}
-                    threadsData={threadsDataFiltered}
-                    statusFilter={statusFilter}
-                    onStatusChange={setStatusFilter}
-                    sortAscending={sortAscending}
-                    onToggleSort={() => setSortAscending(prev => !prev)}
-                    onLoadMore={() => setThreadsLimit(prev => prev + 50)}
-                    scrollToThreadId={scrollToThreadId}
-                    onScrollComplete={() => setScrollToThreadId(null)}
-                  />
+                  <PullToRefresh onRefresh={async () => { refetch(false); }}>
+                    <ThreadList
+                      currentTeamId={currentTeamId}
+                      threadsData={threadsDataFiltered}
+                      statusFilter={statusFilter}
+                      onStatusChange={setStatusFilter}
+                      sortAscending={sortAscending}
+                      onToggleSort={() => setSortAscending(prev => !prev)}
+                      onLoadMore={() => setThreadsLimit(prev => prev + 50)}
+                      scrollToThreadId={scrollToThreadId}
+                      onScrollComplete={() => setScrollToThreadId(null)}
+                    />
+                  </PullToRefresh>
                 </div>
                 <div style={{ flexShrink: 0 }}>
                   <PostForm
