@@ -61,7 +61,7 @@ function App() {
   const [threadsLimit, setThreadsLimit] = useState(50);
   const [sortAscending, setSortAscending] = useState(true);
   const [scrollToThreadId, setScrollToThreadId] = useState<string | null>(null);
-  const [activeMobileTab, setActiveMobileTab] = useState<'teams' | 'feed' | 'pending' | 'settings'>('feed');
+  const [activeMobileTab, setActiveMobileTab] = useState<'teams' | 'feed' | 'pending'>('feed');
   const [isMobilePostFormOpen, setIsMobilePostFormOpen] = useState(false);
 
   const { teams } = useTeams();
@@ -428,10 +428,7 @@ function App() {
         activeTab={activeMobileTab}
         onTabChange={(tab) => {
           setActiveMobileTab(tab);
-          if (tab === 'settings') {
-            setSettingsInitialTab('profile');
-            setIsSettingsOpen(true);
-          } else if (tab === 'feed' || tab === 'pending') {
+          if (tab === 'feed' || tab === 'pending') {
             setViewMode('feed');
           }
         }}

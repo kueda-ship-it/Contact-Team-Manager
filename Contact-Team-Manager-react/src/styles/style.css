@@ -3495,6 +3495,12 @@ html {
         /* Ensure long URLs or text don't overflow */
     }
 
+    .team-name-label {
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
     /* Bottom Nav Styles */
     .mobile-bottom-nav {
         display: flex !important;
@@ -3502,13 +3508,13 @@ html {
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(60px + env(safe-area-inset-bottom, 15px) + 15px);
+        height: calc(60px + env(safe-area-inset-bottom, 15px));
         background: #2B2D31;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 9000;
         justify-content: space-around;
         align-items: center;
-        padding-bottom: calc(env(safe-area-inset-bottom, 15px) + 15px);
+        padding-bottom: env(safe-area-inset-bottom, 15px);
     }
 
     .nav-item {
@@ -3560,7 +3566,7 @@ html {
     /* FAB (Floating Action Button) */
     .mobile-fab {
         position: fixed;
-        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 15px + 20px);
+        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 20px);
         right: 20px;
         width: 56px;
         height: 56px;
