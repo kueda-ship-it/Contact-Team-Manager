@@ -3508,13 +3508,13 @@ html {
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(60px + env(safe-area-inset-bottom, 15px));
+        height: calc(60px + env(safe-area-inset-bottom, 0px));
         background: #2B2D31;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 9000;
         justify-content: space-around;
         align-items: center;
-        padding-bottom: env(safe-area-inset-bottom, 15px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     .nav-item {
