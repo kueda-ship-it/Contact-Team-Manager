@@ -3529,13 +3529,13 @@ html {
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(60px + env(safe-area-inset-bottom, 12px) + 24px);
+        height: calc(60px + env(safe-area-inset-bottom, 12px) + 10px);
         background: #2B2D31;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 9000;
         justify-content: space-around;
         align-items: center;
-        padding-bottom: calc(env(safe-area-inset-bottom, 12px) + 24px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 12px) + 10px);
     }
 
     .nav-item {
@@ -3587,7 +3587,7 @@ html {
     /* FAB (Floating Action Button) */
     .mobile-fab {
         position: fixed;
-        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 44px);
+        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 30px);
         right: 20px;
         width: 56px;
         height: 56px;
@@ -3686,4 +3686,64 @@ html {
     .main-feed-area {
         display: block !important;
     }
+}
+
+/* --- Better Filter Chips --- */
+.filter-chips-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 10px 15px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+}
+
+.filter-chips-container::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-chip {
+    white-space: nowrap;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+}
+
+.filter-chip:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+}
+
+.filter-chip.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(0, 183, 195, 0.3);
+}
+
+.sort-minimal-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    padding: 6px 12px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sort-minimal-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
 }
