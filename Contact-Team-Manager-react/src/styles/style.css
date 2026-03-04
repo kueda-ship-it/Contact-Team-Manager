@@ -3609,18 +3609,18 @@ html {
         background-color: #005a9e;
     }
 
-    /* Mobile Post Form Modal */
+    /* Mobile Post Form Modal - Premium Redesign */
     .mobile-post-modal {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
         top: 0;
-        background: #2B2D31;
+        background: #1a1b1e;
         z-index: 9999;
         display: flex;
         flex-direction: column;
-        animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         padding: env(safe-area-inset-top, 20px) 0 0 0;
     }
 
@@ -3628,18 +3628,217 @@ html {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 10px 15px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        background: #1e1f22;
-        font-weight: bold;
+        padding: 16px 20px;
+        background: linear-gradient(135deg, #1e1f22 0%, #2B2D31 100%);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        gap: 12px;
+    }
+
+    .mobile-post-modal-header .modal-title-area {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .mobile-post-modal-header .modal-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .mobile-post-modal-header .modal-subtitle {
+        font-size: 0.75rem;
+        color: var(--accent);
+        font-weight: 500;
+    }
+
+    .mobile-post-close-btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: none;
+        color: var(--text-muted);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .mobile-post-close-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: var(--text-main);
     }
 
     .mobile-post-modal-content {
         flex: 1;
         overflow-y: auto;
-        padding: 10px;
+        padding: 0;
         display: flex;
         flex-direction: column;
+    }
+
+    /* Override PostForm styles inside mobile modal */
+    .mobile-post-modal .static-form-container {
+        padding: 0;
+        margin: 0;
+    }
+
+    .mobile-post-modal .form-container.compact-form {
+        flex-direction: column !important;
+        gap: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        height: 100% !important;
+    }
+
+    /* Stack all form fields vertically */
+    .mobile-post-modal .form-container.compact-form>div:first-child {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0 !important;
+        height: 100% !important;
+    }
+
+    /* Row 1: Subject + remind - make vertical */
+    .mobile-post-modal .form-container.compact-form>div:first-child>div:first-child {
+        flex-direction: column !important;
+        gap: 0 !important;
+        padding: 16px 20px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    }
+
+    .mobile-post-modal .input-field {
+        border-radius: 12px !important;
+        padding: 14px 16px !important;
+        font-size: 1rem !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        transition: border-color 0.2s, box-shadow 0.2s !important;
+        width: 100% !important;
+    }
+
+    .mobile-post-modal .input-field:focus {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 3px rgba(0, 183, 195, 0.15) !important;
+        outline: none !important;
+    }
+
+    /* Remind date input */
+    .mobile-post-modal input[type="datetime-local"] {
+        width: 100% !important;
+        height: 48px !important;
+        margin-top: 10px !important;
+        border-radius: 12px !important;
+        padding: 12px 16px !important;
+        font-size: 0.9rem !important;
+    }
+
+    /* Row 2: Content area - expand to fill */
+    .mobile-post-modal .form-container.compact-form>div:first-child>div:nth-child(2) {
+        flex-direction: column !important;
+        flex: 1 !important;
+        padding: 16px 20px !important;
+        gap: 0 !important;
+    }
+
+    .mobile-post-modal .rich-editor {
+        min-height: 160px !important;
+        max-height: none !important;
+        flex: 1 !important;
+        border-radius: 16px !important;
+        padding: 16px !important;
+        font-size: 1rem !important;
+        line-height: 1.6 !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .mobile-post-modal .rich-editor:focus {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 3px rgba(0, 183, 195, 0.15) !important;
+        outline: none !important;
+    }
+
+    /* Attachment preview area */
+    .mobile-post-modal .attachment-preview-area {
+        padding: 12px 0 !important;
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        scrollbar-width: none !important;
+    }
+
+    .mobile-post-modal .attachment-item {
+        width: 100px !important;
+        height: 100px !important;
+        border-radius: 12px !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Mobile post toolbar (attach + send) */
+    .mobile-post-toolbar {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        gap: 12px;
+        background: #1e1f22;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .mobile-post-toolbar .btn-clip-yellow {
+        width: 44px !important;
+        height: 44px !important;
+        border-radius: 12px !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .mobile-post-toolbar .btn-send-mobile {
+        flex: 1;
+        height: 48px;
+        border-radius: 14px;
+        background: var(--accent);
+        color: white;
+        font-size: 1rem;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(0, 183, 195, 0.25);
+    }
+
+    .mobile-post-toolbar .btn-send-mobile:hover {
+        background: #009aa3;
+        box-shadow: 0 6px 16px rgba(0, 183, 195, 0.35);
+    }
+
+    .mobile-post-toolbar .btn-send-mobile:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Hide desktop-only elements inside mobile modal */
+    .mobile-post-modal .btn-send-blue {
+        display: none !important;
+    }
+
+    .mobile-post-modal .btn.btn-secondary {
+        display: none !important;
+    }
+
+    /* Hide clip button inside form (we move it to toolbar) */
+    .mobile-post-modal .btn-clip-yellow {
+        display: none !important;
     }
 
     @keyframes slideUp {
