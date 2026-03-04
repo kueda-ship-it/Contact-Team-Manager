@@ -9,6 +9,7 @@ import { highlightMentions, hasMention } from '../../utils/mentions';
 import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
+import { CustomSelect } from '../common/CustomSelect';
 
 interface ThreadListProps {
     currentTeamId: number | string | null;
@@ -448,40 +449,84 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             style={{ overflowY: 'auto', height: '100%' }}
             onScroll={handleScroll}
         >
-            <div className="filter-chips-container">
-                {[
-                    { value: 'all', label: 'すべて表示' },
-                    { value: 'pending', label: '未完了' },
-                    { value: 'completed', label: '完了済み' },
-                    { value: 'mentions', label: '自分宛て' },
-                    { value: 'myposts', label: '自分の投稿' }
-                ].map(opt => (
-                    <div
-                        key={opt.value}
-                        className={`filter-chip ${statusFilter === opt.value ? 'active' : ''}`}
-                        onClick={() => onStatusChange(opt.value as any)}
-                    >
-                        {opt.label}
-                    </div>
-                ))}
-
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '10px' }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{threads.length}件</span>
-                    <button className="sort-minimal-btn" onClick={onToggleSort} style={{ padding: '4px 8px' }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
-                            <polyline points="16 7 22 7 22 13"></polyline>
-                        </svg>
-                        {sortAscending ? '昇' : '降'}
+            {/* Desktop Header (Original UI) */}
+            <div className="feed-header-sticky desktop-only">
+                <div className="feed-header-left">
+                    <CustomSelect
+                        options={[
+                            { value: 'all', label: 'すべて表示' },
+                            { value: 'pending', label: '未完了' },
+                            { value: 'completed', label: '完了済み' },
+                            { value: 'mentions', label: '自分宛て' },
+                            { value: 'myposts', label: '自分の投稿' }
+                        ]}
+                        value={statusFilter}
+                        onChange={(val: string | number) => onStatusChange(val as any)}
+                        style={{
+                            width: '140px',
+                            background: 'transparent',
+                            border: 'none',
+                        }}
+                    />
+                </div>
+                <div className="feed-header-center">
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        {currentTeamName}
+                        <span style={{ color: 'var(--primary-light)', fontSize: '0.9rem', fontWeight: 'normal' }}>{threads.length} 件</span>
+                    </h2>
+                </div>
+                <div className="feed-header-right">
+                    <button className="btn-sort-toggle" onClick={onToggleSort} style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: 'white',
+                        padding: '4px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem'
+                    }}>
+                        {sortAscending ? 'チャット形式 (最新が下)' : 'ニュース形式 (最新が上)'}
                     </button>
                 </div>
             </div>
 
-            <div className="feed-header-sticky" style={{ height: 'auto', padding: '4px 15px', minHeight: 'unset' }}>
-                <div className="feed-header-left">
-                    <h2 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0 }}>
-                        {currentTeamName}
-                    </h2>
+            {/* Mobile Header (New Compact UI) */}
+            <div className="mobile-only">
+                <div className="filter-chips-container">
+                    {[
+                        { value: 'all', label: 'すべて表示' },
+                        { value: 'pending', label: '未完了' },
+                        { value: 'completed', label: '完了済み' },
+                        { value: 'mentions', label: '自分宛て' },
+                        { value: 'myposts', label: '自分の投稿' }
+                    ].map(opt => (
+                        <div
+                            key={opt.value}
+                            className={`filter-chip ${statusFilter === opt.value ? 'active' : ''}`}
+                            onClick={() => onStatusChange(opt.value as any)}
+                        >
+                            {opt.label}
+                        </div>
+                    ))}
+
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '10px' }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{threads.length}件</span>
+                        <button className="sort-minimal-btn" onClick={onToggleSort} style={{ padding: '4px 8px' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                                <polyline points="16 7 22 7 22 13"></polyline>
+                            </svg>
+                            {sortAscending ? '昇' : '降'}
+                        </button>
+                    </div>
+                </div>
+
+                <div className="feed-header-sticky" style={{ height: 'auto', padding: '4px 15px', minHeight: 'unset' }}>
+                    <div className="feed-header-left">
+                        <h2 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0 }}>
+                            {currentTeamName}
+                        </h2>
+                    </div>
                 </div>
             </div>
 

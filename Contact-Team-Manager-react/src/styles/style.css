@@ -3668,6 +3668,10 @@ html {
     .feed-list {
         padding-bottom: 90px !important;
     }
+
+    .desktop-only {
+        display: none !important;
+    }
 }
 
 /* Desktop Defaults - MUST BE OUTSIDE @media query */
@@ -3694,6 +3698,10 @@ html {
 
     .main-feed-area {
         display: block !important;
+    }
+
+    .mobile-only {
+        display: none !important;
     }
 }
 
