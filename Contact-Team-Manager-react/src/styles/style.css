@@ -3529,13 +3529,13 @@ html {
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(60px + env(safe-area-inset-bottom, 12px) + 4px);
+        height: calc(60px + env(safe-area-inset-bottom, 12px) - 6px);
         background: #2B2D31;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 9000;
         justify-content: space-around;
         align-items: center;
-        padding-bottom: calc(env(safe-area-inset-bottom, 12px) + 4px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 12px) - 6px);
     }
 
     .nav-item {
@@ -3587,7 +3587,7 @@ html {
     /* FAB (Floating Action Button) */
     .mobile-fab {
         position: fixed;
-        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 24px);
+        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 14px);
         right: 20px;
         width: 56px;
         height: 56px;
@@ -3708,8 +3708,10 @@ html {
 /* --- Better Filter Chips --- */
 .mobile-header-fixed {
     position: sticky;
-    top: 0;
-    z-index: 1000;
+    top: -10px;
+    /* Offset the gap between search bar and content */
+    z-index: 9500;
+    /* Higher than thread items */
     background: var(--bg-dark);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
