@@ -140,19 +140,19 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
         <div className="static-form-container">
             <section className="form-container compact-form" style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
                 {/* 左側: 入力エリア */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="post-form-main-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {/* 1行目: 件名とリマインド */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div className="post-form-row-1" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <input
                             type="text"
-                            className="input-field"
-                            placeholder="件名..."
+                            className="input-field post-subject-input"
+                            placeholder="件名を追加してください"
                             style={{ margin: 0, flex: 1 }}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             disabled={loading}
                         />
-                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div className="post-remind-container" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <input
                                 type="datetime-local"
                                 value={remindAt}
@@ -197,7 +197,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                         </div>
 
                         {/* Clip Button moved here */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div className="post-clip-container" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {uploading && (
                                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', animation: 'fadeIn 0.2s' }}>
                                     {statusMessage}
@@ -234,12 +234,13 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                     </div>
 
                     {/* 2行目: 本文入力エリアと送信ボタン */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flex: 1 }}>
-                        <div style={{ position: 'relative', flex: 1 }}>
+                    <div className="post-form-row-2" style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flex: 1 }}>
+                        <div className="post-content-container" style={{ position: 'relative', flex: 1 }}>
                             <div
                                 ref={contentRef}
                                 contentEditable
                                 className="input-field rich-editor"
+                                data-placeholder="新しい会話を開始します。@ を入力して、誰かにメンションしてください。"
                                 style={{
                                     marginTop: 0,
                                     minHeight: '80px',

@@ -3587,7 +3587,7 @@ html {
     /* FAB (Floating Action Button) */
     .mobile-fab {
         position: fixed;
-        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 14px);
+        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 34px);
         right: 20px;
         width: 56px;
         height: 56px;
@@ -3707,73 +3707,101 @@ html {
         height: 100% !important;
     }
 
-    /* Row 1: Subject + remind + clip - stack vertically, full width */
-    .mobile-post-modal .form-container.compact-form>div:first-child>div:first-child {
+    /* Row 1: Subject + remind - stack vertically, full width */
+    .mobile-post-modal .post-form-row-1 {
         flex-direction: column !important;
-        gap: 12px !important;
-        padding: 16px 16px 12px !important;
+        gap: 0 !important;
+        padding: 0 !important;
     }
 
-    /* All input fields inside mobile modal */
+    /* All input fields inside mobile modal - seamless flat design */
     .mobile-post-modal .input-field {
-        border-radius: 10px !important;
-        padding: 12px 14px !important;
-        font-size: 1rem !important;
-        height: 44px !important;
-        background: rgba(255, 255, 255, 0.06) !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 0 !important;
+        padding: 16px !important;
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        height: auto !important;
+        min-height: 56px !important;
+        background: transparent !important;
+        border: none !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
         width: 100% !important;
         box-sizing: border-box !important;
+        color: var(--text-main) !important;
+    }
+
+    .mobile-post-modal .input-field::placeholder {
+        color: rgba(255, 255, 255, 0.4) !important;
+        font-weight: 500 !important;
     }
 
     .mobile-post-modal .input-field:focus {
-        border-color: var(--accent) !important;
-        box-shadow: 0 0 0 2px rgba(0, 183, 195, 0.2) !important;
+        border-bottom: 1px solid var(--accent) !important;
+        box-shadow: none !important;
         outline: none !important;
     }
 
-    /* Remind date input */
-    .mobile-post-modal input[type="datetime-local"] {
-        height: 44px !important;
+    /* Remind date input container styling */
+    .mobile-post-modal .post-remind-container {
+        padding: 0 16px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .mobile-post-modal .post-remind-container>input[type="datetime-local"] {
+        height: 48px !important;
         margin-top: 0 !important;
-        border-radius: 10px !important;
-        padding: 10px 14px !important;
-        font-size: 0.9rem !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        font-size: 0.95rem !important;
+        font-weight: normal !important;
+        border: none !important;
+        background: transparent !important;
     }
 
     /* Row 2: Content area - expand to fill all remaining space */
-    .mobile-post-modal .form-container.compact-form>div:first-child>div:nth-child(2) {
+    .mobile-post-modal .post-form-row-2 {
         flex-direction: column !important;
         flex: 1 !important;
-        padding: 0 16px 16px !important;
+        padding: 0 !important;
         gap: 0 !important;
         min-height: 0 !important;
     }
 
-    /* Rich text editor - fill available space */
+    .mobile-post-modal .post-content-container {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding-bottom: 70px !important;
+        /* space for bottom toolbar */
+    }
+
+    /* Rich text editor - seamless flat design */
     .mobile-post-modal .rich-editor {
         min-height: 200px !important;
         max-height: none !important;
         flex: 1 !important;
-        border-radius: 12px !important;
-        padding: 14px !important;
-        font-size: 1rem !important;
+        border-radius: 0 !important;
+        padding: 16px !important;
+        font-size: 1.05rem !important;
         line-height: 1.6 !important;
-        background: rgba(255, 255, 255, 0.04) !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        background: transparent !important;
+        border: none !important;
         width: 100% !important;
         box-sizing: border-box !important;
     }
 
-    .mobile-post-modal .rich-editor:focus {
-        border-color: var(--accent) !important;
-        box-shadow: 0 0 0 2px rgba(0, 183, 195, 0.2) !important;
-        outline: none !important;
+    /* ContentEditable Placeholder */
+    .mobile-post-modal .rich-editor[data-placeholder]:empty:before {
+        content: attr(data-placeholder);
+        color: rgba(255, 255, 255, 0.4);
+        pointer-events: none;
+        display: block;
+        font-size: 1.05rem;
     }
 
     /* Attachment preview */
     .mobile-post-modal .attachment-preview-area {
-        padding: 10px 0 !important;
+        padding: 10px 16px !important;
         overflow-x: auto !important;
         flex-wrap: nowrap !important;
         scrollbar-width: none !important;
@@ -3786,26 +3814,48 @@ html {
         flex-shrink: 0 !important;
     }
 
-    /* Send button - full width, large */
-    .mobile-post-modal .btn-send-blue {
-        width: 100% !important;
-        height: 48px !important;
-        border-radius: 12px !important;
-        font-size: 1rem !important;
-        font-weight: 700 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 8px !important;
-        box-shadow: 0 4px 12px rgba(0, 183, 195, 0.3) !important;
-        margin-top: 12px !important;
+    /* Bottom Toolbar Items (Clip & Send) placed absolutely */
+    .mobile-post-modal .post-clip-container {
+        position: absolute !important;
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+        left: 16px !important;
+        z-index: 10;
+        padding: 0 !important;
     }
 
-    /* Clip button - larger touch target */
     .mobile-post-modal .btn-clip-yellow {
         width: 44px !important;
         height: 44px !important;
-        border-radius: 10px !important;
+        border-radius: 50% !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .mobile-post-modal .post-form-row-2>div:last-child {
+        position: absolute !important;
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+        right: 16px !important;
+        z-index: 10;
+        padding-bottom: 0 !important;
+        display: flex !important;
+    }
+
+    .mobile-post-modal .btn-send-blue {
+        width: 44px !important;
+        height: 44px !important;
+        border-radius: 50% !important;
+        background: var(--accent) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 4px 12px rgba(0, 183, 195, 0.3) !important;
+        margin: 0 !important;
+        font-size: 0 !important;
+    }
+
+    .mobile-post-modal .btn-send-blue svg {
+        width: 20px !important;
+        height: 20px !important;
     }
 
     /* Hide cancel button (close button is in header) */
