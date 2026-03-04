@@ -32,20 +32,44 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
     const [sortedTeams, setSortedTeams] = useState<typeof rawTeams>([]);
     const [draggedId, setDraggedId] = useState<string | null>(null);
     const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
+    const [manuallyCollapsedTeams, setManuallyCollapsedTeams] = useState<Set<string>>(new Set());
+
+    // Build childrenMap early for scope access in toggleTeam
+    const childrenMap: { [parentId: string]: any[] } = {};
+    rawTeams.forEach(t => {
+        if (t.parent_id) {
+            const pId = String(t.parent_id);
+            if (!childrenMap[pId]) childrenMap[pId] = [];
+            childrenMap[pId].push(t);
+        }
+    });
 
     // Toggle team expansion
     const toggleTeam = (teamId: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        setExpandedTeams(prev => {
-            const next = new Set(prev);
-            if (next.has(teamId)) {
-                next.delete(teamId);
-            } else {
-                next.add(teamId);
-            }
-            return next;
-        });
+        const tIdStr = String(teamId);
+
+        const isCurrentlyExpanded = expandedTeams.has(tIdStr) ||
+            (currentTeamId !== null && String(currentTeamId) === tIdStr) ||
+            childrenMap[tIdStr]?.some(child => currentTeamId !== null && String(currentTeamId) === String(child.id));
+
+        if (isCurrentlyExpanded) {
+            setExpandedTeams(prev => {
+                const next = new Set(prev);
+                next.delete(tIdStr);
+                return next;
+            });
+            setManuallyCollapsedTeams(prev => new Set(prev).add(tIdStr));
+        } else {
+            setExpandedTeams(prev => new Set(prev).add(tIdStr));
+            setManuallyCollapsedTeams(prev => {
+                const next = new Set(prev);
+                next.delete(tIdStr);
+                return next;
+            });
+        }
     };
+
 
     // Initial Sort based on LocalStorage
     useEffect(() => {
@@ -215,24 +239,21 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                     const visibleTeams = sortedTeams.filter(t => isAdmin || visibleTeamIds.has(String(t.id)));
 
                     const roots = visibleTeams.filter(t => !t.parent_id);
-                    const childrenMap: { [parentId: string]: any[] } = {};
-                    visibleTeams.forEach(t => {
-                        if (t.parent_id) {
-                            if (!childrenMap[String(t.parent_id)]) childrenMap[String(t.parent_id)] = [];
-                            childrenMap[String(t.parent_id)].push(t);
-                        }
-                    });
+                    // (Note: childrenMap is now built at the top for scope sharing)
 
                     const renderTeamItem = (team: any, isChannel = false) => {
-                        const hasChildren = childrenMap[String(team.id)]?.length > 0;
+                        const tIdStr = String(team.id);
+                        const hasChildren = childrenMap[tIdStr]?.length > 0;
                         // Check if this team or any of its children is currently selected
-                        const isDirectlyActive = currentTeamId !== null && String(currentTeamId) === String(team.id);
-                        const isChildActive = !isChannel && childrenMap[String(team.id)]?.some(
+                        const isDirectlyActive = currentTeamId !== null && String(currentTeamId) === tIdStr;
+                        const isChildActive = !isChannel && childrenMap[tIdStr]?.some(
                             (child: any) => currentTeamId !== null && String(currentTeamId) === String(child.id)
                         );
                         const isActiveOrChildActive = isDirectlyActive || isChildActive;
-                        // Expand if explicitly in expandedTeams OR if this team or its child is currently selected
-                        const isExpanded = expandedTeams.has(String(team.id)) || (!isChannel && isActiveOrChildActive);
+
+                        // Expand if explicitly in expandedTeams OR (active and NOT manually collapsed)
+                        const isExpanded = expandedTeams.has(tIdStr) || (isActiveOrChildActive && !manuallyCollapsedTeams.has(tIdStr));
+
 
                         return (
                             <div

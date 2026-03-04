@@ -881,6 +881,13 @@ body {
 
 .teams-sidebar:hover .team-settings-icon {
     display: flex;
+    opacity: 0.4;
+    /* Visible but subtle when expanded */
+}
+
+.teams-sidebar:hover .team-item-header:hover .team-settings-icon {
+    opacity: 1;
+    /* Fully visible on item hover */
 }
 
 
@@ -3721,7 +3728,20 @@ html {
         flex: 1 !important;
         min-width: 0 !important;
         border-bottom: none !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-right: none !important;
+        position: relative !important;
+    }
+
+    /* Premium Floating Divider instead of cheap border */
+    .mobile-post-modal .post-subject-input::after {
+        content: "" !important;
+        position: absolute !important;
+        right: 0 !important;
+        top: 20% !important;
+        bottom: 20% !important;
+        width: 1px !important;
+        background: rgba(255, 255, 255, 0.15) !important;
+        pointer-events: none !important;
     }
 
 
