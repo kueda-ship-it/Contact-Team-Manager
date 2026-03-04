@@ -170,104 +170,11 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                 disabled={loading}
                             />
                         </div>
-                    </div>
 
-                    {/* 2行目: 本文入力エリア */}
-                    <div style={{ position: 'relative', flex: 1 }}>
-                        <div
-                            ref={contentRef}
-                            contentEditable
-                            className="input-field rich-editor"
-                            style={{
-                                marginTop: 0,
-                                minHeight: '80px',
-                                width: '100%',
-                                border: '1px solid rgba(255, 255, 255, 0.5)',
-                                background: 'rgba(0, 0, 0, 0.2)',
-                                color: 'white',
-                                borderRadius: '4px',
-                                padding: '8px 12px'
-                            }}
-                            onInput={(e) => {
-                                handleInput(e, 'post-form');
-                            }}
-                            onKeyDown={(e) => {
-                                handleKeyDown(e, 'post-form', e.currentTarget);
-                                if (isOpen) {
-                                    if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
-                                        return;
-                                    }
-                                }
-                            }}
-                            onPaste={(e: React.ClipboardEvent) => {
-                                e.preventDefault();
-                                const text = e.clipboardData.getData('text/plain');
-                                document.execCommand('insertText', false, text);
-                            }}
-                        />
-                        {attachments.length > 0 && (
-                            <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                                {attachments.map((att, index) => (
-                                    <div key={index} className="attachment-item" style={{ position: 'relative', width: '120px', height: '120px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        {att.type.startsWith('image/') ? (
-                                            <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        ) : (
-                                            <span style={{ fontSize: '20px' }}>📄</span>
-                                        )}
-                                        <div
-                                            className="attachment-remove"
-                                            onClick={() => removeFile(index)}
-                                            style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                right: 0,
-                                                background: 'rgba(0,0,0,0.5)',
-                                                color: 'white',
-                                                width: '18px',
-                                                height: '18px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                cursor: 'pointer',
-                                                fontSize: '12px'
-                                            }}
-                                        >
-                                            ×
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        {isOpen && (
-                            <MentionList
-                                candidates={candidates}
-                                activeIndex={activeIndex}
-                                onSelect={(c) => {
-                                    if (contentRef.current) insertMention(c, contentRef.current);
-                                }}
-                                style={{
-                                    top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
-                                    left: mentionCoords.left,
-                                    position: 'fixed',
-                                    transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none'
-                                }}
-                            />
-                        )}
-                    </div>
-
-                    {/* 下部: ボタン類（横並びでコンパクトに） */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                        <div>
-                            {onCancel && (
-                                <button type="button" className="btn btn-secondary" onClick={onCancel} style={{ padding: '6px 16px', borderRadius: '4px', fontSize: '0.8rem', border: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer' }}>
-                                    キャンセル
-                                </button>
-                            )}
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {/* Clip Button moved here */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {uploading && (
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', animation: 'fadeIn 0.2s', marginRight: '4px' }}>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', animation: 'fadeIn 0.2s' }}>
                                     {statusMessage}
                                 </span>
                             )}
@@ -298,18 +205,109 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                     </svg>
                                 )}
                             </button>
+                        </div>
+                    </div>
 
+                    {/* 2行目: 本文入力エリアと送信ボタン */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flex: 1 }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                            <div
+                                ref={contentRef}
+                                contentEditable
+                                className="input-field rich-editor"
+                                style={{
+                                    marginTop: 0,
+                                    minHeight: '80px',
+                                    width: '100%',
+                                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                                    background: 'rgba(0, 0, 0, 0.2)',
+                                    color: 'white',
+                                    borderRadius: '4px',
+                                    padding: '8px 12px'
+                                }}
+                                onInput={(e) => {
+                                    handleInput(e, 'post-form');
+                                }}
+                                onKeyDown={(e) => {
+                                    handleKeyDown(e, 'post-form', e.currentTarget);
+                                    if (isOpen) {
+                                        if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
+                                            return;
+                                        }
+                                    }
+                                }}
+                                onPaste={(e: React.ClipboardEvent) => {
+                                    e.preventDefault();
+                                    const text = e.clipboardData.getData('text/plain');
+                                    document.execCommand('insertText', false, text);
+                                }}
+                            />
+                            {attachments.length > 0 && (
+                                <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                                    {attachments.map((att, index) => (
+                                        <div key={index} className="attachment-item" style={{ position: 'relative', width: '120px', height: '120px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {att.type.startsWith('image/') ? (
+                                                <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <span style={{ fontSize: '20px' }}>📄</span>
+                                            )}
+                                            <div
+                                                className="attachment-remove"
+                                                onClick={() => removeFile(index)}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    right: 0,
+                                                    background: 'rgba(0,0,0,0.5)',
+                                                    color: 'white',
+                                                    width: '18px',
+                                                    height: '18px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                    fontSize: '12px'
+                                                }}
+                                            >
+                                                ×
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {isOpen && (
+                                <MentionList
+                                    candidates={candidates}
+                                    activeIndex={activeIndex}
+                                    onSelect={(c) => {
+                                        if (contentRef.current) insertMention(c, contentRef.current);
+                                    }}
+                                    style={{
+                                        top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
+                                        left: mentionCoords.left,
+                                        position: 'fixed',
+                                        transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none'
+                                    }}
+                                />
+                            )}
+                        </div>
+
+                        {/* Send button (Airplane) moved here */}
+                        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '4px' }}>
                             <button
                                 type="button"
                                 className="btn-send-blue"
                                 title="投稿"
                                 style={{
                                     padding: 0,
-                                    width: '32px',
-                                    height: '32px',
+                                    width: '36px',
+                                    height: '36px',
                                     flexShrink: 0,
                                     cursor: 'pointer',
-                                    borderRadius: '50%'
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
                                 }}
                                 onClick={handleSubmit}
                                 disabled={loading || uploading}
@@ -323,6 +321,15 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                             </button>
                         </div>
                     </div>
+
+                    {/* 下部: キャンセルボタン（必要な場合のみ） */}
+                    {onCancel && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '4px' }}>
+                            <button type="button" className="btn btn-secondary" onClick={onCancel} style={{ padding: '6px 16px', borderRadius: '4px', fontSize: '0.8rem', border: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer' }}>
+                                キャンセル
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <input
