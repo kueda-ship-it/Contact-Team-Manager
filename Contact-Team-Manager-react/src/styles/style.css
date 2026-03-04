@@ -3529,13 +3529,13 @@ html {
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(60px + env(safe-area-inset-bottom, 12px) + 10px);
+        height: calc(60px + env(safe-area-inset-bottom, 12px) + 4px);
         background: #2B2D31;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 9000;
         justify-content: space-around;
         align-items: center;
-        padding-bottom: calc(env(safe-area-inset-bottom, 12px) + 10px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 12px) + 4px);
     }
 
     .nav-item {
@@ -3587,7 +3587,7 @@ html {
     /* FAB (Floating Action Button) */
     .mobile-fab {
         position: fixed;
-        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 30px);
+        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 24px);
         right: 20px;
         width: 56px;
         height: 56px;
@@ -3659,6 +3659,15 @@ html {
         visibility: visible !important;
         width: auto !important;
     }
+
+    /* Hide redundant sidebar headers on mobile */
+    .side-panel-title {
+        display: none !important;
+    }
+
+    .feed-list {
+        padding-bottom: 90px !important;
+    }
 }
 
 /* Desktop Defaults - MUST BE OUTSIDE @media query */
@@ -3692,12 +3701,16 @@ html {
 .filter-chips-container {
     display: flex;
     overflow-x: auto;
-    gap: 8px;
-    padding: 10px 15px;
+    gap: 6px;
+    padding: 8px 12px;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    mask-image: linear-gradient(to right, black 85%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    mask-image: linear-gradient(to right, black 90%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+    background: var(--bg-dark);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
 .filter-chips-container::-webkit-scrollbar {
@@ -3706,9 +3719,9 @@ html {
 
 .filter-chip {
     white-space: nowrap;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.85rem;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
     background: rgba(255, 255, 255, 0.05);
@@ -3726,7 +3739,7 @@ html {
     background: var(--accent);
     color: white;
     border-color: var(--accent);
-    box-shadow: 0 4px 12px rgba(0, 183, 195, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 183, 195, 0.2);
 }
 
 .sort-minimal-btn {
