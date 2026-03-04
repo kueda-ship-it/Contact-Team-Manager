@@ -3750,6 +3750,8 @@ html {
         display: flex !important;
         align-items: center !important;
         justify-content: space-between !important;
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
     }
 
     .mobile-post-modal .post-remind-container>input[type="datetime-local"] {
@@ -3761,8 +3763,9 @@ html {
         font-weight: normal !important;
         border: none !important;
         background: transparent !important;
-        flex: 1 !important;
-        width: auto !important;
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+        width: 100% !important;
         color: var(--text-main) !important;
     }
 
@@ -3789,6 +3792,8 @@ html {
         padding: 0 !important;
         gap: 0 !important;
         min-height: 0 !important;
+        align-items: stretch !important;
+        /* Override inline flex-end */
     }
 
     .mobile-post-modal .post-content-container {
@@ -3796,6 +3801,7 @@ html {
         display: flex !important;
         flex-direction: column !important;
         padding-bottom: 70px !important;
+        align-items: stretch !important;
         /* space for bottom toolbar */
     }
 
@@ -3808,6 +3814,7 @@ html {
         padding: 16px !important;
         font-size: 1.05rem !important;
         line-height: 1.6 !important;
+        text-align: left !important;
         background: transparent !important;
         border: none !important;
         width: 100% !important;
