@@ -163,7 +163,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                     padding: '0 8px',
                                     height: '36px',
                                     fontSize: '0.8rem',
-                                    width: '180px',
+                                    flex: 1,
                                     color: remindAt ? 'var(--text-main)' : 'var(--text-muted)'
                                 }}
                                 title="リマインド日時を設定"
@@ -172,21 +172,26 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                             {remindAt && (
                                 <button
                                     type="button"
-                                    className="mobile-remind-reset"
                                     onClick={() => setRemindAt('')}
                                     title="リマインドをリセット"
                                     style={{
-                                        background: 'transparent',
+                                        background: 'rgba(255,255,255,0.06)',
                                         border: '1px solid rgba(255,255,255,0.15)',
                                         color: 'var(--text-muted)',
-                                        borderRadius: '8px',
-                                        padding: '4px 8px',
-                                        fontSize: '0.7rem',
+                                        borderRadius: '6px',
+                                        width: '36px',
+                                        height: '36px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
                                         cursor: 'pointer',
-                                        whiteSpace: 'nowrap'
+                                        flexShrink: 0
                                     }}
                                 >
-                                    ✕
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="1 4 1 10 7 10"></polyline>
+                                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                    </svg>
                                 </button>
                             )}
                         </div>
