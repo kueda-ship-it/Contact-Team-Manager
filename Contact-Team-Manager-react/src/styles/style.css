@@ -3827,18 +3827,47 @@ html {
         cursor: not-allowed;
     }
 
-    /* Hide desktop-only elements inside mobile modal */
+    /* Restyle buttons inside mobile modal for better touch targets */
     .mobile-post-modal .btn-send-blue {
-        display: none !important;
+        width: 100% !important;
+        height: 48px !important;
+        border-radius: 14px !important;
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        box-shadow: 0 4px 12px rgba(0, 183, 195, 0.25) !important;
+        margin-top: 8px !important;
+    }
+
+    .mobile-post-modal .btn-clip-yellow {
+        width: 44px !important;
+        height: 44px !important;
+        border-radius: 12px !important;
     }
 
     .mobile-post-modal .btn.btn-secondary {
         display: none !important;
     }
 
-    /* Hide clip button inside form (we move it to toolbar) */
-    .mobile-post-modal .btn-clip-yellow {
-        display: none !important;
+    /* Remind reset button */
+    .mobile-remind-reset {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: var(--text-muted);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.2s;
+    }
+
+    .mobile-remind-reset:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-main);
     }
 
     @keyframes slideUp {

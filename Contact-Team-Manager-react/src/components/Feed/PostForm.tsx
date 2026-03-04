@@ -152,7 +152,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                             onChange={(e) => setTitle(e.target.value)}
                             disabled={loading}
                         />
-                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <input
                                 type="datetime-local"
                                 value={remindAt}
@@ -169,6 +169,26 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                 title="リマインド日時を設定"
                                 disabled={loading}
                             />
+                            {remindAt && (
+                                <button
+                                    type="button"
+                                    className="mobile-remind-reset"
+                                    onClick={() => setRemindAt('')}
+                                    title="リマインドをリセット"
+                                    style={{
+                                        background: 'transparent',
+                                        border: '1px solid rgba(255,255,255,0.15)',
+                                        color: 'var(--text-muted)',
+                                        borderRadius: '8px',
+                                        padding: '4px 8px',
+                                        fontSize: '0.7rem',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    ✕
+                                </button>
+                            )}
                         </div>
 
                         {/* Clip Button moved here */}
