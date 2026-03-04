@@ -3745,6 +3745,11 @@ html {
     .mobile-post-modal .post-remind-container {
         padding: 0 16px !important;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
     }
 
     .mobile-post-modal .post-remind-container>input[type="datetime-local"] {
@@ -3756,6 +3761,25 @@ html {
         font-weight: normal !important;
         border: none !important;
         background: transparent !important;
+        flex: 1 !important;
+        width: auto !important;
+        color: var(--text-main) !important;
+    }
+
+    /* Fixed Mention popup for mobile */
+    .mention-candidate-list {
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: 90% !important;
+        max-width: 400px !important;
+        position: fixed !important;
+        top: auto !important;
+        bottom: 50% !important;
+        /* Place in upper half to avoid keyboard */
+        z-index: 10000 !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
 
     /* Row 2: Content area - expand to fill all remaining space */
@@ -3824,11 +3848,20 @@ html {
     }
 
     .mobile-post-modal .btn-clip-yellow {
-        width: 44px !important;
-        height: 44px !important;
+        width: 52px !important;
+        height: 52px !important;
         border-radius: 50% !important;
         background: rgba(255, 255, 255, 0.08) !important;
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+    }
+
+    .mobile-post-modal .btn-clip-yellow svg {
+        width: 24px !important;
+        height: 24px !important;
     }
 
     .mobile-post-modal .post-form-row-2>div:last-child {
@@ -3841,8 +3874,8 @@ html {
     }
 
     .mobile-post-modal .btn-send-blue {
-        width: 44px !important;
-        height: 44px !important;
+        width: 52px !important;
+        height: 52px !important;
         border-radius: 50% !important;
         background: var(--accent) !important;
         display: flex !important;
@@ -3854,8 +3887,8 @@ html {
     }
 
     .mobile-post-modal .btn-send-blue svg {
-        width: 20px !important;
-        height: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
     }
 
     /* Hide cancel button (close button is in header) */
