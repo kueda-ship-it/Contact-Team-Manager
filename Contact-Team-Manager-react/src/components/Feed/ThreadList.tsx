@@ -107,22 +107,22 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
     const initialScrollDone = React.useRef(false);
 
-    // Reset initial scroll state when team changes
+    // Reset initial scroll state when team changes or sort order changes
     React.useEffect(() => {
         initialScrollDone.current = false;
-    }, [currentTeamId]);
+    }, [currentTeamId, sortAscending]);
 
     // Initial scroll to bottom for Chat Mode
     React.useEffect(() => {
         // Wait until loading is finished and we have threads
         if (!threadsLoading && sortAscending && threads.length > 0) {
-            // Only scroll to bottom if it's the initial load for this team or a new message arrived
+            // Always try to scroll to bottom on initial load of the view or when switching to Chat mode
             if (!initialScrollDone.current) {
                 // Use a small timeout to ensure DOM is updated
                 const timer = setTimeout(() => {
-                    bottomAnchorRef.current?.scrollIntoView({ behavior: 'auto' });
+                    bottomAnchorRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
                     initialScrollDone.current = true;
-                }, 100);
+                }, 150);
                 return () => clearTimeout(timer);
             }
         }

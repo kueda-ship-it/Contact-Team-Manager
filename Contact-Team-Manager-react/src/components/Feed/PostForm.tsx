@@ -300,8 +300,8 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                 title="投稿"
                                 style={{
                                     padding: 0,
-                                    width: '36px',
-                                    height: '36px',
+                                    width: '32px',
+                                    height: '32px',
                                     flexShrink: 0,
                                     cursor: 'pointer',
                                     borderRadius: '50%',
@@ -313,7 +313,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                 disabled={loading || uploading}
                             >
                                 {loading ? '...' : (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <line x1="22" y1="2" x2="11" y2="13"></line>
                                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                                     </svg>

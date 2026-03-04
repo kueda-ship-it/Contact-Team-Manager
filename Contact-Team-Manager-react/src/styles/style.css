@@ -3490,7 +3490,30 @@ html {
         box-sizing: border-box !important;
         overflow-wrap: anywhere;
         word-break: break-word;
-        /* Ensure long URLs or text don't overflow */
+    }
+
+    /* Fixed hover issue for feed header on mobile */
+    .feed-header-sticky {
+        height: auto !important;
+        opacity: 1 !important;
+        padding: 12px 15px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        background: var(--bg-dark) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+        position: relative !important;
+    }
+
+    .feed-header-sticky>* {
+        visibility: visible !important;
+        pointer-events: auto !important;
+        width: 100% !important;
+        justify-content: center !important;
+    }
+
+    .feed-header-left select {
+        width: 100% !important;
     }
 
     .team-name-label {
@@ -3506,13 +3529,13 @@ html {
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(60px + env(safe-area-inset-bottom, 0px));
+        height: calc(60px + env(safe-area-inset-bottom, 12px) + 24px);
         background: #2B2D31;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 9000;
         justify-content: space-around;
         align-items: center;
-        padding-bottom: env(safe-area-inset-bottom, 0px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 12px) + 24px);
     }
 
     .nav-item {
@@ -3564,7 +3587,7 @@ html {
     /* FAB (Floating Action Button) */
     .mobile-fab {
         position: fixed;
-        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 20px);
+        bottom: calc(60px + env(safe-area-inset-bottom, 15px) + 44px);
         right: 20px;
         width: 56px;
         height: 56px;

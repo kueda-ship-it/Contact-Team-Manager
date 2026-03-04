@@ -12,7 +12,6 @@ import { supabase } from './lib/supabase';
 import { useTheme } from './context/ThemeContext';
 import { useNotifications } from './hooks/useNotifications';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
-import { PullToRefresh } from './components/common/PullToRefresh';
 import './styles/style.css';
 
 import { initializeMsal } from './lib/microsoftGraph';
@@ -333,19 +332,17 @@ function App() {
                 }}
               >
                 <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <PullToRefresh onRefresh={async () => { refetch(false); }}>
-                    <ThreadList
-                      currentTeamId={currentTeamId}
-                      threadsData={threadsDataFiltered}
-                      statusFilter={statusFilter}
-                      onStatusChange={setStatusFilter}
-                      sortAscending={sortAscending}
-                      onToggleSort={() => setSortAscending(prev => !prev)}
-                      onLoadMore={() => setThreadsLimit(prev => prev + 50)}
-                      scrollToThreadId={scrollToThreadId}
-                      onScrollComplete={() => setScrollToThreadId(null)}
-                    />
-                  </PullToRefresh>
+                  <ThreadList
+                    currentTeamId={currentTeamId}
+                    threadsData={threadsDataFiltered}
+                    statusFilter={statusFilter}
+                    onStatusChange={setStatusFilter}
+                    sortAscending={sortAscending}
+                    onToggleSort={() => setSortAscending(prev => !prev)}
+                    onLoadMore={() => setThreadsLimit(prev => prev + 50)}
+                    scrollToThreadId={scrollToThreadId}
+                    onScrollComplete={() => setScrollToThreadId(null)}
+                  />
                 </div>
                 {/* Desktop: Show PostForm inline at bottom */}
                 <div className="desktop-only-postform" style={{ flexShrink: 0 }}>
