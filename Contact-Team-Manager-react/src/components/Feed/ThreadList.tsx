@@ -490,8 +490,23 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 </div>
             </div>
 
-            {/* Mobile Header (New Compact UI) */}
-            <div className="mobile-only">
+            {/* Mobile Header (New Integrated Sticky UI) */}
+            <div className="mobile-only mobile-header-fixed">
+                <div className="mobile-header-top-row">
+                    <div className="mobile-team-name">
+                        {currentTeamName}
+                    </div>
+                    <button className="sort-minimal-btn" onClick={onToggleSort}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                            <polyline points="16 7 22 7 22 13"></polyline>
+                        </svg>
+                        {sortAscending ? '昇' : '降'}
+                    </button>
+                    <div className="mobile-thread-count">
+                        {threads.length}件
+                    </div>
+                </div>
                 <div className="filter-chips-container">
                     {[
                         { value: 'all', label: 'すべて表示' },
@@ -508,25 +523,6 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                             {opt.label}
                         </div>
                     ))}
-
-                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '10px' }}>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{threads.length}件</span>
-                        <button className="sort-minimal-btn" onClick={onToggleSort} style={{ padding: '4px 8px' }}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
-                                <polyline points="16 7 22 7 22 13"></polyline>
-                            </svg>
-                            {sortAscending ? '昇' : '降'}
-                        </button>
-                    </div>
-                </div>
-
-                <div className="feed-header-sticky" style={{ height: 'auto', padding: '4px 15px', minHeight: 'unset' }}>
-                    <div className="feed-header-left">
-                        <h2 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0 }}>
-                            {currentTeamName}
-                        </h2>
-                    </div>
                 </div>
             </div>
 

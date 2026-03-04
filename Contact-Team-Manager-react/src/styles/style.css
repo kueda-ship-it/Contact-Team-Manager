@@ -3706,19 +3706,49 @@ html {
 }
 
 /* --- Better Filter Chips --- */
+.mobile-header-fixed {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--bg-dark);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.mobile-header-top-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 15px;
+    gap: 12px;
+}
+
+.mobile-team-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+}
+
+.mobile-thread-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: auto;
+    white-space: nowrap;
+}
+
 .filter-chips-container {
     display: flex;
     overflow-x: auto;
     gap: 6px;
-    padding: 8px 12px;
+    padding: 0 12px 10px 12px;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    mask-image: linear-gradient(to right, black 90%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
-    background: var(--bg-dark);
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    mask-image: linear-gradient(to right, black 95%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 95%, transparent 100%);
 }
 
 .filter-chips-container::-webkit-scrollbar {
