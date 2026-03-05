@@ -2355,15 +2355,10 @@ body:not(.light-mode) .rich-editor .mention {
     color: var(--primary-light) !important;
 }
 
-/* 右サイドバー冁E�Eみ、ティール色�E�水色�E�で強調 */
+/* 右サイドバー冁EEみ、ティール色E水色Eで強調 */
 #pending-sidebar-list .mention,
 #assigned-sidebar-list .mention {
     color: var(--primary-light) !important;
-}
-
-#pending-sidebar-list .mention.mention-tag,
-#assigned-sidebar-list .mention.mention-tag {
-    color: var(--accent) !important;
 }
 
 .modal-overlay {
