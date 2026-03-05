@@ -18,8 +18,8 @@
 body.light-mode {
     --bg-dark: #f0f2f5;
     --card-bg: #ffffff;
-    --text-main: #333333;
-    --text-muted: #666666;
+    --text-main: #3c4043;
+    --text-muted: #5f6368;
     --primary: #5b5fc7;
     /* Teams-like purple */
     --primary-light: #7f85f5;
@@ -97,7 +97,7 @@ body.light-mode .reply-item {
     background: #ffffff !important;
     border: 1px solid #e1e1e1 !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
-    color: #333333 !important;
+    color: #3c4043 !important;
 }
 
 /* Explicitly remove background/border for static container to prevent "white box" */
@@ -931,7 +931,7 @@ body {
 body.light-mode .task-content *,
 body.light-mode .reply-content *,
 body.light-mode .rich-editor * {
-    color: #333333 !important;
+    color: #3c4043 !important;
 }
 
 body:not(.light-mode) .task-content *,
@@ -4094,6 +4094,7 @@ html {
     background: rgba(255, 255, 255, 0.05);
     color: var(--text-main);
 }
+
 /* EMERGENCY FIX: Ensure bottom nav is hidden on PC */
 @media screen and (min-width: 769px) {
     .mobile-bottom-nav {
@@ -4108,9 +4109,10 @@ html {
 
 
 @media screen and (min-width: 769px) {
-    .mobile-fab, .mobile-post-modal {
+
+    .mobile-fab,
+    .mobile-post-modal {
         display: none !important;
         visibility: hidden !important;
     }
 }
-

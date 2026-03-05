@@ -325,9 +325,9 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                                         flex: 1,
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis',
-                                        fontSize: isChannel ? '0.9rem' : '0.9rem',
+                                        fontSize: isChannel ? '0.85rem' : '0.9rem',
                                         color: (isChannel || hasChildren) ? 'var(--text-muted)' : 'var(--text-main)',
-                                        fontWeight: (isChannel && unreadTeams.has(String(team.id))) ? 700 : (isChannel ? 400 : 600),
+                                        fontWeight: (unreadTeams.has(String(team.id)) || isDirectlyActive) ? 600 : 500,
                                         whiteSpace: 'nowrap',
                                         paddingLeft: isChannel ? '16px' : '0'
                                     }}>
