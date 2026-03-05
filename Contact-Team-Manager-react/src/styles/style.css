@@ -4094,3 +4094,23 @@ html {
     background: rgba(255, 255, 255, 0.05);
     color: var(--text-main);
 }
+/* EMERGENCY FIX: Ensure bottom nav is hidden on PC */
+@media screen and (min-width: 769px) {
+    .mobile-bottom-nav {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        height: 0 !important;
+        pointer-events: none !important;
+        z-index: -1 !important;
+    }
+}
+
+
+@media screen and (min-width: 769px) {
+    .mobile-fab, .mobile-post-modal {
+        display: none !important;
+        visibility: hidden !important;
+    }
+}
+

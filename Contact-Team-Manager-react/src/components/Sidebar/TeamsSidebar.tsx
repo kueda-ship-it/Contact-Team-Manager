@@ -36,7 +36,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
 
     // Build childrenMap early for scope access in toggleTeam
     const childrenMap: { [parentId: string]: any[] } = {};
-    rawTeams.forEach(t => {
+    sortedTeams.forEach(t => {
         if (t.parent_id) {
             const pId = String(t.parent_id);
             if (!childrenMap[pId]) childrenMap[pId] = [];
@@ -122,6 +122,11 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
         const newIndex = sortedTeams.findIndex(t => String(t.id) === String(targetId));
 
         if (oldIndex > -1 && newIndex > -1) {
+            // Removed strict parent_id checking: 
+            // The rendering logic automatically groups children under their respective parents
+            // based on the order they appear in the flat array. Allowing free dropping makes the UI feel better
+            // and allows swapping children even if the drop target slightly overlaps a parent node.
+
             // Determine if drop was on top or bottom half of the HEADER area
             const header = e.currentTarget.querySelector('.team-item-header');
             const rect = header ? header.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
@@ -366,7 +371,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
 
                                 {isExpanded && (
                                     <div className="sidebar-submenu-container">
-                                        {isDirectlyActive && (
+                                        {!isChannel && isDirectlyActive && (
                                             <div className="sidebar-submenu">
                                                 <div
                                                     className={`sidebar-submenu-item ${statusFilter === 'all' ? 'active' : ''}`}
