@@ -37,22 +37,26 @@ export function highlightMentions(text: string | null, options: HighlightMention
         if (!p.display_name) return;
         const mentionText = `@${p.display_name}`;
         const escapedMention = mentionText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedMention, 'g');
+        // Avoid matching if already wrapped in a span (basic check for ">@Name")
+        const regex = new RegExp(`(?<!">)${escapedMention}`, 'g');
         const isSelf = p.email === options.currentUserEmail;
         const className = isSelf ? 'mention mention-me' : 'mention';
         highlighted = highlighted.replace(regex, `<span class="${className}">${mentionText}</span>`);
     });
 
     // @all
-    const allRegex = /@all/g;
+    const allRegex = /(?<!">)@all/g;
     highlighted = highlighted.replace(allRegex, '<span class="mention mention-all">@all</span>');
 
-    // Tags (#TagName)
+    // Tags (@TagName or #TagName)
     options.allTags.forEach(t => {
-        const mentionText = `#${t.name}`;
-        const escapedMention = mentionText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedMention, 'g');
-        highlighted = highlighted.replace(regex, `<span class="mention mention-tag">${mentionText}</span>`);
+        const prefixes = ['@', '#'];
+        prefixes.forEach(prefix => {
+            const mentionText = `${prefix}${t.name}`;
+            const escapedMention = mentionText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(?<!">)${escapedMention}`, 'g');
+            highlighted = highlighted.replace(regex, `<span class="mention mention-tag">${mentionText}</span>`);
+        });
     });
 
     return highlighted;
