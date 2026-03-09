@@ -3970,6 +3970,8 @@ html {
     .mobile-fab,
     .mobile-post-modal {
         display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
     }
 
     /* Ensure mobile tabs don't cause padding/layout issues on PC */
@@ -4110,4 +4112,84 @@ html {
         display: none !important;
         visibility: hidden !important;
     }
+}
+
+/* --- Content Expandable / Collapsible (Hybrid Design) --- */
+.thread-card-body {
+    position: relative;
+    width: 100%;
+}
+
+/* スレッド全体のラッパー (Card Level) */
+.thread-expandable-wrapper {
+    max-height: 200px;
+    overflow: hidden;
+    position: relative;
+    mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.thread-expandable-wrapper.expanded,
+.thread-expandable-wrapper.none {
+    max-height: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+}
+
+/* 各返信の個別制御 (Reply Level) */
+.reply-expandable-wrapper {
+    max-height: 100px;
+    overflow: hidden;
+    position: relative;
+    mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+    transition: max-height 0.3s ease;
+    margin-bottom: 4px;
+}
+
+.reply-expandable-wrapper.expanded {
+    max-height: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+}
+
+/* 共通の展開ボタン */
+.expand-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    margin: 4px 0 12px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 12px;
+    width: fit-content;
+    transition: all 0.2s;
+    z-index: 5;
+}
+
+.expand-btn:hover {
+    background: rgba(0, 183, 195, 0.1);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.expand-btn svg {
+    transition: transform 0.3s ease;
+}
+
+.expand-btn.active svg {
+    transform: rotate(180deg);
+}
+
+/* スレッド全体用ボタンの微調整 */
+.thread-main-expand-btn {
+    margin: -10px auto 10px auto;
+    background: var(--bg-dark);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }

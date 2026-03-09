@@ -62,6 +62,15 @@ function App() {
   const [scrollToThreadId, setScrollToThreadId] = useState<string | null>(null);
   const [activeMobileTab, setActiveMobileTab] = useState<'teams' | 'feed' | 'pending'>('feed');
   const [isMobilePostFormOpen, setIsMobilePostFormOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const { teams } = useTeams();
   // Ensure we fetch ALL pending items if that filter is active, regardless of default limit
@@ -415,26 +424,31 @@ function App() {
       )}
 
       {isSettingsOpen && (
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          initialTab={settingsInitialTab}
-          onClose={() => setIsSettingsOpen(false)}
-          currentTeamId={currentTeamId ? String(currentTeamId) : null}
-          currentTeamName={currentTeamName}
-        />
+        <>
+          {console.log('[App] Opening SettingsModal. currentTeamId:', currentTeamId)}
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            initialTab={settingsInitialTab}
+            onClose={() => setIsSettingsOpen(false)}
+            currentTeamId={currentTeamId ? String(currentTeamId) : null}
+            currentTeamName={currentTeamName}
+          />
+        </>
       )}
 
-      <MobileBottomNav
-        activeTab={activeMobileTab}
-        onTabChange={(tab) => {
-          setActiveMobileTab(tab);
-          if (tab === 'feed' || tab === 'pending') {
-            setViewMode('feed');
-          }
-        }}
-        unreadCount={unreadTeams.size}
-        pendingCount={0}
-      />
+      {isMobile && (
+        <MobileBottomNav
+          activeTab={activeMobileTab}
+          onTabChange={(tab) => {
+            setActiveMobileTab(tab);
+            if (tab === 'feed' || tab === 'pending') {
+              setViewMode('feed');
+            }
+          }}
+          unreadCount={unreadTeams.size}
+          pendingCount={0}
+        />
+      )}
     </div>
   );
 }

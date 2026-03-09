@@ -31,6 +31,48 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
     const { tags } = useTags();
     const { teams } = useTeams();
     const { user, profile: currentProfile } = useAuth();
+    const [expandedThreads, setExpandedThreads] = React.useState<Set<string>>(new Set());
+    const [needsExpandMap, setNeedsExpandMap] = React.useState<{ [key: string]: boolean }>({});
+    const measureRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+    const toggleExpand = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setExpandedThreads(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    // Measure heights for task cards (threshold: 200px)
+    React.useLayoutEffect(() => {
+        const observer = new ResizeObserver((entries) => {
+            setNeedsExpandMap(prev => {
+                const next = { ...prev };
+                let changed = false;
+                for (const entry of entries) {
+                    const el = entry.target as HTMLElement;
+                    const id = el.getAttribute('data-measure-id');
+                    if (id) {
+                        const needs = el.scrollHeight > 200;
+                        if (next[id] !== needs) {
+                            next[id] = needs;
+                            changed = true;
+                        }
+                    }
+                }
+                return changed ? next : prev;
+            });
+        });
+
+        Object.values(measureRefs.current).forEach(el => {
+            if (el) observer.observe(el);
+        });
+
+        return () => observer.disconnect();
+    }, [pendingThreads, mainThreads]); // Re-observe when lists change
+
     const quickReplyRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
 
     // Fetch all pending threads separately
@@ -187,7 +229,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
             }
         }
     };
-
     return (
         <aside className="side-panel">
             <div style={{ paddingBottom: '20px' }}>
@@ -214,10 +255,25 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                                         </button>
                                     </div>
-                                    <div
-                                        className="task-content"
-                                        dangerouslySetInnerHTML={{ __html: highlightMentions(getPlainTextForSidebar(t.content), mentionOptions) }}
-                                    />
+                                    <div className={`thread-expandable-wrapper ${expandedThreads.has(t.id) ? 'expanded' : (needsExpandMap[t.id] ? 'collapsed' : 'none')}`}>
+                                        <div
+                                            ref={(el) => { if (el) measureRefs.current[t.id] = el; }}
+                                            data-measure-id={t.id}
+                                            className="task-content"
+                                            dangerouslySetInnerHTML={{ __html: highlightMentions(getPlainTextForSidebar(t.content), mentionOptions) }}
+                                        />
+                                    </div>
+                                    {needsExpandMap[t.id] && (
+                                        <div style={{ padding: '0 10px 10px' }}>
+                                            <button
+                                                className="expand-btn"
+                                                onClick={(e) => toggleExpand(e, t.id)}
+                                                style={{ margin: 0, fontSize: '0.65rem', padding: '2px 8px' }}
+                                            >
+                                                詳細を表示
+                                            </button>
+                                        </div>
+                                    )}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                                         <span>by {t.author}</span>
                                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -335,11 +391,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                             </svg>
                                         </button>
                                     </div>
-                                </div>
+                                </div >
                             ))
                         )}
-                    </div>
-                </div>
+                    </div >
+                </div >
 
                 <div className="side-panel-section" style={{ minHeight: '200px' }}>
                     <h3 className="side-panel-title">Mentions</h3>
@@ -363,7 +419,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                         )}
                     </div>
                 </div>
-            </div>
-        </aside>
+            </div >
+        </aside >
     );
 };

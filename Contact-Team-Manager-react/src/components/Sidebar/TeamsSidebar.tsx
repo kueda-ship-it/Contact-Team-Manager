@@ -264,7 +264,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                             <div
                                 key={team.id}
                                 className={`team-list-item ${isDirectlyActive ? 'active' : ''} ${isChildActive ? 'child-active' : ''}`}
-                                title={team.name}
+                                title={`${team.name}${team.email_address ? ` (${team.email_address})` : ''}`}
                                 draggable={true}
                                 onDragStart={(e) => {
                                     e.stopPropagation();

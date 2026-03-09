@@ -21,6 +21,7 @@ interface Team {
     icon?: string;
     avatar_url?: string;
     icon_color?: string;
+    email_address?: string;
     created_at: string;
     order_index?: number;
     parent_id?: string | null;

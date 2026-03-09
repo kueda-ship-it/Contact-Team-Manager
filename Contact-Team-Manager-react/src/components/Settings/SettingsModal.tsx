@@ -24,6 +24,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const { memberships } = useUserMemberships(user?.id);
     const { tags, addTag, deleteTag } = useTags();
 
+    console.log('[SettingsModal] Render. currentTeamId prop:', currentTeamId, 'type:', typeof currentTeamId);
+
     // Permission checks
     const { canEdit: canEditCurrentTeam, isAdmin: isGlobalAdmin } = usePermissions(currentTeamId);
     const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history'>(initialTab as any);
@@ -91,12 +93,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const [teamName, setTeamName] = useState('');
     const [teamIconUrl, setTeamIconUrl] = useState('');
     const [parentId, setParentId] = useState<string | null>(null);
+    const [teamEmailAddress, setTeamEmailAddress] = useState('');
 
     // Admin Team Management State
     const [selectedTeamId, setSelectedTeamId] = useState<string>('');
     const [mgmtTeamName, setMgmtTeamName] = useState('');
     const [mgmtTeamIconUrl, setMgmtTeamIconUrl] = useState('');
     const [mgmtParentId, setMgmtParentId] = useState<string | null>(null);
+    const [mgmtEmailAddress, setMgmtEmailAddress] = useState('');
     const [isCreatingTeam, setIsCreatingTeam] = useState(false);
 
     // Microsoft Graph Status
@@ -159,13 +163,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
     const fetchTeamDetails = async () => {
         if (!currentTeamId) return;
-        const { data } = await supabase.from('teams').select('*').eq('id', currentTeamId).single();
+        console.log('[fetchTeamDetails] Fetching for ID:', currentTeamId);
+        const { data, error } = await supabase.from('teams').select('*').eq('id', currentTeamId).single();
+        if (error) {
+            console.error('[fetchTeamDetails] Error:', error);
+            return;
+        }
         if (data) {
+            console.log('[fetchTeamDetails] Data received:', data);
             setTeamName(data.name);
             setTeamIconUrl(data.avatar_url || '');
             setParentId(data.parent_id || null);
+            setTeamEmailAddress(data.email_address || '');
         }
     };
+
+    // Attach to window for easier debugging
+    useEffect(() => {
+        (window as any).debugSupabase = supabase;
+        (window as any).debugCurrentTeamId = currentTeamId;
+    }, [currentTeamId]);
 
     const isAdmin = isGlobalAdmin;
     const canManageTeam = canEditCurrentTeam;
@@ -203,6 +220,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                 setMgmtTeamName(t.name);
                 setMgmtTeamIconUrl(t.avatar_url || '');
                 setMgmtParentId(t.parent_id || null);
+                setMgmtEmailAddress(t.email_address || '');
             }
         }
     }, [selectedTeamId, teams]);
@@ -314,15 +332,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
     const handleSaveMgmtTeam = async () => {
         if (isCreatingTeam) {
-            const { data, error } = await supabase.from('teams').insert({
+            const insertData = {
                 name: mgmtTeamName,
                 avatar_url: mgmtTeamIconUrl,
-                parent_id: mgmtParentId
-            }).select().single();
+                parent_id: mgmtParentId,
+                email_address: mgmtEmailAddress || null
+            };
+            console.log('[handleSaveMgmtTeam] Creating:', insertData);
+            const { data, error } = await supabase.from('teams').insert(insertData).select().single();
 
             if (error) {
+                console.error('[handleSaveMgmtTeam] Create Error:', error);
                 alert('チームの作成に失敗しました: ' + error.message);
             } else {
+                console.log('[handleSaveMgmtTeam] Create Success:', data);
                 alert('チームを作成しました');
                 setSelectedTeamId(data.id);
                 setIsCreatingTeam(false);
@@ -335,13 +358,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
             const updates = {
                 name: mgmtTeamName,
                 avatar_url: mgmtTeamIconUrl,
-                parent_id: mgmtParentId
+                parent_id: mgmtParentId,
+                email_address: mgmtEmailAddress || null
             };
 
+            console.log('[handleSaveMgmtTeam] Updating:', selectedTeamId, updates);
             const { error } = await supabase.from('teams').update(updates).eq('id', selectedTeamId);
             if (error) {
+                console.error('[handleSaveMgmtTeam] Update Error:', error);
                 alert('チームの更新に失敗しました: ' + error.message);
             } else {
+                console.log('[handleSaveMgmtTeam] Update Success');
                 alert('チーム情報を更新しました');
                 if (mgmtParentId) {
                     await handleFirstChannelCreation(mgmtParentId, selectedTeamId);
@@ -433,21 +460,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     };
 
     const handleSaveTeam = async () => {
-        if (!currentTeamId) return;
+        console.log('[handleSaveTeam] Clicked. currentTeamId prop at click time:', currentTeamId);
+
+        if (!currentTeamId || currentTeamId === 'null') {
+            console.warn('[handleSaveTeam] No currentTeamId (falsy or string "null")');
+            alert(`エラー: チームIDが特定できません (currentTeamId: ${currentTeamId})\nチームが正しく選択されているか確認してください。`);
+            return;
+        }
+
         const updates = {
             name: teamName,
             avatar_url: teamIconUrl,
-            parent_id: parentId
+            parent_id: parentId,
+            email_address: teamEmailAddress || null
         };
 
-        const { error } = await supabase.from('teams').update(updates).eq('id', currentTeamId);
-        if (error) {
-            alert('チームの更新に失敗しました: ' + error.message);
-        } else {
-            alert('チーム情報を更新しました');
-            if (parentId) {
-                await handleFirstChannelCreation(parentId, currentTeamId);
+        console.log('[handleSaveTeam] Start. Updates:', updates);
+        // Explicitly cast to number if it looks like one
+        const targetId = isNaN(Number(currentTeamId)) ? currentTeamId : Number(currentTeamId);
+        console.log('[handleSaveTeam] targetId after cast:', targetId);
+
+        try {
+            const { data, error, status } = await supabase
+                .from('teams')
+                .update(updates)
+                .eq('id', targetId)
+                .select();
+
+            console.log('[handleSaveTeam] Supabase response status:', status, 'Data:', data);
+
+            if (error) {
+                console.error('[handleSaveTeam] DB Error:', error);
+                alert(`保存失敗 (エラーコード: ${error.code})\nメッセージ: ${error.message}\n詳細: ${error.details}`);
+            } else if (!data || data.length === 0) {
+                console.warn('[handleSaveTeam] No rows updated. RLS issue or wrong ID?');
+                alert(`保存が反映されませんでした。 (status: ${status})\n※権限がないか、ID [${targetId}] のチームが見つかりません。`);
+            } else {
+                console.log('[handleSaveTeam] Success! Updated data:', data);
+                alert('チーム情報を正常に更新しました');
+                await fetchTeamDetails();
+                if (parentId) {
+                    await handleFirstChannelCreation(parentId, currentTeamId);
+                }
             }
+        } catch (err: any) {
+            console.error('[handleSaveTeam] Exception:', err);
+            alert('実行中に例外が発生しました: ' + err.message);
         }
     };
 
@@ -526,7 +584,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         className={`btn btn-sm ${activeTab === 'team' ? 'btn-primary' : 'btn-outline'}`}
                         style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 'none' }}
                         onClick={() => setActiveTab('team')}
-                        disabled={!currentTeamId || (!canManageTeam && !isAdmin)}
+                        disabled={!currentTeamId}
                     >
                         チーム設定
                     </button>
@@ -686,6 +744,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                 }}
                                             />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>投稿用メールアドレス</label>
+                                        <input
+                                            type="email"
+                                            className="input-field"
+                                            value={teamEmailAddress}
+                                            onChange={(e) => setTeamEmailAddress(e.target.value)}
+                                            placeholder="example@fts.co.jp"
+                                            readOnly={!canManageTeam && !isAdmin}
+                                        />
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                         <button className="btn btn-sm btn-primary" onClick={handleSaveTeam}>基本情報を保存</button>
@@ -1109,6 +1178,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                             ]}
                                                             value={mgmtParentId || ''}
                                                             onChange={(val) => setMgmtParentId(val ? String(val) : null)}
+                                                            style={{ height: '32px', fontSize: '0.8rem' }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>投稿用メールアドレス</label>
+                                                        <input
+                                                            type="email"
+                                                            className="input-field"
+                                                            value={mgmtEmailAddress}
+                                                            onChange={(e) => setMgmtEmailAddress(e.target.value)}
+                                                            placeholder="example@fts.co.jp"
                                                             style={{ height: '32px', fontSize: '0.8rem' }}
                                                         />
                                                     </div>
