@@ -8,36 +8,33 @@ serve(async (req) => {
     }
 
     try {
-        const { to, cc, subject, body, from } = await req.json()
+        const { to, cc, bcc, subject, body, from } = await req.json()
 
         console.log('[handle-inbound-email] Received email from:', from)
         console.log('[handle-inbound-email] To:', to)
-
-        // --- 条件フィルタ ---
-        // 1. k_ueda@fts.co.jp が To または CC に「含まれない」ことを確認 (BCC受信の判定)
-        const myAddress = 'k_ueda@fts.co.jp'
-        const toLower = (to || '').toLowerCase()
-        const ccLower = (cc || '').toLowerCase()
-
-        const isBccForMe = !toLower.includes(myAddress) && !ccLower.includes(myAddress)
-
-        if (!isBccForMe) {
-            console.log('[handle-inbound-email] Ignored: recipient is in To/CC (Expected BCC only)')
-            return new Response('Ignored: recipient is in To/CC (Expected BCC only)', { status: 200 })
-        }
+        console.log('[handle-inbound-email] Cc:', cc)
+        console.log('[handle-inbound-email] Bcc:', bcc)
 
         const supabase = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        // 2. 「To」フィールドに含まれるアドレスの中に、チームの投稿用アドレスがあるか探す
-        const toRecipients = toLower.split(',').map((e: string) => e.trim())
+        // --- 受信者リストの作成 ---
+        // To, Cc, Bcc のすべてのアドレスをマージしてチームを検索する
+        const recipients = [
+            ...(to || '').toLowerCase().split(','),
+            ...(cc || '').toLowerCase().split(','),
+            ...(bcc || '').toLowerCase().split(',')
+        ].map(e => e.trim()).filter(e => e.length > 0)
 
+        console.log('[handle-inbound-email] All recipients:', recipients)
+
+        // チームを検索
         const { data: team, error: teamError } = await supabase
             .from('teams')
             .select('id, name')
-            .in('email_address', toRecipients)
+            .in('email_address', recipients)
             .maybeSingle()
 
         if (teamError) {
@@ -46,8 +43,8 @@ serve(async (req) => {
         }
 
         if (!team) {
-            console.log('[handle-inbound-email] No matching team found for recipients:', toRecipients)
-            return new Response('No matching team found in the To field', { status: 404 })
+            console.log('[handle-inbound-email] No matching team found for recipients:', recipients)
+            return new Response('No matching team found for the recipients', { status: 404 })
         }
 
         // 3. スレッドを作成
