@@ -20,21 +20,26 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        // --- 受信者リストの作成 ---
-        // To, Cc, Bcc のすべてのアドレスをマージしてチームを検索する
-        const recipients = [
-            ...(to || '').toLowerCase().split(','),
-            ...(cc || '').toLowerCase().split(','),
-            ...(bcc || '').toLowerCase().split(',')
-        ].map(e => e.trim()).filter(e => e.length > 0)
+        // --- 受信者判定 ---
+        // 「To」フィールドに含まれる、かつ「Bcc」フィールドにも含まれるチームのアドレスを探す
+        const toRecipients = (to || '').toLowerCase().split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0)
+        const bccRecipients = (bcc || '').toLowerCase().split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0)
 
-        console.log('[handle-inbound-email] All recipients:', recipients)
+        // 両方のフィールドに存在するアドレスのみを抽出
+        const commonRecipients = toRecipients.filter((addr: string) => bccRecipients.includes(addr))
+
+        console.log('[handle-inbound-email] Recipients in both To & Bcc:', commonRecipients)
+
+        if (commonRecipients.length === 0) {
+            console.log('[handle-inbound-email] Ignored: No team address found in BOTH To and Bcc fields')
+            return new Response('Ignored: Team address must be in both To and Bcc fields', { status: 200 })
+        }
 
         // チームを検索
         const { data: team, error: teamError } = await supabase
             .from('teams')
             .select('id, name')
-            .in('email_address', recipients)
+            .in('email_address', commonRecipients)
             .maybeSingle()
 
         if (teamError) {
@@ -43,8 +48,8 @@ serve(async (req) => {
         }
 
         if (!team) {
-            console.log('[handle-inbound-email] No matching team found for recipients:', recipients)
-            return new Response('No matching team found for the recipients', { status: 404 })
+            console.log('[handle-inbound-email] No matching team found in common recipients:', commonRecipients)
+            return new Response('No matching team found for the common recipients', { status: 404 })
         }
 
         // 3. スレッドを作成
