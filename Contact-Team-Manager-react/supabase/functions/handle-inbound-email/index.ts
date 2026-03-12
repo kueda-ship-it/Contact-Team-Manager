@@ -21,18 +21,50 @@ serve(async (req) => {
         )
 
         // --- 受信者判定 ---
+        // メールのテキストから正式なメールアドレスのみを抽出する補助関数
+        const extractEmails = (str: string | any) => {
+            if (!str) return []
+            let text = '';
+            if (typeof str === 'string') {
+                text = str;
+            } else if (Array.isArray(str)) {
+                text = str.join(', ');
+            } else if (typeof str === 'object') {
+                text = JSON.stringify(str);
+            }
+            
+            // Slightly more robust regex
+            const matches = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g)
+            // Use Set to unique and normalize
+            return matches ? Array.from(new Set(matches.map(m => m.toLowerCase().trim()))) : []
+        }
+
+        const toEmails = extractEmails(to)
+        const bccEmails = extractEmails(bcc)
+        const ccEmails = extractEmails(cc)
+
+        console.log('[handle-inbound-email] Extracted Emails:', {
+            to: toEmails,
+            cc: ccEmails,
+            bcc: bccEmails
+        })
+
         // 「To」フィールドに含まれる、かつ「Bcc」フィールドにも含まれるチームのアドレスを探す
-        const toRecipients = (to || '').toLowerCase().split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0)
-        const bccRecipients = (bcc || '').toLowerCase().split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0)
+        // 重複なしのリストから積集合を取得
+        const commonRecipients = toEmails.filter((addr: string) => bccEmails.includes(addr))
 
-        // 両方のフィールドに存在するアドレスのみを抽出
-        const commonRecipients = toRecipients.filter((addr: string) => bccRecipients.includes(addr))
-
-        console.log('[handle-inbound-email] Recipients in both To & Bcc:', commonRecipients)
+        console.log('[handle-inbound-email] Intersection (To & Bcc):', commonRecipients)
 
         if (commonRecipients.length === 0) {
-            console.log('[handle-inbound-email] Ignored: No team address found in BOTH To and Bcc fields')
-            return new Response('Ignored: Team address must be in both To and Bcc fields', { status: 200 })
+            console.log('[handle-inbound-email] Ignored: No overlapping address in To and Bcc fields.')
+            return new Response(JSON.stringify({ 
+                success: false, 
+                message: 'Ignored: No overlapping address between To and Bcc fields',
+                extracted: { to: toEmails, bcc: bccEmails }
+            }), { 
+                status: 200,
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            })
         }
 
         // チームを検索

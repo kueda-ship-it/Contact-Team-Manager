@@ -2116,6 +2116,8 @@ textarea.input-field {
     color: var(--text-muted);
 }
 
+
+
 .rich-editor .mention {
     color: var(--primary-light);
     /* #8B8CC7 matching List count */
@@ -4192,4 +4194,66 @@ html {
     margin: -10px auto 10px auto;
     background: var(--bg-dark);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* --- Link and Mention Styles (Final Force) --- */
+#root .task-card .task-content a,
+#root .reply-item .reply-content a,
+#root a.post-link {
+    color: #00B7C3 !important; /* Accent color matching 'NOT FINISHED' */
+    text-decoration: underline !important;
+    font-weight: 600 !important;
+}
+
+#root .task-card .task-content a:hover,
+#root .reply-item .reply-content a:hover,
+#root a.post-link:hover {
+    color: #00d9e6 !important; /* Brighter accent */
+    text-decoration: none !important;
+}
+
+/* Base Mention Styling - Force inline to prevent "2 lines" issue */
+.mention {
+    color: #8B8CC7 !important;
+    background: rgba(139, 140, 199, 0.15) !important;
+    padding: 0 4px !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+    display: inline !important; 
+    white-space: normal !important;
+}
+
+.mention.mention-me {
+    color: #FFD700 !important;
+    background: rgba(255, 215, 0, 0.1) !important;
+}
+
+.mention.mention-all {
+    color: #00B7C3 !important; /* Matching accent */
+    background: rgba(0, 183, 195, 0.1) !important;
+}
+
+/* Light mode overrides */
+body.light-mode #root .task-card .task-content a,
+body.light-mode #root .reply-item .reply-content a,
+body.light-mode #root a.post-link {
+    color: #008891 !important; /* Darker accent for light mode */
+}
+
+.link-preview-card:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: var(--accent) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
 }

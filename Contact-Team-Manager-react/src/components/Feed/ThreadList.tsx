@@ -10,6 +10,15 @@ import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
+import { LinkPreview } from '../common/LinkPreview';
+
+// Helper to extract URLs from text
+const extractUrls = (text: string | null): string[] => {
+    if (!text) return [];
+    const urlRegex = /((?:https?|file):\/\/[^\s<]+[^<.,:;"')\s])/g;
+    const matches = text.match(urlRegex);
+    return matches ? Array.from(new Set(matches)) : [];
+};
 
 interface ThreadListProps {
     currentTeamId: number | string | null;
@@ -803,6 +812,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 style={{ whiteSpace: 'pre-wrap' }}
                                             />
 
+                                            <div className="link-previews">
+                                                {extractUrls(thread.content).map((url, idx) => (
+                                                    <LinkPreview key={idx} url={url} />
+                                                ))}
+                                            </div>
+
                                             {renderAttachments(thread.attachments)}
 
                                             <div className="task-footer-teams">
@@ -891,6 +906,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                                     className="reply-content"
                                                                                     dangerouslySetInnerHTML={{ __html: highlightMentions(reply.content, mentionOptions) }}
                                                                                 />
+                                                                                <div className="link-previews">
+                                                                                    {extractUrls(reply.content).map((url, idx) => (
+                                                                                        <LinkPreview key={idx} url={url} />
+                                                                                    ))}
+                                                                                </div>
                                                                                 {renderAttachments(reply.attachments)}
                                                                             </div>
 

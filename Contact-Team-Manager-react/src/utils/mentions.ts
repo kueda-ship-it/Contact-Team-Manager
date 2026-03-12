@@ -25,14 +25,32 @@ interface HighlightMentionsOptions {
 }
 
 /**
- * Replace mention syntax with styled spans
+ * Replace mention syntax and URLs with styled spans/links
  */
 export function highlightMentions(text: string | null, options: HighlightMentionsOptions): string {
     if (!text) return '';
 
     let highlighted = text;
 
-    // Profiles (@DisplayName)
+    // Helper to replace only in text nodes (roughly) by matching outside of tags
+    const replaceOutsideTags = (str: string, regex: RegExp, replacement: string | ((match: string) => string)) => {
+        // Matches HTML tags or content
+        return str.replace(/(<(?:"[^"]*"|'[^']*'|[^'">])*>)|([^<]+)/g, (match, tag, textNode) => {
+            if (tag) return tag; // Return tag as is
+            if (typeof replacement === 'string') {
+                return textNode.replace(regex, replacement);
+            }
+            return textNode.replace(regex, replacement);
+        });
+    };
+
+    // 1. URLs
+    const urlRegex = /((?:https?|file):\/\/[^\s<]+[^<.,:;"')\s])/g;
+    highlighted = replaceOutsideTags(highlighted, urlRegex, (url) => {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="post-link">${url}</a>`;
+    });
+
+    // 2. Profiles (@DisplayName)
     options.allProfiles.forEach(p => {
         if (!p.display_name) return;
         const mentionText = `@${p.display_name}`;
@@ -40,21 +58,21 @@ export function highlightMentions(text: string | null, options: HighlightMention
         const regex = new RegExp(escapedMention, 'g');
         const isSelf = p.email === options.currentUserEmail;
         const className = isSelf ? 'mention mention-me' : 'mention';
-        highlighted = highlighted.replace(regex, `<span class="${className}">${mentionText}</span>`);
+        highlighted = replaceOutsideTags(highlighted, regex, `<span class="${className}">${mentionText}</span>`);
     });
 
-    // @all
+    // 3. @all
     const allRegex = /@all/g;
-    highlighted = highlighted.replace(allRegex, '<span class="mention mention-all">@all</span>');
+    highlighted = replaceOutsideTags(highlighted, allRegex, '<span class="mention mention-all">@all</span>');
 
-    // Tags (@TagName or #TagName)
+    // 4. Tags (@TagName or #TagName)
     options.allTags.forEach(t => {
         const prefixes = ['@', '#'];
         prefixes.forEach(prefix => {
             const mentionText = `${prefix}${t.name}`;
             const escapedMention = mentionText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const regex = new RegExp(escapedMention, 'g');
-            highlighted = highlighted.replace(regex, `<span class="mention mention-tag">${mentionText}</span>`);
+            highlighted = replaceOutsideTags(highlighted, regex, `<span class="mention mention-tag">${mentionText}</span>`);
         });
     });
 
