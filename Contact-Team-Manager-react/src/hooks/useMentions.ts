@@ -14,9 +14,10 @@ interface UseMentionsProps {
     tags: any[];
     currentTeamId: number | string | null;
     teams?: any[];
+    memberIds?: string[]; // Added: Filter by members
 }
 
-export const useMentions = ({ profiles, tags, currentTeamId, teams }: UseMentionsProps) => {
+export const useMentions = ({ profiles, tags, currentTeamId, teams, memberIds }: UseMentionsProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
@@ -34,8 +35,12 @@ export const useMentions = ({ profiles, tags, currentTeamId, teams }: UseMention
 
         const lowerQuery = cleanText(query).toLowerCase();
 
-        // Users
-        const matchedProfiles = profiles
+        // Users - Filter by team members if provided
+        const filteredProfiles = memberIds 
+            ? profiles.filter(p => memberIds.includes(p.id))
+            : profiles;
+
+        const matchedProfiles = filteredProfiles
             .filter(p => {
                 const name = cleanText(p.display_name || '').toLowerCase();
                 const email = cleanText(p.email || '').toLowerCase();

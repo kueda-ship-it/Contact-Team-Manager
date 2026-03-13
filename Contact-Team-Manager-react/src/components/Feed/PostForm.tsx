@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useMentions } from '../../hooks/useMentions';
-import { useProfiles, useTags, useTeams } from '../../hooks/useSupabase';
+import { useProfiles, useTags, useTeams, useTeamMembers } from '../../hooks/useSupabase';
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { MentionList } from '../common/MentionList';
 
@@ -39,6 +39,11 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const { members: teamMembers } = useTeamMembers(teamId);
+    const memberIds = React.useMemo(() => 
+        teamId ? teamMembers.map(m => m.user_id) : undefined
+    , [teamMembers, teamId]);
+
     const {
         isOpen,
         candidates,
@@ -48,7 +53,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
         handleInput,
         handleKeyDown,
         insertMention,
-    } = useMentions({ profiles, tags, currentTeamId: teamId, teams });
+    } = useMentions({ profiles, tags, currentTeamId: teamId, teams, memberIds });
 
     // Ensure MSAL is initialized on mount so we can check it synchronously later
     React.useEffect(() => {

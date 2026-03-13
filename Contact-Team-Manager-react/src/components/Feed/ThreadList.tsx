@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTeams, useProfiles, useTags, useReactions } from '../../hooks/useSupabase';
+import { useTeams, useProfiles, useTags, useReactions, useTeamMembers } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { Attachment } from '../../hooks/useFileUpload';
@@ -108,6 +108,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
     const { uploadFile, downloadFileFromOneDrive, isAuthenticated, login } = useOneDriveUpload(); // Use OneDrive instead of Supabase
 
+    const { members: teamMembers } = useTeamMembers(currentTeamId);
+    const memberIds = React.useMemo(() => 
+        currentTeamId ? teamMembers.map(m => m.user_id) : undefined
+    , [teamMembers, currentTeamId]);
+
     const {
         isOpen,
         candidates,
@@ -118,7 +123,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         handleInput,
         handleKeyDown,
         insertMention
-    } = useMentions({ profiles, tags, currentTeamId, teams });
+    } = useMentions({ profiles, tags, currentTeamId, teams, memberIds });
 
     // Auto-scroll to proper end of thread list on load/update
     const threadListRef = React.useRef<HTMLDivElement>(null);
@@ -643,15 +648,24 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 {user?.id === thread.user_id && (
                                                     <div className="menu-item" onClick={() => {
                                                         setEditingThreadId(thread.id);
-                                                        // useTimeout to wait for render then focus? 
-                                                        // handled by simple autofocus or effect?
-                                                        // We can rely on user clicking or just standard flow.
                                                     }}>
-                                                        <span className="menu-icon">✏️</span> 編集
+                                                        <span className="menu-icon">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                            </svg>
+                                                        </span> 編集
                                                     </div>
                                                 )}
                                                 <div className="menu-item menu-item-delete" onClick={() => handleDeleteThread(thread.id)}>
-                                                    <span className="menu-icon">🗑️</span> 削除
+                                                    <span className="menu-icon">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                        </svg>
+                                                    </span> 削除
                                                 </div>
                                                 <div className="menu-item" onClick={() => {
                                                     // Initialize with current remind_at if exists
@@ -850,11 +864,23 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                                 <>
                                                                                     {user?.id === reply.user_id && (
                                                                                         <div className="menu-item" onClick={() => setEditingReplyId(reply.id)}>
-                                                                                            <span className="menu-icon">✏️</span> 編集
+                                                                                            <span className="menu-icon">
+                                                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                                                                </svg>
+                                                                                            </span> 編集
                                                                                         </div>
                                                                                     )}
                                                                                     <div className="menu-item menu-item-delete" onClick={() => handleDeleteReply(reply.id)}>
-                                                                                        <span className="menu-icon">🗑️</span> 削除
+                                                                                        <span className="menu-icon">
+                                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                                                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                                                            </svg>
+                                                                                        </span> 削除
                                                                                     </div>
                                                                                 </>
                                                                             )}

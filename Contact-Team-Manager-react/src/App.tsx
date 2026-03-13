@@ -366,6 +366,7 @@ function App() {
               <Dashboard
                 currentTeamId={currentTeamId}
                 onSelectTeam={setCurrentTeamId}
+                onThreadClick={handleSidebarThreadClick}
               />
             )}
           </main>
