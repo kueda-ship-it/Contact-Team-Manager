@@ -8,7 +8,7 @@ serve(async (req) => {
     }
 
     try {
-        const { to, cc, bcc, subject, body, from } = await req.json()
+        const { to, cc, bcc, categories, subject, body, from } = await req.json()
 
         console.log('[handle-inbound-email] Received email from:', from)
         console.log('[handle-inbound-email] To:', to)
@@ -48,19 +48,38 @@ serve(async (req) => {
             cc: ccEmails,
             bcc: bccEmails
         })
+        console.log('[handle-inbound-email] Categories:', categories)
 
-        // 「To」フィールドに含まれる、かつ「Bcc」フィールドにも含まれるチームのアドレスを探す
-        // 重複なしのリストから積集合を取得
-        const commonRecipients = toEmails.filter((addr: string) => bccEmails.includes(addr))
+        // --- 判定ロジック ---
+        // カテゴリー（Outlook分類項目）に "スレッド投稿" が含まれているか確認
+        const categoriesStr = (categories || '').toString().toLowerCase()
+        const hasTriggerCategory = categoriesStr.includes('スレッド投稿')
 
-        console.log('[handle-inbound-email] Intersection (To & Bcc):', commonRecipients)
+        let commonRecipients: string[] = []
+
+        if (hasTriggerCategory) {
+            // カテゴリーがある場合：To, Cc, Bcc のいずれかにチームアドレスがあればOK
+            console.log('[handle-inbound-email] Trigger category found. Checking all recipients.')
+            commonRecipients = Array.from(new Set([...toEmails, ...ccEmails, ...bccEmails]))
+        } else {
+            // カテゴリーがない場合：従来通り To と Bcc の両方に含まれている場合のみ
+            console.log('[handle-inbound-email] No trigger category. Checking To & Bcc strict match.')
+            commonRecipients = toEmails.filter((addr: string) => bccEmails.includes(addr))
+        }
+
+        console.log('[handle-inbound-email] Final candidate recipients:', commonRecipients)
 
         if (commonRecipients.length === 0) {
-            console.log('[handle-inbound-email] Ignored: No overlapping address in To and Bcc fields.')
+            const reason = hasTriggerCategory 
+                ? 'No team address found in any recipient field' 
+                : 'No overlapping address between To and Bcc fields';
+            
+            console.log(`[handle-inbound-email] Ignored: ${reason}`)
             return new Response(JSON.stringify({ 
                 success: false, 
-                message: 'Ignored: No overlapping address between To and Bcc fields',
-                extracted: { to: toEmails, bcc: bccEmails }
+                message: `Ignored: ${reason}`,
+                extracted: { to: toEmails, bcc: bccEmails, cc: ccEmails },
+                categories: categoriesStr
             }), { 
                 status: 200,
                 headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
