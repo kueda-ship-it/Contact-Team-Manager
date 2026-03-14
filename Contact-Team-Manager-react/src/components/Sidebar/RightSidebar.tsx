@@ -398,7 +398,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                 </div >
 
                 <div className="side-panel-section" style={{ minHeight: '200px' }}>
-                    <h3 className="side-panel-title">Mentions</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', marginBottom: '15px' }}>
+                        <h3 className="side-panel-title" style={{ margin: 0, textAlign: 'left' }}>Mentions</h3>
+                    </div>
                     <div id="assigned-sidebar-list">
                         {mentionedThreads.length === 0 ? (
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px' }}>メンションされた投稿はありません</div>
