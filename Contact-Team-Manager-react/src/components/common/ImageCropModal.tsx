@@ -6,34 +6,53 @@ interface ImageCropModalProps {
     onCancel: () => void;
 }
 
-const PREVIEW_SIZE = 400;
+const MAX_CANVAS_W = 440;
+const MAX_CANVAS_H = 480;
 const MIN_CROP = 60;
 
 export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConfirm, onCancel }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
-
-    // crop circle state (in display coords)
+    const [canvasSize, setCanvasSize] = useState({ w: MAX_CANVAS_W, h: MAX_CANVAS_W });
     const [crop, setCrop] = useState({ x: 80, y: 80, size: 240 });
     const dragState = useRef<{ type: 'move' | 'resize'; startX: number; startY: number; startCrop: typeof crop } | null>(null);
 
-    // Draw image + crop overlay
+    const handleImageLoad = useCallback(() => {
+        const img = imgRef.current;
+        if (!img) return;
+        const ratio = img.naturalHeight / img.naturalWidth;
+        let w = MAX_CANVAS_W;
+        let h = Math.round(w * ratio);
+        if (h > MAX_CANVAS_H) {
+            h = MAX_CANVAS_H;
+            w = Math.round(h / ratio);
+        }
+        if (h < 200) h = 200;
+        setCanvasSize({ w, h });
+        const initSize = Math.round(Math.min(w, h) * 0.65);
+        const initX = Math.round((w - initSize) / 2);
+        const initY = Math.round((h - initSize) / 2);
+        setCrop({ x: initX, y: initY, size: initSize });
+    }, []);
+
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
         const img = imgRef.current;
-        if (!canvas || !img || !img.complete) return;
+        if (!canvas || !img || !img.complete || img.naturalWidth === 0) return;
+        const { w, h } = { w: canvas.width, h: canvas.height };
         const ctx = canvas.getContext('2d')!;
-        ctx.clearRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+        ctx.clearRect(0, 0, w, h);
 
-        // Draw image scaled to fit canvas
-        ctx.drawImage(img, 0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+        // Draw image at natural aspect ratio filling canvas
+        ctx.drawImage(img, 0, 0, w, h);
 
         // Dim outside crop circle
         ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.fillRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+        ctx.fillRect(0, 0, w, h);
         const cx = crop.x + crop.size / 2;
         const cy = crop.y + crop.size / 2;
         const r = crop.size / 2;
+
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';
         ctx.beginPath();
@@ -41,12 +60,12 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConf
         ctx.fill();
         ctx.restore();
 
-        // Redraw image inside circle (clear reveals bg, need to redraw image)
+        // Redraw image inside circle
         ctx.save();
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(img, 0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+        ctx.drawImage(img, 0, 0, w, h);
         ctx.restore();
 
         // Circle border
@@ -70,11 +89,16 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConf
 
     useEffect(() => {
         draw();
-    }, [draw]);
+    }, [draw, canvasSize]);
 
     const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const rect = canvasRef.current!.getBoundingClientRect();
-        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        const scaleX = canvasRef.current!.width / rect.width;
+        const scaleY = canvasRef.current!.height / rect.height;
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY,
+        };
     };
 
     const isOnHandle = (px: number, py: number) => {
@@ -107,16 +131,18 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConf
         const dx = x - dragState.current.startX;
         const dy = y - dragState.current.startY;
         const sc = dragState.current.startCrop;
+        const { w, h } = canvasSize;
 
         if (dragState.current.type === 'move') {
-            const nx = Math.max(0, Math.min(PREVIEW_SIZE - sc.size, sc.x + dx));
-            const ny = Math.max(0, Math.min(PREVIEW_SIZE - sc.size, sc.y + dy));
+            const nx = Math.max(0, Math.min(w - sc.size, sc.x + dx));
+            const ny = Math.max(0, Math.min(h - sc.size, sc.y + dy));
             setCrop(c => ({ ...c, x: nx, y: ny }));
         } else {
             const delta = (dx + dy) / 2;
-            const newSize = Math.max(MIN_CROP, Math.min(PREVIEW_SIZE, sc.size + delta * 1.4));
-            const nx = Math.max(0, Math.min(PREVIEW_SIZE - newSize, sc.x));
-            const ny = Math.max(0, Math.min(PREVIEW_SIZE - newSize, sc.y));
+            const maxSize = Math.min(w, h);
+            const newSize = Math.max(MIN_CROP, Math.min(maxSize, sc.size + delta * 1.4));
+            const nx = Math.max(0, Math.min(w - newSize, sc.x));
+            const ny = Math.max(0, Math.min(h - newSize, sc.y));
             setCrop({ x: nx, y: ny, size: newSize });
         }
     };
@@ -134,9 +160,9 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConf
         const img = imgRef.current;
         if (!img) return;
 
-        // Scale from display coords to actual image coords
-        const scaleX = img.naturalWidth / PREVIEW_SIZE;
-        const scaleY = img.naturalHeight / PREVIEW_SIZE;
+        // Map from canvas coords to actual image coords
+        const scaleX = img.naturalWidth / canvasSize.w;
+        const scaleY = img.naturalHeight / canvasSize.h;
         const sx = crop.x * scaleX;
         const sy = crop.y * scaleY;
         const sw = crop.size * scaleX;
@@ -148,7 +174,6 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConf
         out.height = outSize;
         const ctx = out.getContext('2d')!;
 
-        // Clip to circle
         ctx.beginPath();
         ctx.arc(outSize / 2, outSize / 2, outSize / 2, 0, Math.PI * 2);
         ctx.clip();
@@ -175,9 +200,9 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConf
                 </div>
                 <canvas
                     ref={canvasRef}
-                    width={PREVIEW_SIZE}
-                    height={PREVIEW_SIZE}
-                    style={{ borderRadius: '12px', display: 'block', cursor: 'default' }}
+                    width={canvasSize.w}
+                    height={canvasSize.h}
+                    style={{ borderRadius: '12px', display: 'block', cursor: 'default', maxWidth: '100%' }}
                     onMouseDown={onMouseDown}
                     onMouseMove={(e) => {
                         onMouseMove(e);
@@ -186,12 +211,11 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConf
                     onMouseUp={onMouseUp}
                     onMouseLeave={onMouseUp}
                 />
-                {/* hidden img for drawing */}
                 <img
                     ref={imgRef}
                     src={imageSrc}
                     style={{ display: 'none' }}
-                    onLoad={draw}
+                    onLoad={handleImageLoad}
                     crossOrigin="anonymous"
                 />
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
