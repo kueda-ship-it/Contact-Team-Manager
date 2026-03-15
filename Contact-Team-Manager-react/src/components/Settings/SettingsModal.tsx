@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ImageCropModal } from '../common/ImageCropModal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useTeamMembers, useProfiles, useTeams, usePermissions, useUserMemberships, useTags } from '../../hooks/useSupabase';
@@ -41,6 +42,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     // Profile State
     const [displayName, setDisplayName] = useState('');
     const [avatarUrl, setAvatarUrl] = useState('');
+    const [cropSrc, setCropSrc] = useState<string | null>(null);
 
     const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
     const [bulkRole, setBulkRole] = useState<'Admin' | 'Manager' | 'Member' | 'Viewer'>('Member');
@@ -630,19 +632,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                     accept="image/*"
                                     className="input-field"
                                     style={{ paddingTop: '10px' }}
-                                    onChange={async (e) => {
+                                    onChange={(e) => {
                                         const file = e.target.files?.[0];
-                                        if (!file || !user) return;
-                                        try {
-                                            const fileExt = file.name.split('.').pop();
-                                            const fileName = `avatars/${user.id}-${Math.random()}.${fileExt}`;
-                                            const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
-                                            if (uploadError) throw uploadError;
-                                            const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
-                                            setAvatarUrl(data.publicUrl);
-                                        } catch (err: any) {
-                                            alert('アップロード失敗: ' + err.message);
-                                        }
+                                        if (!file) return;
+                                        const reader = new FileReader();
+                                        reader.onload = () => setCropSrc(reader.result as string);
+                                        reader.readAsDataURL(file);
+                                        e.target.value = '';
                                     }}
                                 />
                                 {avatarUrl && (
@@ -651,6 +647,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                     </div>
                                 )}
                             </div>
+                            {cropSrc && (
+                                <ImageCropModal
+                                    imageSrc={cropSrc}
+                                    onCancel={() => setCropSrc(null)}
+                                    onConfirm={async (blob) => {
+                                        setCropSrc(null);
+                                        if (!user) return;
+                                        try {
+                                            const fileName = `avatars/${user.id}-${Date.now()}.png`;
+                                            const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, blob, { contentType: 'image/png' });
+                                            if (uploadError) throw uploadError;
+                                            const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
+                                            setAvatarUrl(data.publicUrl);
+                                        } catch (err: any) {
+                                            alert('アップロード失敗: ' + err.message);
+                                        }
+                                    }}
+                                />
+                            )}
                             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                 <button className="btn btn-primary" onClick={handleSaveProfile}>保存</button>
                             </div>
