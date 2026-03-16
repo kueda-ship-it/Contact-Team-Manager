@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useMentions } from '../../hooks/useMentions';
-import { useProfiles, useTags, useTeams } from '../../hooks/useSupabase';
+import { useProfiles, useTags, useTeams, useTeamMembers } from '../../hooks/useSupabase';
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { MentionList } from '../common/MentionList';
 
@@ -11,9 +11,10 @@ import { initializeMsal } from '../../lib/microsoftGraph';
 interface PostFormProps {
     teamId: number | string | null;
     onSuccess?: () => void;
+    onCancel?: () => void;
 }
 
-export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
+export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel }) => {
     const { user, profile } = useAuth();
     const [title, setTitle] = useState('');
     const [remindAt, setRemindAt] = useState('');
@@ -38,6 +39,11 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const { members: teamMembers } = useTeamMembers(teamId);
+    const memberIds = React.useMemo(() => 
+        teamId ? teamMembers.map(m => m.user_id) : undefined
+    , [teamMembers, teamId]);
+
     const {
         isOpen,
         candidates,
@@ -47,7 +53,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         handleInput,
         handleKeyDown,
         insertMention,
-    } = useMentions({ profiles, tags, currentTeamId: teamId, teams });
+    } = useMentions({ profiles, tags, currentTeamId: teamId, teams, memberIds });
 
     // Ensure MSAL is initialized on mount so we can check it synchronously later
     React.useEffect(() => {
@@ -139,19 +145,19 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
         <div className="static-form-container">
             <section className="form-container compact-form" style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
                 {/* 左側: 入力エリア */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="post-form-main-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {/* 1行目: 件名とリマインド */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div className="post-form-row-1" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <input
                             type="text"
-                            className="input-field"
-                            placeholder="件名..."
+                            className="input-field post-subject-input"
+                            placeholder="件名を追加してください"
                             style={{ margin: 0, flex: 1 }}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             disabled={loading}
                         />
-                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <div className="post-remind-container" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <input
                                 type="datetime-local"
                                 value={remindAt}
@@ -162,155 +168,197 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess }) => {
                                     padding: '0 8px',
                                     height: '36px',
                                     fontSize: '0.8rem',
-                                    width: '180px',
+                                    flex: 1,
                                     color: remindAt ? 'var(--text-main)' : 'var(--text-muted)'
                                 }}
                                 title="リマインド日時を設定"
                                 disabled={loading}
                             />
+                            {remindAt && (
+                                <button
+                                    type="button"
+                                    onClick={() => setRemindAt('')}
+                                    title="リマインドをリセット"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.06)',
+                                        border: '1px solid rgba(255,255,255,0.15)',
+                                        color: 'var(--text-muted)',
+                                        borderRadius: '6px',
+                                        width: '36px',
+                                        height: '36px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        flexShrink: 0
+                                    }}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="1 4 1 10 7 10"></polyline>
+                                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Clip Button moved here */}
+                        <div className="post-clip-container" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {uploading && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', animation: 'fadeIn 0.2s' }}>
+                                    {statusMessage}
+                                </span>
+                            )}
+                            <button
+                                type="button"
+                                className="btn btn-clip-yellow"
+                                title="ファイル添付"
+                                style={{
+                                    padding: 0,
+                                    width: '32px',
+                                    height: '32px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                    opacity: uploading ? 0.7 : 1,
+                                    cursor: uploading ? 'default' : 'pointer',
+                                    borderRadius: '50%'
+                                }}
+                                disabled={loading || uploading}
+                                onClick={handleAttachClick}
+                            >
+                                {uploading ? (
+                                    <div className="spinner-small" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                ) : (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                    </svg>
+                                )}
+                            </button>
                         </div>
                     </div>
 
-                    {/* 2行目: 本文入力エリア */}
-                    <div style={{ position: 'relative', flex: 1 }}>
-                        <div
-                            ref={contentRef}
-                            contentEditable
-                            className="input-field rich-editor"
-                            style={{
-                                marginTop: 0,
-                                minHeight: '80px',
-                                width: '100%',
-                                border: '1px solid rgba(255, 255, 255, 0.5)',
-                                background: 'rgba(0, 0, 0, 0.2)',
-                                color: 'white',
-                                borderRadius: '4px',
-                                padding: '8px 12px'
-                            }}
-                            onInput={(e) => {
-                                handleInput(e, 'post-form');
-                            }}
-                            onKeyDown={(e) => {
-                                if (isOpen) {
-                                    handleKeyDown(e, 'post-form', e.currentTarget);
-                                    if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
-                                        return;
-                                    }
-                                }
-                            }}
-                            onPaste={(e: React.ClipboardEvent) => {
-                                e.preventDefault();
-                                const text = e.clipboardData.getData('text/plain');
-                                document.execCommand('insertText', false, text);
-                            }}
-                        />
-                        {attachments.length > 0 && (
-                            <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                                {attachments.map((att, index) => (
-                                    <div key={index} className="attachment-item" style={{ position: 'relative', width: '120px', height: '120px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        {att.type.startsWith('image/') ? (
-                                            <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        ) : (
-                                            <span style={{ fontSize: '20px' }}>📄</span>
-                                        )}
-                                        <div
-                                            className="attachment-remove"
-                                            onClick={() => removeFile(index)}
-                                            style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                right: 0,
-                                                background: 'rgba(0,0,0,0.5)',
-                                                color: 'white',
-                                                width: '18px',
-                                                height: '18px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                cursor: 'pointer',
-                                                fontSize: '12px'
-                                            }}
-                                        >
-                                            ×
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        {isOpen && (
-                            <MentionList
-                                candidates={candidates}
-                                activeIndex={activeIndex}
-                                onSelect={(c) => {
-                                    if (contentRef.current) insertMention(c, contentRef.current);
-                                }}
+                    {/* 2行目: 本文入力エリアと送信ボタン */}
+                    <div className="post-form-row-2" style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flex: 1 }}>
+                        <div className="post-content-container" style={{ position: 'relative', flex: 1 }}>
+                            <div
+                                ref={contentRef}
+                                contentEditable
+                                className="input-field rich-editor"
+                                data-placeholder="新しい会話を開始します。@ を入力して、誰かにメンションしてください。"
                                 style={{
-                                    top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
-                                    left: mentionCoords.left,
-                                    position: 'fixed',
-                                    transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none'
+                                    marginTop: 0,
+                                    minHeight: '80px',
+                                    width: '100%',
+                                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                                    background: 'rgba(0, 0, 0, 0.2)',
+                                    color: 'white',
+                                    borderRadius: '4px',
+                                    padding: '8px 12px'
+                                }}
+                                onInput={(e) => {
+                                    handleInput(e, 'post-form');
+                                }}
+                                onKeyDown={(e) => {
+                                    handleKeyDown(e, 'post-form', e.currentTarget);
+                                    if (isOpen) {
+                                        if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
+                                            return;
+                                        }
+                                    }
+                                }}
+                                onPaste={(e: React.ClipboardEvent) => {
+                                    e.preventDefault();
+                                    const text = e.clipboardData.getData('text/plain');
+                                    document.execCommand('insertText', false, text);
                                 }}
                             />
-                        )}
+                            {attachments.length > 0 && (
+                                <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                                    {attachments.map((att, index) => (
+                                        <div key={index} className="attachment-item" style={{ position: 'relative', width: '120px', height: '120px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {att.type.startsWith('image/') ? (
+                                                <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <span style={{ fontSize: '20px' }}>📄</span>
+                                            )}
+                                            <div
+                                                className="attachment-remove"
+                                                onClick={() => removeFile(index)}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    right: 0,
+                                                    background: 'rgba(0,0,0,0.5)',
+                                                    color: 'white',
+                                                    width: '18px',
+                                                    height: '18px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                    fontSize: '12px'
+                                                }}
+                                            >
+                                                ×
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {isOpen && (
+                                <MentionList
+                                    candidates={candidates}
+                                    activeIndex={activeIndex}
+                                    onSelect={(c) => {
+                                        if (contentRef.current) insertMention(c, contentRef.current);
+                                    }}
+                                    style={{
+                                        top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
+                                        left: mentionCoords.left,
+                                        position: 'fixed',
+                                        transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none'
+                                    }}
+                                />
+                            )}
+                        </div>
+
+                        {/* Send button (Airplane) moved here */}
+                        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '4px' }}>
+                            <button
+                                type="button"
+                                className="btn-send-blue"
+                                title="投稿"
+                                style={{
+                                    padding: 0,
+                                    width: '32px',
+                                    height: '32px',
+                                    flexShrink: 0,
+                                    cursor: 'pointer',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                                onClick={handleSubmit}
+                                disabled={loading || uploading}
+                            >
+                                {loading ? '...' : (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                )}
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                {/* 右側: ボタン（縦並び） */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'flex-start' }}>
-                    <button
-                        type="button"
-                        className="btn btn-clip-yellow"
-                        title="ファイル添付"
-                        style={{
-                            padding: 0,
-                            width: '38px',
-                            height: '38px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            opacity: uploading ? 0.7 : 1,
-                            cursor: uploading ? 'default' : 'pointer'
-                        }}
-                        disabled={loading || uploading}
-                        onClick={handleAttachClick}
-                    >
-                        {uploading ? (
-                            <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                        ) : (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                            </svg>
-                        )}
-                    </button>
-
-                    <button
-                        type="button"
-                        className="btn-send-blue"
-                        title="投稿"
-                        style={{
-                            padding: 0,
-                            width: '38px',
-                            height: '38px',
-                            flexShrink: 0,
-                            cursor: 'pointer',
-                        }}
-                        onClick={handleSubmit}
-                        disabled={loading || uploading}
-                    >
-                        {loading ? '...' : (
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                            </svg>
-                        )}
-                    </button>
-
-                    {uploading && (
-                        <div style={{ position: 'relative' }}>
-                            <span style={{ position: 'absolute', right: '45px', top: '-30px', whiteSpace: 'nowrap', fontSize: '0.7rem', color: 'var(--text-muted)', animation: 'fadeIn 0.2s' }}>
-                                {statusMessage}
-                            </span>
+                    {/* 下部: キャンセルボタン（必要な場合のみ） */}
+                    {onCancel && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '4px' }}>
+                            <button type="button" className="btn btn-secondary" onClick={onCancel} style={{ padding: '6px 16px', borderRadius: '4px', fontSize: '0.8rem', border: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer' }}>
+                                キャンセル
+                            </button>
                         </div>
                     )}
                 </div>

@@ -90,36 +90,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .single();
 
             if (error) {
-                // If not found by ID, check if this email is in our 'whitelist'
                 const { data: { user: currentUser } } = await supabase.auth.getUser();
                 if (currentUser?.email) {
-                    const { data: whitelistData, error: whitelistError } = await supabase
-                        .from('whitelist')
+                    // Step 1: Check if a profile with this email already exists (Microsoft SSO re-login)
+                    const { data: existingProfile } = await supabase
+                        .from('profiles')
                         .select('*')
                         .eq('email', currentUser.email)
                         .single();
 
-                    if (!whitelistError && whitelistData) {
-                        // Authorized email! Now we can safely create the formal profile
-                        // using the real auth userId.
-                        const { data: newProfile, error: createError } = await supabase
+                    if (existingProfile) {
+                        // Profile exists with old auth ID - update it to new auth ID
+                        const { data: updatedProfile, error: updateError } = await supabase
                             .from('profiles')
-                            .insert({
-                                id: userId,
-                                email: currentUser.email,
-                                display_name: currentUser.email.split('@')[0],
-                                role: 'Member',
-                                is_active: true
-                            })
+                            .update({ id: userId })
+                            .eq('email', currentUser.email)
                             .select()
                             .single();
-
-                        if (!createError) {
-                            // Optionally remove from whitelist after successful onboarding
-                            await supabase.from('whitelist').delete().eq('email', currentUser.email);
-
-                            data = newProfile;
+                        if (!updateError) {
+                            data = updatedProfile;
                             error = null as any;
+                        }
+                    } else {
+                        // Step 2: Check whitelist for new user onboarding
+                        const { data: whitelistData, error: whitelistError } = await supabase
+                            .from('whitelist')
+                            .select('*')
+                            .eq('email', currentUser.email)
+                            .single();
+
+                        if (!whitelistError && whitelistData) {
+                            const { data: newProfile, error: createError } = await supabase
+                                .from('profiles')
+                                .insert({
+                                    id: userId,
+                                    email: currentUser.email,
+                                    display_name: currentUser.email.split('@')[0],
+                                    role: 'Member',
+                                    is_active: true
+                                })
+                                .select()
+                                .single();
+                            if (!createError) {
+                                await supabase.from('whitelist').delete().eq('email', currentUser.email);
+                                data = newProfile;
+                                error = null as any;
+                            }
                         }
                     }
                 }

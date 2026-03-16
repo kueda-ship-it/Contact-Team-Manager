@@ -29,10 +29,10 @@ jobs:
       - name: Detect project directory
         id: detect
         run: |
-          if [ -f "package.json" ]; then
-            echo "dir=." >> $GITHUB_OUTPUT
-          elif [ -d "Contact-Team-Manager-react" ]; then
+          if [ -d "Contact-Team-Manager-react" ]; then
             echo "dir=Contact-Team-Manager-react" >> $GITHUB_OUTPUT
+          elif [ -f "package.json" ]; then
+            echo "dir=." >> $GITHUB_OUTPUT
           else
             echo "Error: package.json not found"
             exit 1

@@ -8,8 +8,10 @@ import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Login';
 import { useAuth } from './hooks/useAuth';
 import { useThreads, useTeams, useUserMemberships, useUnreadCounts } from './hooks/useSupabase';
+import { supabase } from './lib/supabase';
 import { useTheme } from './context/ThemeContext';
 import { useNotifications } from './hooks/useNotifications';
+import { MobileBottomNav } from './components/common/MobileBottomNav';
 import './styles/style.css';
 
 import { initializeMsal } from './lib/microsoftGraph';
@@ -58,6 +60,17 @@ function App() {
   const [threadsLimit, setThreadsLimit] = useState(50);
   const [sortAscending, setSortAscending] = useState(true);
   const [scrollToThreadId, setScrollToThreadId] = useState<string | null>(null);
+  const [activeMobileTab, setActiveMobileTab] = useState<'teams' | 'feed' | 'pending'>('feed');
+  const [isMobilePostFormOpen, setIsMobilePostFormOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const { teams } = useTeams();
   // Ensure we fetch ALL pending items if that filter is active, regardless of default limit
@@ -79,9 +92,13 @@ function App() {
   };
 
   // Redirect non-admins to their first team if no team is selected
+  // Mobile UI improvement (2026-03-03): If no team is selected initially, force the 'teams' tab to open
   useEffect(() => {
-    if (!authLoading && !membershipsLoading && user && profile?.role !== 'Admin' && currentTeamId === null) {
-      if (memberships.length > 0) {
+    if (!authLoading && !membershipsLoading && user && currentTeamId === null) {
+      // Switch tab to 'teams' to enforce team selection first on mobile
+      setActiveMobileTab('teams');
+
+      if (profile?.role !== 'Admin' && memberships.length > 0) {
         console.log('Redirecting non-admin to first team:', memberships[0].team_id);
         setCurrentTeamId(memberships[0].team_id);
       }
@@ -102,6 +119,43 @@ function App() {
       updateLastRead(String(currentTeamId));
     }
   }, [currentTeamId]);
+
+  // Handle ?thread=ID query parameter from notifications
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const threadId = params.get('thread');
+    if (threadId && !authLoading && user) {
+      // Find the thread and its team
+      const findAndNavigate = async () => {
+        // If thread is already in rawThreads, we can find its team_id
+        const loadedThread = rawThreads.find(t => t.id === threadId);
+        if (loadedThread) {
+          if (String(loadedThread.team_id) !== String(currentTeamId)) {
+            setCurrentTeamId(loadedThread.team_id);
+          }
+          handleSidebarThreadClick(threadId);
+          // Clear param from URL to avoid repeated navigation
+          const newUrl = window.location.pathname + window.location.hash;
+          window.history.replaceState({}, '', newUrl);
+        } else {
+          // If not loaded, we might need to fetch it to know the team
+          const { data } = await supabase.from('threads').select('team_id').eq('id', threadId).single();
+          if (data) {
+            if (String(data.team_id) !== String(currentTeamId)) {
+              setCurrentTeamId(data.team_id);
+            }
+            // Give it a moment to load threads for the new team
+            setTimeout(() => {
+              handleSidebarThreadClick(threadId);
+              const newUrl = window.location.pathname + window.location.hash;
+              window.history.replaceState({}, '', newUrl);
+            }, 500);
+          }
+        }
+      };
+      findAndNavigate();
+    }
+  }, [authLoading, user, rawThreads]);
 
   // Title flashing for unread messages
   useEffect(() => {
@@ -174,7 +228,7 @@ function App() {
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
           </svg>
-          Contact Team Manager
+          <span className="logo-text">Contact Team Manager</span>
         </div>
 
         <div className="header-search-container">
@@ -244,19 +298,24 @@ function App() {
         </div>
       </header>
 
-      <div className="main-wrapper">
+      <div className={`main-wrapper mobile-tab-${activeMobileTab}`}>
         <TeamsSidebar
           currentTeamId={currentTeamId}
           onSelectTeam={(id) => {
             setCurrentTeamId(id);
             setViewMode('feed');
+            setActiveMobileTab('feed');
           }}
           viewMode={viewMode}
-          onSelectDashboard={() => setViewMode('dashboard')}
+          onSelectDashboard={() => {
+            setViewMode('dashboard');
+            setActiveMobileTab('feed');
+          }}
           statusFilter={statusFilter}
           onSelectStatus={(status) => {
             setStatusFilter(status);
             setViewMode('feed');
+            setActiveMobileTab('feed');
           }}
           onEditTeam={() => {
             setSettingsInitialTab('team');
@@ -294,7 +353,8 @@ function App() {
                     onScrollComplete={() => setScrollToThreadId(null)}
                   />
                 </div>
-                <div style={{ flexShrink: 0 }}>
+                {/* Desktop: Show PostForm inline at bottom */}
+                <div className="desktop-only-postform" style={{ flexShrink: 0 }}>
                   <PostForm
                     teamId={currentTeamId}
                     onSuccess={() => refetch(true)}
@@ -306,6 +366,7 @@ function App() {
               <Dashboard
                 currentTeamId={currentTeamId}
                 onSelectTeam={setCurrentTeamId}
+                onThreadClick={handleSidebarThreadClick}
               />
             )}
           </main>
@@ -318,13 +379,75 @@ function App() {
         </div>
       </div>
 
+      {/* Mobile Post FAB (Only show when active tab is feed or teams, and form is not open) */}
+      {!isMobilePostFormOpen && (activeMobileTab === 'feed' || activeMobileTab === 'teams') && viewMode !== 'dashboard' && (
+        <button
+          className="mobile-fab"
+          onClick={() => setIsMobilePostFormOpen(true)}
+          title="新規投稿"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+        </button>
+      )}
+
+      {/* Mobile Post Form Modal - Premium Redesign */}
+      {isMobilePostFormOpen && (
+        <div className="mobile-post-modal">
+          <div className="mobile-post-modal-header">
+            <div className="modal-title-area">
+              <span className="modal-title">新規投稿</span>
+              <span className="modal-subtitle">{currentTeamName || 'チーム未選択'}</span>
+            </div>
+            <button
+              className="mobile-post-close-btn"
+              onClick={() => setIsMobilePostFormOpen(false)}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div className="mobile-post-modal-content">
+            <PostForm
+              teamId={currentTeamId}
+              onSuccess={() => {
+                refetch(true);
+                setIsMobilePostFormOpen(false);
+              }}
+              onCancel={() => setIsMobilePostFormOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {isSettingsOpen && (
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          initialTab={settingsInitialTab}
-          onClose={() => setIsSettingsOpen(false)}
-          currentTeamId={currentTeamId ? String(currentTeamId) : null}
-          currentTeamName={currentTeamName}
+        <>
+          {console.log('[App] Opening SettingsModal. currentTeamId:', currentTeamId)}
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            initialTab={settingsInitialTab}
+            onClose={() => setIsSettingsOpen(false)}
+            currentTeamId={currentTeamId ? String(currentTeamId) : null}
+            currentTeamName={currentTeamName}
+          />
+        </>
+      )}
+
+      {isMobile && (
+        <MobileBottomNav
+          activeTab={activeMobileTab}
+          onTabChange={(tab) => {
+            setActiveMobileTab(tab);
+            if (tab === 'feed' || tab === 'pending') {
+              setViewMode('feed');
+            }
+          }}
+          unreadCount={unreadTeams.size}
+          pendingCount={0}
         />
       )}
     </div>

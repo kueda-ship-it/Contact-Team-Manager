@@ -24,14 +24,14 @@ export function escapeHtml(text: string): string {
  */
 export function getPlainTextForSidebar(html: string): string {
     if (!html) return '';
-    // Temporarily replace mention spans with markers
-    let processed = html.replace(/<span class="mention".*?>(.*?)<\/span>/g, '___MENTION_START___$1___MENTION_END___');
+    // Temporarily replace mention spans with markers, capturing classes
+    let processed = html.replace(/<span class="(mention.*?)".*?>(.*?)<\/span>/g, '___MENTION_START___$1|___|$2___MENTION_END___');
     // Strip other HTML
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = processed;
     let plain = tempDiv.innerText || tempDiv.textContent || '';
-    // Restore mention spans
-    plain = plain.replace(/___MENTION_START___(.*?)___MENTION_END___/g, '<span class="mention">$1</span>');
+    // Restore mention spans with original classes
+    plain = plain.replace(/___MENTION_START___(.*?)\|___\|(.*?)___MENTION_END___/g, '<span class="$1">$2</span>');
     return plain;
 }
 

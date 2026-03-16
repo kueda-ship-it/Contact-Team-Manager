@@ -6,11 +6,13 @@ import { useAuth } from '../../hooks/useAuth';
 interface DashboardProps {
     currentTeamId: number | string | null;
     onSelectTeam: (id: number | string | null) => void;
+    onThreadClick?: (threadId: string) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
     currentTeamId,
-    onSelectTeam
+    onSelectTeam,
+    onThreadClick
 }) => {
     const { teams } = useTeams();
     const { user, profile } = useAuth();
@@ -140,6 +142,43 @@ export const Dashboard: React.FC<DashboardProps> = ({
             userStats[completerName].completedCount++;
         }
     });
+
+    // --- New Reply Analytics ---
+    const threadsWithReplies = displayThreads.filter(t => (t.replies?.length || 0) > 0);
+    const threadsWithoutReplies = displayThreads.filter(t => (t.replies?.length || 0) === 0);
+    const replyRate = totalThreads > 0 ? Math.round((threadsWithReplies.length / totalThreads) * 100) : 0;
+    const totalReplies = displayThreads.reduce((acc, t) => acc + (t.replies?.length || 0), 0);
+    const avgRepliesPerThread = threadsWithReplies.length > 0 ? (totalReplies / threadsWithReplies.length).toFixed(1) : '0';
+
+    const avgTimeWithReplies = calculateAvgTime(threadsWithReplies);
+    const avgTimeWithoutReplies = calculateAvgTime(threadsWithoutReplies);
+
+    // Reply Distribution Analysis
+    const replyCountDist: { [key: string]: number } = { '1': 0, '2': 0, '3': 0, '4': 0, '5+': 0 };
+    threadsWithReplies.forEach(t => {
+        const count = t.replies?.length || 0;
+        if (count >= 5) replyCountDist['5+']++;
+        else replyCountDist[String(count)]++;
+    });
+
+    // Longest Completion Ranking (Top 100)
+    const longestThreads = displayThreads
+        .filter(t => t.status === 'completed' && t.completed_at && t.created_at)
+        .map(t => {
+            const durationMs = new Date(t.completed_at!).getTime() - new Date(t.created_at).getTime();
+            return { ...t, durationMs };
+        })
+        .sort((a, b) => b.durationMs - a.durationMs)
+        .slice(0, 100);
+
+    const formatDuration = (ms: number) => {
+        const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+        if (days > 0) return `${days}日 ${hours}時間`;
+        if (hours > 0) return `${hours}時間 ${mins}分`;
+        return `${mins}分`;
+    };
 
     Object.keys(userStats).forEach(userName => {
         const stats = userStats[userName];
@@ -422,6 +461,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>平均完了時間</div>
                             <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)', textAlign: 'center' }}>{overallAvgTime}</div>
                         </div>
+                        <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(220, 38, 38, 0.05), rgba(220, 38, 38, 0.02))' }}>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>返信ありの割合</div>
+                            <div style={{ fontSize: '2.8rem', fontWeight: 800, color: 'var(--danger)' }}>{replyRate}%</div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+                        <div className="task-card" style={{ padding: '25px' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>返信数の分布</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                {Object.entries(replyCountDist).map(([count, total]) => (
+                                    <div key={count}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.9rem' }}>
+                                            <span style={{ fontWeight: 600 }}>{count} 件の返信</span>
+                                            <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{total} スレッド</span>
+                                        </div>
+                                        <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                                            <div
+                                                style={{
+                                                    height: '100%',
+                                                    width: `${threadsWithReplies.length > 0 ? (total / threadsWithReplies.length) * 100 : 0}%`,
+                                                    background: 'var(--danger)',
+                                                    transition: 'width 1s ease-out'
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>総返信数</span>
+                                    <span style={{ fontWeight: 700 }}>{totalReplies} 件 (平均 {avgRepliesPerThread} 件)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="task-card" style={{ padding: '25px' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>返信有無による完了時間の比較</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', justifyContent: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ width: '12px', height: '40px', background: 'var(--danger)', borderRadius: '6px' }}></div>
+                                    <div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>返信ありのスレッド</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{avgTimeWithReplies}</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ width: '12px', height: '40px', background: 'var(--text-muted)', borderRadius: '6px' }}></div>
+                                    <div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>返信なしのスレッド</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{avgTimeWithoutReplies}</div>
+                                    </div>
+                                </div>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '10px' }}>
+                                    ※返信が多いほど複雑な案件である可能性が高く、解決まで時間を要する傾向にあります。
+                                </p>
+                            </div>
+                        </div>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
@@ -654,6 +750,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                         </div>
                     </div>
+                    <div className="task-card" style={{ padding: '25px', marginTop: '20px' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>解決まで時間を要したスレッド (Top 100)</h3>
+                        <div style={{ overflowX: 'auto', maxHeight: '500px' }} className="custom-scrollbar">
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-main)', zIndex: 1 }}>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)' }}>
+                                        <th style={{ padding: '10px', textAlign: 'left' }}>スレッドタイトル</th>
+                                        <th style={{ padding: '10px', textAlign: 'center' }}>返信数</th>
+                                        <th style={{ padding: '10px', textAlign: 'center' }}>対応者</th>
+                                        <th style={{ padding: '10px', textAlign: 'right' }}>所要時間</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {longestThreads.length === 0 ? (
+                                        <tr><td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>データなし</td></tr>
+                                    ) : (
+                                        longestThreads.map(t => {
+                                            const completerProfile = t.completed_by ? (profiles.find((p: any) => p.id === t.completed_by)) : null;
+                                            const completerName = completerProfile?.display_name || completerProfile?.email || t.author_name || t.author || 'Unknown';
+                                            
+                                            return (
+                                                <tr 
+                                                    key={t.id} 
+                                                    style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: onThreadClick ? 'pointer' : 'default' }}
+                                                    onClick={() => onThreadClick && onThreadClick(t.id)}
+                                                    className="dashboard-ranking-row"
+                                                >
+                                                    <td style={{ padding: '12px 10px', maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        <span style={{ fontWeight: 600, color: 'var(--accent)', marginRight: '8px' }}>#{t.title.split(' ')[0]}</span>
+                                                        <span style={{ color: 'var(--text-main)' }}>{t.title.split(' ').slice(1).join(' ') || t.title}</span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                                                        <span style={{ padding: '2px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                                                            {t.replies?.length || 0}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 10px', textAlign: 'center', fontSize: '0.85rem' }}>
+                                                        {completerName}
+                                                    </td>
+                                                    <td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
+                                                        {formatDuration(t.durationMs)}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </>
             )}
 
@@ -712,6 +858,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); borderRadius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+                .dashboard-ranking-row:hover { background: rgba(255,255,255,0.03); }
+                .dashboard-ranking-row:hover td { color: var(--accent); }
             `}</style>
         </div>
     );

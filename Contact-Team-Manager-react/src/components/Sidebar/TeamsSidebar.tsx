@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTeams, useUserMemberships } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../lib/supabase';
 
 export interface TeamsSidebarProps {
     currentTeamId: number | string | null;
@@ -32,20 +33,59 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
     const [sortedTeams, setSortedTeams] = useState<typeof rawTeams>([]);
     const [draggedId, setDraggedId] = useState<string | null>(null);
     const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
+    const [manuallyCollapsedTeams, setManuallyCollapsedTeams] = useState<Set<string>>(new Set());
+    const [pendingCount, setPendingCount] = useState<number>(0);
+
+    useEffect(() => {
+        if (!user) return;
+        let query = supabase
+            .from('threads')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'pending');
+        if (currentTeamId) {
+            query = query.eq('team_id', currentTeamId);
+        }
+        query.then(({ count }) => {
+            setPendingCount(count ?? 0);
+        });
+    }, [user, currentTeamId]);
+
+    // Build childrenMap early for scope access in toggleTeam
+    const childrenMap: { [parentId: string]: any[] } = {};
+    sortedTeams.forEach(t => {
+        if (t.parent_id) {
+            const pId = String(t.parent_id);
+            if (!childrenMap[pId]) childrenMap[pId] = [];
+            childrenMap[pId].push(t);
+        }
+    });
 
     // Toggle team expansion
     const toggleTeam = (teamId: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        setExpandedTeams(prev => {
-            const next = new Set(prev);
-            if (next.has(teamId)) {
-                next.delete(teamId);
-            } else {
-                next.add(teamId);
-            }
-            return next;
-        });
+        const tIdStr = String(teamId);
+
+        const isCurrentlyExpanded = expandedTeams.has(tIdStr) ||
+            (currentTeamId !== null && String(currentTeamId) === tIdStr) ||
+            childrenMap[tIdStr]?.some(child => currentTeamId !== null && String(currentTeamId) === String(child.id));
+
+        if (isCurrentlyExpanded) {
+            setExpandedTeams(prev => {
+                const next = new Set(prev);
+                next.delete(tIdStr);
+                return next;
+            });
+            setManuallyCollapsedTeams(prev => new Set(prev).add(tIdStr));
+        } else {
+            setExpandedTeams(prev => new Set(prev).add(tIdStr));
+            setManuallyCollapsedTeams(prev => {
+                const next = new Set(prev);
+                next.delete(tIdStr);
+                return next;
+            });
+        }
     };
+
 
     // Initial Sort based on LocalStorage
     useEffect(() => {
@@ -98,6 +138,11 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
         const newIndex = sortedTeams.findIndex(t => String(t.id) === String(targetId));
 
         if (oldIndex > -1 && newIndex > -1) {
+            // Removed strict parent_id checking: 
+            // The rendering logic automatically groups children under their respective parents
+            // based on the order they appear in the flat array. Allowing free dropping makes the UI feel better
+            // and allows swapping children even if the drop target slightly overlaps a parent node.
+
             // Determine if drop was on top or bottom half of the HEADER area
             const header = e.currentTarget.querySelector('.team-item-header');
             const rect = header ? header.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
@@ -215,30 +260,27 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                     const visibleTeams = sortedTeams.filter(t => isAdmin || visibleTeamIds.has(String(t.id)));
 
                     const roots = visibleTeams.filter(t => !t.parent_id);
-                    const childrenMap: { [parentId: string]: any[] } = {};
-                    visibleTeams.forEach(t => {
-                        if (t.parent_id) {
-                            if (!childrenMap[String(t.parent_id)]) childrenMap[String(t.parent_id)] = [];
-                            childrenMap[String(t.parent_id)].push(t);
-                        }
-                    });
+                    // (Note: childrenMap is now built at the top for scope sharing)
 
                     const renderTeamItem = (team: any, isChannel = false) => {
-                        const hasChildren = childrenMap[String(team.id)]?.length > 0;
+                        const tIdStr = String(team.id);
+                        const hasChildren = childrenMap[tIdStr]?.length > 0;
                         // Check if this team or any of its children is currently selected
-                        const isDirectlyActive = currentTeamId !== null && String(currentTeamId) === String(team.id);
-                        const isChildActive = !isChannel && childrenMap[String(team.id)]?.some(
+                        const isDirectlyActive = currentTeamId !== null && String(currentTeamId) === tIdStr;
+                        const isChildActive = !isChannel && childrenMap[tIdStr]?.some(
                             (child: any) => currentTeamId !== null && String(currentTeamId) === String(child.id)
                         );
                         const isActiveOrChildActive = isDirectlyActive || isChildActive;
-                        // Expand if explicitly in expandedTeams OR if this team or its child is currently selected
-                        const isExpanded = expandedTeams.has(String(team.id)) || (!isChannel && isActiveOrChildActive);
+
+                        // Expand if explicitly in expandedTeams OR (active and NOT manually collapsed)
+                        const isExpanded = expandedTeams.has(tIdStr) || (isActiveOrChildActive && !manuallyCollapsedTeams.has(tIdStr));
+
 
                         return (
                             <div
                                 key={team.id}
                                 className={`team-list-item ${isDirectlyActive ? 'active' : ''} ${isChildActive ? 'child-active' : ''}`}
-                                title={team.name}
+                                title={`${team.name}${team.email_address ? ` (${team.email_address})` : ''}`}
                                 draggable={true}
                                 onDragStart={(e) => {
                                     e.stopPropagation();
@@ -299,9 +341,9 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                                         flex: 1,
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis',
-                                        fontSize: isChannel ? '0.9rem' : '0.9rem',
+                                        fontSize: isChannel ? '0.85rem' : '0.9rem',
                                         color: (isChannel || hasChildren) ? 'var(--text-muted)' : 'var(--text-main)',
-                                        fontWeight: (isChannel && unreadTeams.has(String(team.id))) ? 700 : (isChannel ? 400 : 600),
+                                        fontWeight: (unreadTeams.has(String(team.id)) || isDirectlyActive) ? 600 : 500,
                                         whiteSpace: 'nowrap',
                                         paddingLeft: isChannel ? '16px' : '0'
                                     }}>
@@ -345,7 +387,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
 
                                 {isExpanded && (
                                     <div className="sidebar-submenu-container">
-                                        {isDirectlyActive && (
+                                        {!isChannel && isDirectlyActive && (
                                             <div className="sidebar-submenu">
                                                 <div
                                                     className={`sidebar-submenu-item ${statusFilter === 'all' ? 'active' : ''}`}
@@ -357,7 +399,27 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                                                     className={`sidebar-submenu-item ${statusFilter === 'pending' ? 'active' : ''}`}
                                                     onClick={() => onSelectStatus('pending')}
                                                 >
-                                                    <span># 未完了</span>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        # 未完了
+                                                        {pendingCount > 0 && (
+                                                            <span style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                minWidth: '18px',
+                                                                height: '18px',
+                                                                padding: '0 5px',
+                                                                borderRadius: '9px',
+                                                                background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
+                                                                color: '#fff',
+                                                                fontSize: '0.65rem',
+                                                                fontWeight: 700,
+                                                                lineHeight: 1,
+                                                            }}>
+                                                                {pendingCount}
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                 </div>
                                                 <div
                                                     className={`sidebar-submenu-item ${statusFilter === 'mentions' ? 'active' : ''}`}
@@ -384,17 +446,40 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
 
                 <div className="sidebar-divider"></div>
 
-                <div className="team-list-item" title="チームを追加" onClick={onAddTeam} style={{ cursor: 'pointer' }}>
-                    <div className="team-item-header">
-                        <div className="team-icon" style={{ border: '2px dashed #555', background: 'transparent', color: '#777' }}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
+                {(() => {
+                    const canCreate = profile?.role !== 'Viewer';
+                    return (
+                        <div
+                            className="team-list-item"
+                            title={canCreate ? 'チームを追加' : 'チーム作成権限がありません'}
+                            style={{ cursor: 'pointer', opacity: canCreate ? 1 : 0.35, transition: 'opacity 0.2s' }}
+                            onClick={() => {
+                                if (!canCreate) {
+                                    alert('チーム作成権限がありません');
+                                    return;
+                                }
+                                onAddTeam?.();
+                            }}
+                        >
+                            <div className="team-item-header">
+                                <div className="team-icon" style={{
+                                    border: canCreate ? '2px dashed rgba(0,183,189,0.6)' : '2px dashed #444',
+                                    background: canCreate ? 'rgba(0,183,189,0.06)' : 'transparent',
+                                    color: canCreate ? 'var(--accent)' : '#555',
+                                    transition: 'all 0.2s',
+                                }}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </div>
+                                <span className="team-name-label" style={{ color: canCreate ? 'var(--text-main)' : '#555', transition: 'color 0.2s' }}>
+                                    チームを追加
+                                </span>
+                            </div>
                         </div>
-                        <span className="team-name-label">チームを追加</span>
-                    </div>
-                </div>
+                    );
+                })()}
 
                 <div className="sidebar-divider"></div>
 

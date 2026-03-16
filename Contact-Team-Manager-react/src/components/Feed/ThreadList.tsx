@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTeams, useProfiles, useTags, useReactions } from '../../hooks/useSupabase';
+import { useTeams, useProfiles, useTags, useReactions, useTeamMembers } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { Attachment } from '../../hooks/useFileUpload';
@@ -10,6 +10,15 @@ import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
+import { LinkPreview } from '../common/LinkPreview';
+
+// Helper to extract URLs from text
+const extractUrls = (text: string | null): string[] => {
+    if (!text) return [];
+    const urlRegex = /((?:https?|file):\/\/[^\s<]+[^<.,:;"')\s])/g;
+    const matches = text.match(urlRegex);
+    return matches ? Array.from(new Set(matches)) : [];
+};
 
 interface ThreadListProps {
     currentTeamId: number | string | null;
@@ -55,8 +64,54 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [replyAttachments, setReplyAttachments] = React.useState<{ [key: string]: Attachment[] }>({});
     const [replyUploading, setReplyUploading] = React.useState<{ [key: string]: boolean }>({});
     const [remindInput, setRemindInput] = React.useState<{ threadId: string, remindAt: string } | null>(null);
+    const [expandedThreads, setExpandedThreads] = React.useState<Set<string>>(new Set());
+    const [needsExpandMap, setNeedsExpandMap] = React.useState<{ [key: string]: boolean }>({});
+    const measureRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+    // Measure heights to detect if they exceed thresholds (200px for threads, 100px for replies)
+    React.useLayoutEffect(() => {
+        const observer = new ResizeObserver((entries) => {
+            setNeedsExpandMap(prev => {
+                const next = { ...prev };
+                let changed = false;
+                for (const entry of entries) {
+                    const el = entry.target as HTMLElement;
+                    const id = el.getAttribute('data-measure-id');
+                    if (id) {
+                        const threshold = id.startsWith('reply-') ? 100 : 200;
+                        const needs = el.scrollHeight > threshold;
+                        if (next[id] !== needs) {
+                            next[id] = needs;
+                            changed = true;
+                        }
+                    }
+                }
+                return changed ? next : prev;
+            });
+        });
+
+        Object.values(measureRefs.current).forEach(el => {
+            if (el) observer.observe(el);
+        });
+
+        return () => observer.disconnect();
+    }, [threads]); // Re-observe when threads change (new items added)
+
+    const toggleExpand = (id: string) => {
+        setExpandedThreads(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     const { uploadFile, downloadFileFromOneDrive, isAuthenticated, login } = useOneDriveUpload(); // Use OneDrive instead of Supabase
+
+    const { members: teamMembers } = useTeamMembers(currentTeamId);
+    const memberIds = React.useMemo(() => 
+        currentTeamId ? teamMembers.map(m => m.user_id) : undefined
+    , [teamMembers, currentTeamId]);
 
     const {
         isOpen,
@@ -68,7 +123,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         handleInput,
         handleKeyDown,
         insertMention
-    } = useMentions({ profiles, tags, currentTeamId, teams });
+    } = useMentions({ profiles, tags, currentTeamId, teams, memberIds });
 
     // Auto-scroll to proper end of thread list on load/update
     const threadListRef = React.useRef<HTMLDivElement>(null);
@@ -107,22 +162,22 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
     const initialScrollDone = React.useRef(false);
 
-    // Reset initial scroll state when team changes
+    // Reset initial scroll state when team changes or sort order changes
     React.useEffect(() => {
         initialScrollDone.current = false;
-    }, [currentTeamId]);
+    }, [currentTeamId, sortAscending]);
 
     // Initial scroll to bottom for Chat Mode
     React.useEffect(() => {
         // Wait until loading is finished and we have threads
         if (!threadsLoading && sortAscending && threads.length > 0) {
-            // Only scroll to bottom if it's the initial load for this team or a new message arrived
+            // Always try to scroll to bottom on initial load of the view or when switching to Chat mode
             if (!initialScrollDone.current) {
                 // Use a small timeout to ensure DOM is updated
                 const timer = setTimeout(() => {
-                    bottomAnchorRef.current?.scrollIntoView({ behavior: 'auto' });
+                    bottomAnchorRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
                     initialScrollDone.current = true;
-                }, 100);
+                }, 150);
                 return () => clearTimeout(timer);
             }
         }
@@ -449,7 +504,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             style={{ overflowY: 'auto', height: '100%' }}
             onScroll={handleScroll}
         >
-            <div className="feed-header-sticky">
+            {/* Desktop Header (Original UI) */}
+            <div className="feed-header-sticky desktop-only">
                 <div className="feed-header-left">
                     <CustomSelect
                         options={[
@@ -486,6 +542,42 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                     }}>
                         {sortAscending ? 'チャット形式 (最新が下)' : 'ニュース形式 (最新が上)'}
                     </button>
+                </div>
+            </div>
+
+            {/* Mobile Header (New Integrated Sticky UI) */}
+            <div className="mobile-only mobile-header-fixed">
+                <div className="mobile-header-top-row">
+                    <div className="mobile-team-name">
+                        {currentTeamName}
+                    </div>
+                    <button className="sort-minimal-btn" onClick={onToggleSort}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                            <polyline points="16 7 22 7 22 13"></polyline>
+                        </svg>
+                        {sortAscending ? '昇' : '降'}
+                    </button>
+                    <div className="mobile-thread-count">
+                        {threads.length}件
+                    </div>
+                </div>
+                <div className="filter-chips-container">
+                    {[
+                        { value: 'all', label: 'すべて表示' },
+                        { value: 'pending', label: '未完了' },
+                        { value: 'completed', label: '完了済み' },
+                        { value: 'mentions', label: '自分宛て' },
+                        { value: 'myposts', label: '自分の投稿' }
+                    ].map(opt => (
+                        <div
+                            key={opt.value}
+                            className={`filter-chip ${statusFilter === opt.value ? 'active' : ''}`}
+                            onClick={() => onStatusChange(opt.value as any)}
+                        >
+                            {opt.label}
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -556,15 +648,24 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 {user?.id === thread.user_id && (
                                                     <div className="menu-item" onClick={() => {
                                                         setEditingThreadId(thread.id);
-                                                        // useTimeout to wait for render then focus? 
-                                                        // handled by simple autofocus or effect?
-                                                        // We can rely on user clicking or just standard flow.
                                                     }}>
-                                                        <span className="menu-icon">✏️</span> 編集
+                                                        <span className="menu-icon">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                            </svg>
+                                                        </span> 編集
                                                     </div>
                                                 )}
                                                 <div className="menu-item menu-item-delete" onClick={() => handleDeleteThread(thread.id)}>
-                                                    <span className="menu-icon">🗑️</span> 削除
+                                                    <span className="menu-icon">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                        </svg>
+                                                    </span> 削除
                                                 </div>
                                                 <div className="menu-item" onClick={() => {
                                                     // Initialize with current remind_at if exists
@@ -687,8 +788,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                             style={{ minHeight: '80px', marginBottom: '8px', color: 'var(--text-main)' }}
                                             onInput={(e) => handleInput(e, thread.id)}
                                             onKeyDown={(e) => {
+                                                handleKeyDown(e, thread.id, e.currentTarget);
                                                 if (isOpen && targetThreadId === thread.id) {
-                                                    handleKeyDown(e, thread.id, e.currentTarget);
+                                                    // Handle other mention keys if needed
                                                 }
                                             }}
                                         />
@@ -714,293 +816,338 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                         </div>
                                     </div>
                                 ) : (
-                                    <div
-                                        className="task-content line-clamp-2"
-                                        dangerouslySetInnerHTML={{ __html: highlightMentions(thread.content, mentionOptions) }}
-                                        style={{ whiteSpace: 'pre-wrap', cursor: 'pointer' }}
-                                        title="クリックで全文表示/折りたたみ"
-                                        onClick={(e) => e.currentTarget.classList.toggle('line-clamp-2')}
-                                    />
-                                )}
+                                    <>
+                                        <div className={`thread-expandable-wrapper ${expandedThreads.has(thread.id) ? 'expanded' : (needsExpandMap[thread.id] ? 'collapsed' : 'none')}`}>
+                                            <div
+                                                ref={(el) => { if (el) measureRefs.current[thread.id] = el; }}
+                                                data-measure-id={thread.id}
+                                                className="task-content"
+                                                dangerouslySetInnerHTML={{ __html: highlightMentions(thread.content, mentionOptions) }}
+                                                style={{ whiteSpace: 'pre-wrap' }}
+                                            />
 
-                                {renderAttachments(thread.attachments)}
+                                            <div className="link-previews">
+                                                {extractUrls(thread.content).map((url, idx) => (
+                                                    <LinkPreview key={idx} url={url} />
+                                                ))}
+                                            </div>
 
-                                <div className="task-footer-teams">
-                                    <ReactionBar
-                                        reactions={reactions.filter(r => r.thread_id === thread.id && !r.reply_id)}
-                                        profiles={profiles}
-                                        currentUserId={user?.id}
-                                        currentProfile={currentProfile}
-                                        onAdd={(emoji) => handleAddReaction(emoji, thread.id, undefined)}
-                                        onRemove={handleRemoveReaction}
-                                    />
-                                </div>
+                                            {renderAttachments(thread.attachments)}
 
-                                <div className={`reply-section ${(!thread.replies || thread.replies.length === 0) ? 'is-empty' : ''}`}>
-                                    {thread.replies && thread.replies.length > 0 && (
-                                        <div className="reply-scroll-area">
-                                            {[...thread.replies].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map(reply => {
-                                                const replyAuthorProfile = getProfile(reply.author);
-                                                const replyAvatar = replyAuthorProfile?.avatar_url;
-                                                return (
-                                                    <div key={reply.id} className="reply-item" style={{ position: 'relative' }}>
-                                                        <div className="dot-menu-container" style={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}>
-                                                            <div className="dot-menu-trigger">⋮</div>
-                                                            <div className="dot-menu">
-                                                                {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
-                                                                    <>
-                                                                        {user?.id === reply.user_id && (
-                                                                            <div className="menu-item" onClick={() => setEditingReplyId(reply.id)}>
-                                                                                <span className="menu-icon">✏️</span> 編集
-                                                                            </div>
-                                                                        )}
-                                                                        <div className="menu-item menu-item-delete" onClick={() => handleDeleteReply(reply.id)}>
-                                                                            <span className="menu-icon">🗑️</span> 削除
-                                                                        </div>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className="reply-header">
-                                                            <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.6rem' }}>
-                                                                {replyAvatar ? (
-                                                                    <img src={replyAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                                                                ) : (
-                                                                    (reply.author && reply.author[0].toUpperCase())
-                                                                )}
-                                                            </div>
-                                                            <span>{reply.author}</span>
-                                                            <span>{formatDate(reply.created_at)}</span>
-                                                        </div>
-                                                        {editingReplyId === reply.id ? (
-                                                            <div className="edit-form" style={{ marginTop: '5px' }}>
-                                                                <div style={{ position: 'relative' }}>
-                                                                    <div
-                                                                        ref={(el) => {
-                                                                            if (el) {
-                                                                                editRefs.current[reply.id] = el;
-                                                                                // Initialize content only once if empty
-                                                                                if (!el.innerHTML && reply.content) {
-                                                                                    el.innerHTML = reply.content;
-                                                                                }
-                                                                            }
-                                                                        }}
-                                                                        contentEditable
-                                                                        className="input-field rich-editor"
-                                                                        style={{ minHeight: '60px', marginBottom: '8px', color: 'var(--text-main)', fontSize: '0.85rem' }}
-                                                                        onInput={(e) => handleInput(e, reply.id)}
-                                                                        onKeyDown={(e) => {
-                                                                            if (isOpen && targetThreadId === reply.id) {
-                                                                                handleKeyDown(e, reply.id, e.currentTarget);
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    {isOpen && targetThreadId === reply.id && (
-                                                                        <MentionList
-                                                                            candidates={candidates}
-                                                                            activeIndex={activeIndex}
-                                                                            onSelect={(c) => {
-                                                                                const el = editRefs.current[reply.id];
-                                                                                if (el) insertMention(c, el);
-                                                                            }}
-                                                                            style={{
-                                                                                top: mentionPosition === 'top' ? mentionCoords.top - 205 : mentionCoords.top + 5,
-                                                                                left: mentionCoords.left,
-                                                                                position: 'fixed'
-                                                                            }}
-                                                                        />
-                                                                    )}
-                                                                </div>
-                                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                                    <button className="btn btn-sm" onClick={() => setEditingReplyId(null)}>キャンセル</button>
-                                                                    <button className="btn btn-sm btn-primary" onClick={() => handleUpdateReply(reply.id)}>保存</button>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div
-                                                                className="reply-content"
-                                                                dangerouslySetInnerHTML={{ __html: highlightMentions(reply.content, mentionOptions) }}
-                                                            />
-                                                        )}
-                                                        {renderAttachments(reply.attachments)}
-                                                        <ReactionBar
-                                                            reactions={reactions.filter(r => r.reply_id === reply.id)}
-                                                            profiles={profiles}
-                                                            currentUserId={user?.id}
-                                                            currentProfile={currentProfile}
-                                                            onAdd={(emoji) => handleAddReaction(emoji, undefined, reply.id)}
-                                                            onRemove={handleRemoveReaction}
-                                                            style={{ marginTop: '4px' }}
-                                                        />
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                    {thread.status !== 'completed' && (
-                                        <div className="reply-form" style={{ display: 'flex', gap: '15px', alignItems: 'flex-start', marginTop: '10px' }}>
-                                            <div style={{ flex: 1, position: 'relative' }}>
-                                                <div
-                                                    ref={(el) => { if (el) replyRefs.current[thread.id] = el; }}
-                                                    contentEditable
-                                                    className="input-field btn-sm rich-editor"
-                                                    style={{ minHeight: '38px', marginTop: 0, padding: '8px' }}
-                                                    onInput={(e) => {
-                                                        handleInput(e, thread.id);
-                                                    }}
-                                                    onKeyDown={(e) => {
-                                                        if (isOpen && targetThreadId === thread.id) {
-                                                            handleKeyDown(e, thread.id, e.currentTarget);
-                                                            if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
-                                                                return;
-                                                            }
-                                                        }
-                                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                                            e.preventDefault();
-                                                            handleAddReply(thread.id);
-                                                        }
-                                                    }}
-                                                    onPaste={(e: React.ClipboardEvent) => {
-                                                        e.preventDefault();
-                                                        const text = e.clipboardData.getData('text/plain');
-                                                        document.execCommand('insertText', false, text);
-                                                    }}
+                                            <div className="task-footer-teams">
+                                                <ReactionBar
+                                                    reactions={reactions.filter(r => r.thread_id === thread.id && !r.reply_id)}
+                                                    profiles={profiles}
+                                                    currentUserId={user?.id}
+                                                    currentProfile={currentProfile}
+                                                    onAdd={(emoji) => handleAddReaction(emoji, thread.id, undefined)}
+                                                    onRemove={handleRemoveReaction}
                                                 />
-                                                {isOpen && targetThreadId === thread.id && (
-                                                    <MentionList
-                                                        candidates={candidates}
-                                                        activeIndex={activeIndex}
-                                                        onSelect={(c) => {
-                                                            const el = replyRefs.current[thread.id];
-                                                            if (el) insertMention(c, el);
+                                            </div>
+
+                                            <div className={`reply-section ${(!thread.replies || thread.replies.length === 0) ? 'is-empty' : ''}`}>
+                                                {thread.replies && thread.replies.length > 0 && (
+                                                    <div className="reply-scroll-area">
+                                                        {[...thread.replies].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map(reply => {
+                                                            const replyAuthorProfile = getProfile(reply.author);
+                                                            const replyAvatar = replyAuthorProfile?.avatar_url;
+                                                            const hasAttachments = reply.attachments && reply.attachments.length > 0;
+                                                            const needsReplyExpandByHeight = needsExpandMap[`reply-${reply.id}`];
+                                                            const needsReplyExpand = hasAttachments || needsReplyExpandByHeight;
+
+                                                            return (
+                                                                <div key={reply.id} className="reply-item" style={{ position: 'relative' }}>
+                                                                    <div className="dot-menu-container" style={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}>
+                                                                        <div className="dot-menu-trigger">⋮</div>
+                                                                        <div className="dot-menu">
+                                                                            {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                                                                <>
+                                                                                    {user?.id === reply.user_id && (
+                                                                                        <div className="menu-item" onClick={() => setEditingReplyId(reply.id)}>
+                                                                                            <span className="menu-icon">
+                                                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                                                                </svg>
+                                                                                            </span> 編集
+                                                                                        </div>
+                                                                                    )}
+                                                                                    <div className="menu-item menu-item-delete" onClick={() => handleDeleteReply(reply.id)}>
+                                                                                        <span className="menu-icon">
+                                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                                                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                                                            </svg>
+                                                                                        </span> 削除
+                                                                                    </div>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="reply-header">
+                                                                        <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.6rem' }}>
+                                                                            {replyAvatar ? (
+                                                                                <img src={replyAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                                                            ) : (
+                                                                                (reply.author && reply.author[0].toUpperCase())
+                                                                            )}
+                                                                        </div>
+                                                                        <span>{reply.author}</span>
+                                                                        <span>{formatDate(reply.created_at)}</span>
+                                                                    </div>
+                                                                    {editingReplyId === reply.id ? (
+                                                                        <div className="edit-form" style={{ marginTop: '5px' }}>
+                                                                            <div style={{ position: 'relative' }}>
+                                                                                <div
+                                                                                    ref={(el) => {
+                                                                                        if (el) {
+                                                                                            editRefs.current[reply.id] = el;
+                                                                                            if (!el.innerHTML && reply.content) {
+                                                                                                el.innerHTML = reply.content;
+                                                                                            }
+                                                                                        }
+                                                                                    }}
+                                                                                    contentEditable
+                                                                                    className="input-field rich-editor"
+                                                                                    style={{ minHeight: '60px', marginBottom: '8px', color: 'var(--text-main)', fontSize: '0.85rem' }}
+                                                                                    onInput={(e) => handleInput(e, reply.id)}
+                                                                                    onKeyDown={(e) => {
+                                                                                        handleKeyDown(e, reply.id, e.currentTarget);
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                                                <button className="btn btn-sm" onClick={() => setEditingReplyId(null)}>キャンセル</button>
+                                                                                <button className="btn btn-sm btn-primary" onClick={() => handleUpdateReply(reply.id)}>保存</button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="reply-body-container">
+                                                                            <div className={`reply-expandable-wrapper ${(needsReplyExpand && !expandedThreads.has(reply.id)) ? 'collapsed' : 'expanded'}`}>
+                                                                                <div
+                                                                                    ref={(el) => { if (el) measureRefs.current[`reply-${reply.id}`] = el; }}
+                                                                                    data-measure-id={`reply-${reply.id}`}
+                                                                                    className="reply-content"
+                                                                                    dangerouslySetInnerHTML={{ __html: highlightMentions(reply.content, mentionOptions) }}
+                                                                                />
+                                                                                <div className="link-previews">
+                                                                                    {extractUrls(reply.content).map((url, idx) => (
+                                                                                        <LinkPreview key={idx} url={url} />
+                                                                                    ))}
+                                                                                </div>
+                                                                                {renderAttachments(reply.attachments)}
+                                                                            </div>
+
+                                                                            {needsReplyExpand && (
+                                                                                <button
+                                                                                    className={`expand-btn ${expandedThreads.has(reply.id) ? 'active' : ''}`}
+                                                                                    onClick={() => toggleExpand(reply.id)}
+                                                                                >
+                                                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                                                                    </svg>
+                                                                                    {expandedThreads.has(reply.id) ? '閉じる' : (hasAttachments ? '詳細/ファイルを表示' : '詳細を表示')}
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                    <ReactionBar
+                                                                        reactions={reactions.filter(r => r.reply_id === reply.id)}
+                                                                        profiles={profiles}
+                                                                        currentUserId={user?.id}
+                                                                        currentProfile={currentProfile}
+                                                                        onAdd={(emoji) => handleAddReaction(emoji, undefined, reply.id)}
+                                                                        onRemove={handleRemoveReaction}
+                                                                        style={{ marginTop: '4px' }}
+                                                                    />
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {needsExpandMap[thread.id] && (
+                                            <button
+                                                className={`expand-btn thread-main-expand-btn ${expandedThreads.has(thread.id) ? 'active' : ''}`}
+                                                onClick={() => toggleExpand(thread.id)}
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                                </svg>
+                                                {expandedThreads.has(thread.id) ? 'スレッドを閉じる' : 'スレッド全文/返信を表示'}
+                                            </button>
+                                        )}
+
+                                        {thread.status !== 'completed' && (
+                                            <div className="reply-form" style={{ display: 'flex', gap: '15px', alignItems: 'flex-start', marginTop: '10px' }}>
+                                                <div style={{ flex: 1, position: 'relative' }}>
+                                                    <div
+                                                        ref={(el) => { if (el) replyRefs.current[thread.id] = el; }}
+                                                        contentEditable
+                                                        className="input-field btn-sm rich-editor"
+                                                        style={{ minHeight: '38px', marginTop: 0, padding: '8px' }}
+                                                        onInput={(e: React.FormEvent<HTMLDivElement>) => {
+                                                            handleInput(e, thread.id);
                                                         }}
-                                                        style={{
-                                                            top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
-                                                            left: mentionCoords.left,
-                                                            position: 'fixed',
-                                                            transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none',
-                                                            zIndex: 10000
+                                                        onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+                                                            handleKeyDown(e, thread.id, e.currentTarget);
+                                                            if (isOpen && targetThreadId === thread.id) {
+                                                                if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
+                                                                    return;
+                                                                }
+                                                            }
+                                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                                e.preventDefault();
+                                                                handleAddReply(thread.id);
+                                                            }
+                                                        }}
+                                                        onPaste={(e: React.ClipboardEvent) => {
+                                                            e.preventDefault();
+                                                            const text = e.clipboardData.getData('text/plain');
+                                                            document.execCommand('insertText', false, text);
                                                         }}
                                                     />
-                                                )}
-                                                {(replyAttachments[thread.id]?.length || 0) > 0 && (
-                                                    <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                                                        {replyAttachments[thread.id].map((att, idx) => (
-                                                            <div key={idx} className="attachment-item" style={{ position: 'relative', width: '40px', height: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                {att.type.startsWith('image/') ? (
-                                                                    <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                                ) : (
-                                                                    <span style={{ fontSize: '14px' }}>📄</span>
-                                                                )}
-                                                                <div
-                                                                    className="attachment-remove"
-                                                                    onClick={() => removeReplyAttachment(thread.id, idx)}
-                                                                    style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}
-                                                                >
-                                                                    ×
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '5px', marginTop: '0px' }}>
-                                                <button
-                                                    className="btn-sm btn-clip-yellow"
-                                                    style={{ padding: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                                                    onClick={() => handleReplyAttachClick(thread.id)}
-                                                    disabled={replyUploading[thread.id]}
-                                                >
-                                                    {replyUploading[thread.id] ? (
-                                                        <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                                    ) : (
-                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                                                        </svg>
+                                                    {isOpen && targetThreadId === thread.id && (
+                                                        <MentionList
+                                                            candidates={candidates}
+                                                            activeIndex={activeIndex}
+                                                            onSelect={(c) => {
+                                                                const el = replyRefs.current[thread.id];
+                                                                if (el) insertMention(c, el);
+                                                            }}
+                                                            style={{
+                                                                top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
+                                                                left: mentionCoords.left,
+                                                                position: 'fixed',
+                                                                transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none',
+                                                                zIndex: 10000
+                                                            }}
+                                                        />
                                                     )}
-                                                </button>
-                                                <input
-                                                    type="file"
-                                                    ref={el => { fileInputRefs.current[thread.id] = el; }}
-                                                    data-reply-thread={thread.id}
-                                                    style={{ display: 'none' }}
-                                                    multiple
-                                                    onChange={(e) => handleReplyFileChange(thread.id, e)}
-                                                    disabled={replyUploading[thread.id]}
-                                                />
-                                                <button
-                                                    className="btn-send-blue"
-                                                    title="送信"
-                                                    style={{
-                                                        width: '38px',
-                                                        height: '38px',
-                                                        padding: 0,
-                                                        flexShrink: 0,
-                                                        cursor: 'pointer'
-                                                    }}
-                                                    onClick={() => handleAddReply(thread.id)}
-                                                >
-                                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                                    </svg>
-                                                </button>
+                                                    {(replyAttachments[thread.id]?.length || 0) > 0 && (
+                                                        <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                                                            {replyAttachments[thread.id].map((att, idx) => (
+                                                                <div key={idx} className="attachment-item" style={{ position: 'relative', width: '40px', height: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                    {att.type.startsWith('image/') ? (
+                                                                        <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                    ) : (
+                                                                        <span style={{ fontSize: '14px' }}>📄</span>
+                                                                    )}
+                                                                    <div
+                                                                        className="attachment-remove"
+                                                                        onClick={() => removeReplyAttachment(thread.id, idx)}
+                                                                        style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}
+                                                                    >
+                                                                        ×
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '5px', marginTop: '0px' }}>
+                                                    <button
+                                                        className="btn-sm btn-clip-yellow"
+                                                        style={{ padding: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                                        onClick={() => handleReplyAttachClick(thread.id)}
+                                                        disabled={replyUploading[thread.id]}
+                                                    >
+                                                        {replyUploading[thread.id] ? (
+                                                            <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                        ) : (
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                                            </svg>
+                                                        )}
+                                                    </button>
+                                                    <input
+                                                        type="file"
+                                                        ref={el => { fileInputRefs.current[thread.id] = el; }}
+                                                        data-reply-thread={thread.id}
+                                                        style={{ display: 'none' }}
+                                                        multiple
+                                                        onChange={(e) => handleReplyFileChange(thread.id, e)}
+                                                        disabled={replyUploading[thread.id]}
+                                                    />
+                                                    <button
+                                                        className="btn-send-blue"
+                                                        title="送信"
+                                                        style={{
+                                                            width: '38px',
+                                                            height: '38px',
+                                                            padding: 0,
+                                                            flexShrink: 0,
+                                                            cursor: 'pointer'
+                                                        }}
+                                                        onClick={() => handleAddReply(thread.id)}
+                                                    >
+                                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div style={{ position: 'absolute', bottom: '10px', right: (thread.replies && thread.replies.length > 0) ? '20px' : '15px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 100 }}>
-                                    {thread.status === 'completed' && (
-                                        <div style={{
-                                            fontSize: '0.75rem',
-                                            color: 'var(--success)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '5px',
-                                            background: 'rgba(67, 181, 129, 0.1)',
-                                            padding: '4px 12px',
-                                            borderRadius: '20px',
-                                            border: '1px solid rgba(67, 181, 129, 0.2)',
-                                            animation: 'fadeIn 0.3s ease-out',
-                                            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                                        }}>
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                <polyline points="20 6 9 17 4 12"></polyline>
-                                            </svg>
-                                            <span style={{ fontWeight: 600 }}>完了者: {completerName}</span>
-                                            <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.completed_at)}</span>
-                                        </div>
-                                    )}
-                                    <button
-                                        className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}`}
-                                        title={thread.status === 'completed' ? '未完了に戻す' : '完了にする'}
-                                        style={{ width: '38px', height: '38px' }}
-                                        onClick={() => handleToggleStatus(thread.id, thread.status)}
-                                    >
-                                        {thread.status === 'completed' ? (
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-                                        ) : (
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                                         )}
-                                    </button>
-                                </div>
+                                        <div style={{ position: 'absolute', bottom: '10px', right: (thread.replies && thread.replies.length > 0) ? '20px' : '15px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 100 }}>
+                                            {thread.status === 'completed' && (
+                                                <div style={{
+                                                    fontSize: '0.75rem',
+                                                    color: 'var(--success)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '5px',
+                                                    background: 'rgba(67, 181, 129, 0.1)',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '20px',
+                                                    border: '1px solid rgba(67, 181, 129, 0.2)',
+                                                    animation: 'fadeIn 0.3s ease-out',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                                                }}>
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                                    </svg>
+                                                    <span style={{ fontWeight: 600 }}>完了者: {completerName}</span>
+                                                    <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.completed_at)}</span>
+                                                </div>
+                                            )}
+                                            <button
+                                                className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}`}
+                                                title={thread.status === 'completed' ? '未完了に戻す' : '完了にする'}
+                                                style={{ width: '38px', height: '38px' }}
+                                                onClick={() => handleToggleStatus(thread.id, thread.status)}
+                                            >
+                                                {thread.status === 'completed' ? (
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                                                ) : (
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         );
                     })
             )}
 
-            {!sortAscending && (
-                <div style={{ padding: '20px', display: 'flex', justifyContent: 'center' }}>
-                    <button
-                        onClick={onLoadMore}
-                        className="btn-load-more"
-                    >
-                        以前の投稿を読み込む (現在 {threads.length} 件表示)
-                    </button>
-                </div>
-            )}
+            {
+                !sortAscending && (
+                    <div style={{ padding: '20px', display: 'flex', justifyContent: 'center' }}>
+                        <button
+                            onClick={onLoadMore}
+                            className="btn-load-more"
+                        >
+                            以前の投稿を読み込む (現在 {threads.length} 件表示)
+                        </button>
+                    </div>
+                )
+            }
             <div ref={bottomAnchorRef} style={{ height: '1px' }} />
-        </div>
+        </div >
     );
 };
