@@ -87,7 +87,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const [editRole, setEditRole] = useState<'Admin' | 'Manager' | 'Member' | 'Viewer'>('Member');
     const [editIsActive, setEditIsActive] = useState(true);
     const [newUserEmail, setNewUserEmail] = useState('');
+    const [newDisplayName, setNewDisplayName] = useState('');
+    const [newUserRole, setNewUserRole] = useState<'Admin' | 'Manager' | 'Member' | 'Viewer'>('Member');
     const [isRegistering, setIsRegistering] = useState(false);
+    const [userSearchQuery, setUserSearchQuery] = useState('');
 
     // Team State
     const [teamName, setTeamName] = useState('');
@@ -394,44 +397,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         if (!newUserEmail) return;
         setIsRegistering(true);
         try {
-            // Check if user already exists in profiles
+            // Check if user already exists
             const { data: existingProfile } = await supabase
                 .from('profiles')
-                .select('id')
+                .select('id, is_active')
                 .eq('email', newUserEmail)
                 .maybeSingle();
 
             if (existingProfile) {
-                alert('このユーザーは既にシステムに登録されています。');
+                if (existingProfile.is_active) {
+                    alert('このユーザーは既にシステムに登録されています。');
+                } else {
+                    alert('このメールアドレスは既に招待済みです（ログイン待ち）。');
+                }
                 setIsRegistering(false);
                 return;
             }
 
-            // Check if already in whitelist
-            const { data: existingWhitelist } = await supabase
-                .from('whitelist')
-                .select('email')
-                .eq('email', newUserEmail)
-                .maybeSingle();
-
-            if (existingWhitelist) {
-                alert('このメールアドレスは既にホワイトリストに登録済みです。');
-                setIsRegistering(false);
-                return;
-            }
-
-            // Insert into the new 'whitelist' table instead of 'profiles'
-            // This avoids the foreign key constraint with auth.users because
-            // we haven't created the auth user yet.
-            const { error } = await supabase.from('whitelist').insert({
-                email: newUserEmail
+            // profiles に直接インサート（仮IDを割り当て）
+            const { error } = await supabase.from('profiles').insert({
+                id: crypto.randomUUID(), // 仮ID
+                email: newUserEmail,
+                display_name: newDisplayName || newUserEmail.split('@')[0],
+                role: newUserRole,
+                is_active: false // ログインするまで false
             });
 
             if (error) throw error;
 
-            alert('ユーザーを登録しました。');
+            alert('ユーザーを招待しました。\nログイン時に名前と権限が自動的に紐付けられます。');
             setNewUserEmail('');
-            // reload profiles is handled by the hook
+            setNewDisplayName('');
+            setNewUserRole('Member');
         } catch (error: any) {
             alert('登録に失敗しました: ' + error.message);
         } finally {
@@ -947,175 +944,327 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
                     {activeTab === 'admin' && isAdmin && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent)' }}>ユーザー管理 ({profiles.length}名)</h4>
-                                    {selectedUserIds.size > 0 && (
-                                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'rgba(0,183,189,0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--accent)' }}>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{selectedUserIds.size}人選択中</span>
-                                            <CustomSelect
-                                                options={[
-                                                    { value: 'Admin', label: 'システム管理者' },
-                                                    { value: 'Manager', label: 'マネージャー' },
-                                                    { value: 'Member', label: 'メンバー' },
-                                                    { value: 'Viewer', label: '閲覧のみ' }
-                                                ]}
-                                                value={bulkRole}
-                                                onChange={(val) => setBulkRole(val as any)}
-                                                style={{ height: '28px', width: '130px', fontSize: '0.8rem' }}
-                                            />
-                                            <button
-                                                className="btn btn-sm btn-primary"
-                                                onClick={handleBulkRoleUpdate}
-                                                disabled={isBulkUpdating}
-                                                style={{ height: '28px', padding: '0 10px' }}
-                                            >
-                                                {isBulkUpdating ? '更新中...' : '一括変更'}
-                                            </button>
-                                            <button
-                                                style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', opacity: 0.6 }}
-                                                onClick={() => setSelectedUserIds(new Set())}
-                                            >✕</button>
-                                        </div>
-                                    )}
+                            {/* --- User Management Header Stats --- */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
+                                <div style={{ padding: '15px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '5px' }}>全ユーザー</div>
+                                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)' }}>{profiles.length} <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>名</span></div>
                                 </div>
+                                <div style={{ padding: '15px', background: 'rgba(255,107,107,0.05)', borderRadius: '12px', border: '1px solid rgba(255,107,107,0.1)' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'rgba(255,107,107,0.8)', marginBottom: '5px' }}>管理者</div>
+                                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#FF6B6B' }}>{profiles.filter(p => p.role === 'Admin').length} <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>名</span></div>
+                                </div>
+                                <div style={{ padding: '15px', background: 'rgba(51,204,51,0.05)', borderRadius: '12px', border: '1px solid rgba(51,204,51,0.1)' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'rgba(51,204,51,0.8)', marginBottom: '5px' }}>アクティブ</div>
+                                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#33cc33' }}>{profiles.filter(p => p.is_active !== false).length} <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>名</span></div>
+                                </div>
+                            </div>
 
-                                {/* User Registration Form */}
-                                <div style={{ marginBottom: '20px', padding: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <h5 style={{ margin: '0 0 10px 0', fontSize: '0.85rem' }}>新規ユーザー登録 (ホワイトリストに追加)</h5>
-                                    <div style={{ display: 'flex', gap: '10px' }}>
+                            {/* --- Modern Invite Form --- */}
+                            <div style={{ padding: '20px', background: 'linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+                                <h4 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)' }}></span>
+                                    新規ユーザー招待
+                                </h4>
+                                <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                                    <div style={{ flex: '1 1 200px' }}>
+                                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>メールアドレス</label>
                                         <input
                                             type="email"
                                             className="input-field"
-                                            placeholder="example@mail.com"
+                                            placeholder="example@fts.co.jp"
                                             value={newUserEmail}
                                             onChange={(e) => setNewUserEmail(e.target.value)}
-                                            style={{ flex: 1 }}
+                                            style={{ height: '38px', fontSize: '0.9rem', width: '100%' }}
+                                        />
+                                    </div>
+                                    <div style={{ flex: '1 1 150px' }}>
+                                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>表示名 (任意)</label>
+                                        <input
+                                            type="text"
+                                            className="input-field"
+                                            placeholder="山田 太郎"
+                                            value={newDisplayName}
+                                            onChange={(e) => setNewDisplayName(e.target.value)}
+                                            style={{ height: '38px', fontSize: '0.9rem', width: '100%' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>ロール</label>
+                                        <CustomSelect
+                                            options={[
+                                                { value: 'Admin', label: '管理者' },
+                                                { value: 'Manager', label: 'マネージャ' },
+                                                { value: 'Member', label: 'メンバー' },
+                                                { value: 'Viewer', label: '閲覧のみ' }
+                                            ]}
+                                            value={newUserRole}
+                                            onChange={(val) => setNewUserRole(val as any)}
+                                            style={{ height: '38px', fontSize: '0.85rem' }}
+                                        />
+                                    </div>
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={handleRegisterUser}
+                                        disabled={isRegistering || !newUserEmail}
+                                        style={{ height: '38px', padding: '0 20px', fontWeight: 600 }}
+                                    >
+                                        {isRegistering ? '処理中...' : '招待を追加'}
+                                    </button>
+                                </div>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '10px', opacity: 0.7 }}>
+                                    ※招待されたユーザーは、初回ログイン時に設定した名前と権限が反映されます。
+                                </p>
+                            </div>
+
+                            {/* --- Search & Bulk Action Bar --- */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '12px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ flex: 1, maxWidth: '300px' }}>
+                                    <input 
+                                        type="text" 
+                                        className="input-field" 
+                                        placeholder="ユーザーを検索..." 
+                                        style={{ height: '32px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.03)' }}
+                                        /* search logic could be added to profile filter */
+                                    />
+                                </div>
+                                {selectedUserIds.size > 0 && (
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', animation: 'fadeIn 0.2s ease-out' }}>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 600 }}>{selectedUserIds.size} 名選択中</span>
+                                        <CustomSelect
+                                            options={[
+                                                { value: 'Admin', label: 'システム管理者' },
+                                                { value: 'Manager', label: 'マネージャー' },
+                                                { value: 'Member', label: 'メンバー' },
+                                                { value: 'Viewer', label: '閲覧のみ' }
+                                            ]}
+                                            value={bulkRole}
+                                            onChange={(val) => setBulkRole(val as any)}
+                                            style={{ height: '32px', width: '130px', fontSize: '0.8rem' }}
                                         />
                                         <button
                                             className="btn btn-sm btn-primary"
-                                            onClick={handleRegisterUser}
-                                            disabled={isRegistering || !newUserEmail}
+                                            onClick={handleBulkRoleUpdate}
+                                            disabled={isBulkUpdating}
+                                            style={{ height: '32px', padding: '0 12px' }}
                                         >
-                                            {isRegistering ? '登録中...' : 'ユーザー追加'}
+                                            {isBulkUpdating ? '...' : '一括変更'}
                                         </button>
-                                    </div>
-                                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '5px' }}>
-                                        ※ここで登録されたメールアドレスのみがログイン可能になります。
-                                    </p>
-                                </div>
-
-                                <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                                    {profiles.map(p => (
-                                        <div
-                                            key={p.id}
-                                            onClick={() => toggleUserSelection(p.id)}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '12px',
-                                                padding: '8px 12px',
-                                                borderRadius: '6px',
-                                                cursor: 'pointer',
-                                                background: selectedUserIds.has(p.id) ? 'rgba(0,183,189,0.15)' : 'transparent',
-                                                border: selectedUserIds.has(p.id) ? '1px solid rgba(0,183,189,0.3)' : '1px solid transparent',
-                                                transition: 'all 0.1s'
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedUserIds.has(p.id)}
-                                                readOnly
-                                                style={{ pointerEvents: 'none' }}
-                                            />
-                                            <img src={p.avatar_url || 'https://via.placeholder.com/32'} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{p.display_name}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.email}</div>
-                                            </div>
-                                            <div style={{
-                                                fontSize: '0.75rem',
-                                                padding: '2px 8px',
-                                                borderRadius: '4px',
-                                                background: 'rgba(255,255,255,0.05)',
-                                                color: p.role === 'Admin' ? '#FF6B6B' : (p.role === 'Manager' ? '#4D96FF' : 'inherit')
-                                            }}>
-                                                {p.role === 'Admin' ? '管理者' : (p.role === 'Manager' ? 'マネージャ' : (p.role === 'Viewer' ? '閲覧' : 'メンバ'))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {selectedUserIds.size === 1 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', padding: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <h5 style={{ margin: 0, fontSize: '0.85rem' }}>個別編集: {editDisplayName}</h5>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>表示名</label>
-                                            <input
-                                                type="text"
-                                                className="input-field"
-                                                value={editDisplayName}
-                                                onChange={(e) => setEditDisplayName(e.target.value)}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>アイコン画像</label>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                className="input-field"
-                                                style={{ paddingTop: '8px' }}
-                                                onChange={async (e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (!file) return;
-                                                    try {
-                                                        const targetUserId = Array.from(selectedUserIds)[0];
-                                                        const fileExt = file.name.split('.').pop();
-                                                        const fileName = `avatars/${targetUserId}-${Math.random()}.${fileExt}`;
-                                                        const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
-                                                        if (uploadError) throw uploadError;
-                                                        const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
-                                                        setEditAvatarUrl(data.publicUrl);
-                                                    } catch (err: any) {
-                                                        alert('アップロード失敗: ' + err.message);
-                                                    }
-                                                }}
-                                            />
-                                            {editAvatarUrl && (
-                                                <div style={{ marginTop: '8px' }}>
-                                                    <img src={editAvatarUrl} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>ロール (権限)</label>
-                                            <CustomSelect
-                                                options={[
-                                                    { value: 'Admin', label: 'システム管理者' },
-                                                    { value: 'Manager', label: 'マネージャー' },
-                                                    { value: 'Member', label: 'メンバー' },
-                                                    { value: 'Viewer', label: '閲覧のみ' }
-                                                ]}
-                                                value={editRole}
-                                                onChange={(val) => setEditRole(val as any)}
-                                                style={{ height: '36px' }}
-                                            />
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px' }}>
-                                            <input
-                                                type="checkbox"
-                                                id="is-active-checkbox"
-                                                checked={editIsActive}
-                                                onChange={(e) => setEditIsActive(e.target.checked)}
-                                            />
-                                            <label htmlFor="is-active-checkbox" style={{ fontSize: '0.9rem', cursor: 'pointer' }}>ログインを許可する</label>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                            <button className="btn btn-sm btn-primary" onClick={handleAdminSaveUser}>設定を保存</button>
-                                        </div>
+                                        <button
+                                            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '6px' }}
+                                            onClick={() => setSelectedUserIds(new Set())}
+                                        >✕</button>
                                     </div>
                                 )}
                             </div>
+
+                            {/* --- User Card Grid --- */}
+                            <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                                gap: '15px', 
+                                maxHeight: '500px', 
+                                overflowY: 'auto', 
+                                padding: '4px',
+                                scrollbarWidth: 'thin'
+                            }}>
+                                {profiles.filter(p => !userSearchQuery || p.display_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) || p.email?.toLowerCase().includes(userSearchQuery.toLowerCase())).map(p => (
+                                    <div
+                                        key={p.id}
+                                        onClick={() => toggleUserSelection(p.id)}
+                                        style={{
+                                            position: 'relative',
+                                            padding: '15px',
+                                            borderRadius: '12px',
+                                            background: selectedUserIds.has(p.id) ? 'rgba(0,183,189,0.08)' : 'rgba(255,255,255,0.02)',
+                                            border: '1px solid',
+                                            borderColor: selectedUserIds.has(p.id) ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            gap: '12px',
+                                            alignItems: 'center'
+                                        }}
+                                        className="user-card-hover"
+                                    >
+                                        <div style={{ position: 'relative' }}>
+                                            {p.avatar_url ? (
+                                                <img 
+                                                    src={p.avatar_url} 
+                                                    alt="" 
+                                                    style={{ width: '48px', height: '48px', borderRadius: '10px', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.1)' }}
+                                                />
+                                            ) : (
+                                                <div style={{ 
+                                                    width: '48px', 
+                                                    height: '48px', 
+                                                    borderRadius: '10px', 
+                                                    background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '1.2rem',
+                                                    fontWeight: 'bold',
+                                                    color: 'white',
+                                                    textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                                                    border: '2px solid rgba(255,255,255,0.1)'
+                                                }}>
+                                                    {p.display_name?.charAt(0) || p.email.charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
+                                            {selectedUserIds.has(p.id) && (
+                                                <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '18px', height: '18px', background: 'var(--accent)', borderRadius: '50%', color: 'white', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(0,0,0,0.5)', zIndex: 2 }}>
+                                                    ✓
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: '0.95rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {p.display_name}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {p.email}
+                                            </div>
+                                            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{
+                                                    fontSize: '0.65rem',
+                                                    padding: '2px 8px',
+                                                    borderRadius: '20px',
+                                                    fontWeight: 700,
+                                                    textTransform: 'uppercase',
+                                                    background: 
+                                                        p.role === 'Admin' ? 'rgba(255,107,107,0.15)' : 
+                                                        p.role === 'Manager' ? 'rgba(77,150,255,0.15)' : 
+                                                        'rgba(255,255,255,0.08)',
+                                                    color: 
+                                                        p.role === 'Admin' ? '#FF6B6B' : 
+                                                        p.role === 'Manager' ? '#4D96FF' : 
+                                                        'rgba(255,255,255,0.6)'
+                                                }}>
+                                                    {p.role === 'Admin' ? 'ADMIN' : p.role === 'Manager' ? 'MANAGER' : p.role === 'Viewer' ? 'VIEWER' : 'MEMBER'}
+                                                </span>
+                                                {!p.is_active && (
+                                                    <span style={{ fontSize: '0.65rem', color: 'var(--danger)', fontWeight: 600 }}>DISCONTINUED</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* --- Individual Edit Section --- */}
+                            {selectedUserIds.size === 1 && (
+                                <div style={{ 
+                                    padding: '25px', 
+                                    background: 'rgba(0,183,189,0.03)', 
+                                    borderRadius: '16px', 
+                                    border: '1px solid rgba(0,183,189,0.15)',
+                                    animation: 'slideUp 0.3s ease-out'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                        <h5 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>詳細編集: {editDisplayName}</h5>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {Array.from(selectedUserIds)[0]}</div>
+                                    </div>
+                                    
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>表示名</label>
+                                                <input
+                                                    type="text"
+                                                    className="input-field"
+                                                    value={editDisplayName}
+                                                    onChange={(e) => setEditDisplayName(e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>ロール (権限)</label>
+                                                <CustomSelect
+                                                    options={[
+                                                        { value: 'Admin', label: 'システム管理者 (フルアクセス)' },
+                                                        { value: 'Manager', label: 'マネージャー (チーム管理可)' },
+                                                        { value: 'Member', label: 'メンバー (標準機能)' },
+                                                        { value: 'Viewer', label: '閲覧のみ' }
+                                                    ]}
+                                                    value={editRole}
+                                                    onChange={(val) => setEditRole(val as any)}
+                                                    style={{ height: '42px' }}
+                                                />
+                                            </div>
+                                        </div>
+                                        
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', justifyContent: 'center' }}>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>アイコン画像</label>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="input-field"
+                                                    style={{ paddingTop: '8px' }}
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+                                                        try {
+                                                            const targetUserId = Array.from(selectedUserIds)[0];
+                                                            const fileExt = file.name.split('.').pop();
+                                                            const fileName = `avatars/${targetUserId}-${Math.random()}.${fileExt}`;
+                                                            const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
+                                                            if (uploadError) throw uploadError;
+                                                            const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
+                                                            setEditAvatarUrl(data.publicUrl);
+                                                        } catch (err: any) {
+                                                            alert('アップロード失敗: ' + err.message);
+                                                        }
+                                                    }}
+                                                />
+                                                {editAvatarUrl && (
+                                                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <img src={editAvatarUrl} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div style={{ 
+                                                padding: '15px', 
+                                                background: 'rgba(0,0,0,0.2)', 
+                                                borderRadius: '12px', 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: '12px' 
+                                            }}>
+                                                <input
+                                                    type="checkbox"
+                                                    id="is-active-checkbox"
+                                                    checked={editIsActive}
+                                                    onChange={(e) => setEditIsActive(e.target.checked)}
+                                                    style={{ width: '18px', height: '18px' }}
+                                                />
+                                                <label htmlFor="is-active-checkbox" style={{ fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}>
+                                                    アカウントを有効にする
+                                                    <div style={{ fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-muted)' }}>
+                                                        オフにするとログインできなくなります
+                                                    </div>
+                                                </label>
+                                            </div>
+                                            
+                                            <div style={{ display: 'flex', gap: '12px' }}>
+                                                <button 
+                                                    className="btn btn-outline" 
+                                                    style={{ flex: 1, height: '42px' }}
+                                                    onClick={() => setSelectedUserIds(new Set())}
+                                                >キャンセル</button>
+                                                <button 
+                                                    className="btn btn-primary" 
+                                                    style={{ flex: 1, height: '42px', fontWeight: 700 }}
+                                                    onClick={handleAdminSaveUser}
+                                                >変更を保存</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Spacing for dropdowns */}
+                            <div style={{ height: '100px' }}></div>
                         </div>
                     )}
 
