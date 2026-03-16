@@ -115,12 +115,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const filePickerActiveRef = React.useRef(false);
 
     const openCrop = (file: File, onConfirm: (blob: Blob) => Promise<void>) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            setCropImageSrc(ev.target?.result as string);
-            cropConfirmRef.current = onConfirm;
-        };
-        reader.readAsDataURL(file);
+        const url = URL.createObjectURL(file);
+        cropConfirmRef.current = onConfirm;
+        setCropImageSrc(url);
     };
 
     // Microsoft Graph Status
@@ -1539,10 +1536,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
             <ImageCropModal
                 imageSrc={cropImageSrc}
                 onConfirm={async (blob) => {
+                    const src = cropImageSrc;
                     setCropImageSrc(null);
+                    URL.revokeObjectURL(src);
                     await cropConfirmRef.current(blob);
                 }}
-                onCancel={() => setCropImageSrc(null)}
+                onCancel={() => {
+                    URL.revokeObjectURL(cropImageSrc);
+                    setCropImageSrc(null);
+                }}
             />
         )}
         </>

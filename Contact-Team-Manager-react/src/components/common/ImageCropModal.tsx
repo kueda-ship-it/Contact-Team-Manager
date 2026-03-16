@@ -216,7 +216,6 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConf
                     src={imageSrc}
                     style={{ display: 'none' }}
                     onLoad={handleImageLoad}
-                    crossOrigin="anonymous"
                 />
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                     <button className="btn btn-outline" onClick={onCancel}>キャンセル</button>
