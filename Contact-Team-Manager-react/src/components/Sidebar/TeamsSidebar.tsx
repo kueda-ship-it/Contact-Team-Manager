@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTeams, useUserMemberships } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../lib/supabase';
 
 export interface TeamsSidebarProps {
     currentTeamId: number | string | null;
@@ -33,6 +34,21 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
     const [draggedId, setDraggedId] = useState<string | null>(null);
     const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
     const [manuallyCollapsedTeams, setManuallyCollapsedTeams] = useState<Set<string>>(new Set());
+    const [pendingCount, setPendingCount] = useState<number>(0);
+
+    useEffect(() => {
+        if (!user) return;
+        let query = supabase
+            .from('threads')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'pending');
+        if (currentTeamId) {
+            query = query.eq('team_id', currentTeamId);
+        }
+        query.then(({ count }) => {
+            setPendingCount(count ?? 0);
+        });
+    }, [user, currentTeamId]);
 
     // Build childrenMap early for scope access in toggleTeam
     const childrenMap: { [parentId: string]: any[] } = {};
@@ -383,7 +399,27 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                                                     className={`sidebar-submenu-item ${statusFilter === 'pending' ? 'active' : ''}`}
                                                     onClick={() => onSelectStatus('pending')}
                                                 >
-                                                    <span># 未完了</span>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        # 未完了
+                                                        {pendingCount > 0 && (
+                                                            <span style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                minWidth: '18px',
+                                                                height: '18px',
+                                                                padding: '0 5px',
+                                                                borderRadius: '9px',
+                                                                background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
+                                                                color: '#fff',
+                                                                fontSize: '0.65rem',
+                                                                fontWeight: 700,
+                                                                lineHeight: 1,
+                                                            }}>
+                                                                {pendingCount}
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                 </div>
                                                 <div
                                                     className={`sidebar-submenu-item ${statusFilter === 'mentions' ? 'active' : ''}`}
@@ -410,17 +446,40 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
 
                 <div className="sidebar-divider"></div>
 
-                <div className="team-list-item" title="チームを追加" onClick={onAddTeam} style={{ cursor: 'pointer' }}>
-                    <div className="team-item-header">
-                        <div className="team-icon" style={{ border: '2px dashed #555', background: 'transparent', color: '#777' }}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
+                {(() => {
+                    const canCreate = profile?.role !== 'Viewer';
+                    return (
+                        <div
+                            className="team-list-item"
+                            title={canCreate ? 'チームを追加' : 'チーム作成権限がありません'}
+                            style={{ cursor: 'pointer', opacity: canCreate ? 1 : 0.35, transition: 'opacity 0.2s' }}
+                            onClick={() => {
+                                if (!canCreate) {
+                                    alert('チーム作成権限がありません');
+                                    return;
+                                }
+                                onAddTeam?.();
+                            }}
+                        >
+                            <div className="team-item-header">
+                                <div className="team-icon" style={{
+                                    border: canCreate ? '2px dashed rgba(0,183,189,0.6)' : '2px dashed #444',
+                                    background: canCreate ? 'rgba(0,183,189,0.06)' : 'transparent',
+                                    color: canCreate ? 'var(--accent)' : '#555',
+                                    transition: 'all 0.2s',
+                                }}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </div>
+                                <span className="team-name-label" style={{ color: canCreate ? 'var(--text-main)' : '#555', transition: 'color 0.2s' }}>
+                                    チームを追加
+                                </span>
+                            </div>
                         </div>
-                        <span className="team-name-label">チームを追加</span>
-                    </div>
-                </div>
+                    );
+                })()}
 
                 <div className="sidebar-divider"></div>
 

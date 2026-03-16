@@ -566,14 +566,18 @@ export function useTeamMembers(teamId: number | string | null) {
     const updateMemberRole = async (profileId: string, role: string) => {
         if (!teamId) return;
         console.log(`[useTeamMembers] Updating role: team=${teamId}, profile=${profileId}, role=${role}`);
-        const { error } = await supabase
+        const { data: updated, error } = await supabase
             .from('team_members')
             .update({ role })
             .eq('team_id', teamId)
-            .eq('user_id', profileId);
+            .eq('user_id', profileId)
+            .select();
         if (error) {
             console.error('[useTeamMembers] Update error:', error);
             throw error;
+        }
+        if (!updated || updated.length === 0) {
+            throw new Error('更新権限がないか、対象レコードが見つかりません');
         }
         await fetchMembers();
     };

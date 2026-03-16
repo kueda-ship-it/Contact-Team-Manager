@@ -91,6 +91,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const [newUserRole, setNewUserRole] = useState<'Admin' | 'Manager' | 'Member' | 'Viewer'>('Member');
     const [isRegistering, setIsRegistering] = useState(false);
     const [userSearchQuery, setUserSearchQuery] = useState('');
+    const [adminRoleFilter, setAdminRoleFilter] = useState<'all' | 'Admin' | 'Manager' | 'Member' | 'Viewer' | 'inactive'>('all');
 
     // Team State
     const [teamName, setTeamName] = useState('');
@@ -565,21 +566,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={onClose}>
             <div className="modal" onClick={(e) => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <h2 style={{ margin: 0 }}>設定</h2>
-                    <button className="btn btn-sm btn-outline" onClick={onClose}>✕</button>
+                    <h2 style={{
+                        margin: 0,
+                        background: 'linear-gradient(135deg, var(--text-main) 0%, var(--accent) 100%)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                        fontSize: '1.3rem',
+                        fontWeight: 800,
+                        letterSpacing: '-0.02em'
+                    }}>設定</h2>
+                    <button
+                        className="btn btn-sm btn-outline"
+                        onClick={onClose}
+                        style={{ width: '32px', height: '32px', padding: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}
+                    >✕</button>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(8px)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <button
                         className={`btn btn-sm ${activeTab === 'profile' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 'none' }}
+                        style={{ borderRadius: '8px', border: 'none' }}
                         onClick={() => setActiveTab('profile')}
                     >
                         個人設定
                     </button>
                     <button
                         className={`btn btn-sm ${activeTab === 'team' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 'none' }}
+                        style={{ borderRadius: '8px', border: 'none' }}
                         onClick={() => setActiveTab('team')}
                         disabled={!currentTeamId}
                     >
@@ -588,16 +602,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                     {isAdmin && (
                         <button
                             className={`btn btn-sm ${activeTab === 'admin' ? 'btn-primary' : 'btn-outline'}`}
-                            style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 'none' }}
+                            style={{ borderRadius: '8px', border: 'none' }}
                             onClick={() => setActiveTab('admin')}
                         >
                             ユーザー管理
                         </button>
                     )}
-                    {(isAdmin || (canManageTeam && currentTeamId)) && (
+                    {(isAdmin || canManageTeam || (profile?.role !== 'Viewer')) && (
                         <button
                             className={`btn btn-sm ${activeTab === 'team-mgmt' ? 'btn-primary' : 'btn-outline'}`}
-                            style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 'none' }}
+                            style={{ borderRadius: '8px', border: 'none' }}
                             onClick={() => setActiveTab('team-mgmt')}
                         >
                             チーム管理
@@ -605,7 +619,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                     )}
                     <button
                         className={`btn btn-sm ${activeTab === 'history' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 'none' }}
+                        style={{ borderRadius: '8px', border: 'none' }}
                         onClick={() => setActiveTab('history')}
                     >
                         更新履歴
@@ -937,6 +951,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                     })()}
                                 </div>
                             </div>
+                            {/* チームを退出 */}
+                            {(() => {
+                                const isMemberOfTeam = members.some(m => m.user_id === user?.id);
+                                if (!isMemberOfTeam) return null;
+                                const managerCount = members.filter(m => m.role === 'Manager' || m.role === 'manager').length;
+                                const isSoleManager = (members.find(m => m.user_id === user?.id)?.role ?? '').toLowerCase() === 'manager' && managerCount <= 1;
+                                return (
+                                    <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(196,49,75,0.05)', border: '1px solid rgba(196,49,75,0.15)' }}>
+                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--danger)' }}>退出</h4>
+                                        {isSoleManager && (
+                                            <p style={{ fontSize: '0.75rem', color: 'rgba(196,49,75,0.8)', marginBottom: '10px' }}>
+                                                あなたはこのチームの唯一の管理者です。退出する前に他のメンバーを管理者に変更してください。
+                                            </p>
+                                        )}
+                                        <button
+                                            className="btn btn-sm"
+                                            style={{ color: 'var(--danger)', background: 'rgba(196,49,75,0.1)', border: '1px solid rgba(196,49,75,0.3)' }}
+                                            disabled={isSoleManager}
+                                            onClick={async () => {
+                                                if (!user?.id) return;
+                                                if (!window.confirm(`「${currentTeamName}」を退出しますか？`)) return;
+                                                try {
+                                                    await removeMember(user.id);
+                                                    onClose();
+                                                } catch (err: any) {
+                                                    alert('退出に失敗しました: ' + err.message);
+                                                }
+                                            }}
+                                        >
+                                            チームを退出
+                                        </button>
+                                    </div>
+                                );
+                            })()}
+
                             {/* Extra space to ensure dropdowns at the bottom are not clipped by the scroll container */}
                             <div style={{ height: '180px' }}></div>
                         </div>
@@ -945,23 +994,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                     {activeTab === 'admin' && isAdmin && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {/* --- User Management Header Stats --- */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
-                                <div style={{ padding: '15px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '5px' }}>全ユーザー</div>
-                                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)' }}>{profiles.length} <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>名</span></div>
-                                </div>
-                                <div style={{ padding: '15px', background: 'rgba(255,107,107,0.05)', borderRadius: '12px', border: '1px solid rgba(255,107,107,0.1)' }}>
-                                    <div style={{ fontSize: '0.75rem', color: 'rgba(255,107,107,0.8)', marginBottom: '5px' }}>管理者</div>
-                                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#FF6B6B' }}>{profiles.filter(p => p.role === 'Admin').length} <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>名</span></div>
-                                </div>
-                                <div style={{ padding: '15px', background: 'rgba(51,204,51,0.05)', borderRadius: '12px', border: '1px solid rgba(51,204,51,0.1)' }}>
-                                    <div style={{ fontSize: '0.75rem', color: 'rgba(51,204,51,0.8)', marginBottom: '5px' }}>アクティブ</div>
-                                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#33cc33' }}>{profiles.filter(p => p.is_active !== false).length} <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>名</span></div>
-                                </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                                {[
+                                    { label: '全ユーザー', value: profiles.length, color: 'var(--text-main)', gradient: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)', border: 'rgba(255,255,255,0.1)', glow: 'rgba(255,255,255,0.05)', filter: 'all' as const },
+                                    { label: '管理者', value: profiles.filter(p => p.role === 'Admin').length, color: '#FF6B6B', gradient: 'linear-gradient(135deg, rgba(255,107,107,0.1) 0%, rgba(255,107,107,0.04) 100%)', border: 'rgba(255,107,107,0.25)', glow: 'rgba(255,107,107,0.12)', filter: 'Admin' as const },
+                                    { label: 'アクティブ', value: profiles.filter(p => p.is_active !== false).length, color: '#33cc33', gradient: 'linear-gradient(135deg, rgba(51,204,51,0.1) 0%, rgba(51,204,51,0.04) 100%)', border: 'rgba(51,204,51,0.25)', glow: 'rgba(51,204,51,0.12)', filter: 'all' as const },
+                                    { label: '無効アカウント', value: profiles.filter(p => p.is_active === false).length, color: '#f59e0b', gradient: 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(245,158,11,0.04) 100%)', border: 'rgba(245,158,11,0.25)', glow: 'rgba(245,158,11,0.12)', filter: 'inactive' as const },
+                                ].map(s => (
+                                    <div
+                                        key={s.label}
+                                        onClick={() => setAdminRoleFilter(s.filter)}
+                                        style={{
+                                            padding: '14px 16px',
+                                            background: s.gradient,
+                                            backdropFilter: 'blur(12px)',
+                                            WebkitBackdropFilter: 'blur(12px)',
+                                            borderRadius: '14px',
+                                            border: `1px solid ${s.border}`,
+                                            boxShadow: `0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 20px ${s.glow}`,
+                                            cursor: 'pointer',
+                                            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                        }}
+                                        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
+                                        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
+                                    >
+                                        <div style={{ fontSize: '0.68rem', color: s.color, opacity: 0.85, marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</div>
+                                        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: s.color, lineHeight: 1, textShadow: `0 0 20px ${s.glow}` }}>{s.value}<span style={{ fontSize: '0.72rem', fontWeight: 400, marginLeft: '4px', opacity: 0.6 }}>名</span></div>
+                                    </div>
+                                ))}
                             </div>
 
                             {/* --- Modern Invite Form --- */}
-                            <div style={{ padding: '20px', background: 'linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+                            <div style={{ padding: '20px', background: 'linear-gradient(145deg, rgba(0,183,189,0.08) 0%, rgba(255,255,255,0.03) 100%)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: '16px', border: '1px solid rgba(0,183,189,0.2)', boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07), 0 0 40px rgba(0,183,189,0.06)' }}>
                                 <h4 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)' }}></span>
                                     新規ユーザー招待
@@ -1017,20 +1081,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 </p>
                             </div>
 
-                            {/* --- Search & Bulk Action Bar --- */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '12px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <div style={{ flex: 1, maxWidth: '300px' }}>
-                                    <input 
-                                        type="text" 
-                                        className="input-field" 
-                                        placeholder="ユーザーを検索..." 
-                                        style={{ height: '32px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.03)' }}
-                                        /* search logic could be added to profile filter */
+                            {/* --- Search & Filter Bar --- */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.15) 100%)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: '14px 16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 4px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="名前 / メールで検索..."
+                                        value={userSearchQuery}
+                                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                                        style={{ flex: 1, height: '34px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.04)' }}
                                     />
+                                    {userSearchQuery && (
+                                        <button onClick={() => setUserSearchQuery('')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0 6px', fontSize: '1rem' }}>✕</button>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    {(['all', 'Admin', 'Manager', 'Member', 'Viewer', 'inactive'] as const).map(f => (
+                                        <button
+                                            key={f}
+                                            onClick={() => setAdminRoleFilter(f)}
+                                            style={{
+                                                padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                                                background: adminRoleFilter === f ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                                                color: adminRoleFilter === f ? '#000' : 'var(--text-muted)',
+                                                border: `1px solid ${adminRoleFilter === f ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
+                                            }}
+                                        >
+                                            {f === 'all' ? 'すべて' : f === 'inactive' ? '無効' : f === 'Admin' ? '管理者' : f === 'Manager' ? 'マネージャー' : f === 'Member' ? 'メンバー' : '閲覧のみ'}
+                                            <span style={{ marginLeft: '5px', opacity: 0.7 }}>
+                                                {f === 'all' ? profiles.length :
+                                                 f === 'inactive' ? profiles.filter(p => p.is_active === false).length :
+                                                 profiles.filter(p => p.role === f).length}
+                                            </span>
+                                        </button>
+                                    ))}
+                                    {selectedUserIds.size > 0 && <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 600 }}>{selectedUserIds.size} 名選択中</span>}
                                 </div>
                                 {selectedUserIds.size > 0 && (
-                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', animation: 'fadeIn 0.2s ease-out' }}>
-                                        <span style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 600 }}>{selectedUserIds.size} 名選択中</span>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                                         <CustomSelect
                                             options={[
                                                 { value: 'Admin', label: 'システム管理者' },
@@ -1040,20 +1129,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                             ]}
                                             value={bulkRole}
                                             onChange={(val) => setBulkRole(val as any)}
-                                            style={{ height: '32px', width: '130px', fontSize: '0.8rem' }}
+                                            style={{ height: '30px', width: '140px', fontSize: '0.8rem' }}
                                         />
                                         <button
                                             className="btn btn-sm btn-primary"
                                             onClick={handleBulkRoleUpdate}
                                             disabled={isBulkUpdating}
-                                            style={{ height: '32px', padding: '0 12px' }}
+                                            style={{ height: '30px', padding: '0 14px', fontSize: '0.8rem' }}
                                         >
-                                            {isBulkUpdating ? '...' : '一括変更'}
+                                            {isBulkUpdating ? '変更中...' : `${selectedUserIds.size}名を一括変更`}
                                         </button>
                                         <button
-                                            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '6px' }}
+                                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', cursor: 'pointer', height: '30px', padding: '0 10px', borderRadius: '6px', fontSize: '0.8rem' }}
                                             onClick={() => setSelectedUserIds(new Set())}
-                                        >✕</button>
+                                        >選択解除</button>
                                     </div>
                                 )}
                             </div>
@@ -1068,19 +1157,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 padding: '4px',
                                 scrollbarWidth: 'thin'
                             }}>
-                                {profiles.filter(p => !userSearchQuery || p.display_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) || p.email?.toLowerCase().includes(userSearchQuery.toLowerCase())).map(p => (
+                                {profiles.filter(p => {
+                                    if (userSearchQuery && !p.display_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) && !p.email?.toLowerCase().includes(userSearchQuery.toLowerCase())) return false;
+                                    if (adminRoleFilter === 'inactive') return p.is_active === false;
+                                    if (adminRoleFilter !== 'all') return p.role === adminRoleFilter;
+                                    return true;
+                                }).map(p => (
                                     <div
                                         key={p.id}
                                         onClick={() => toggleUserSelection(p.id)}
                                         style={{
                                             position: 'relative',
                                             padding: '15px',
-                                            borderRadius: '12px',
-                                            background: selectedUserIds.has(p.id) ? 'rgba(0,183,189,0.08)' : 'rgba(255,255,255,0.02)',
-                                            border: '1px solid',
-                                            borderColor: selectedUserIds.has(p.id) ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                                            borderRadius: '14px',
+                                            background: selectedUserIds.has(p.id)
+                                                ? 'linear-gradient(135deg, rgba(0,183,189,0.15) 0%, rgba(0,183,189,0.06) 100%)'
+                                                : 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
+                                            backdropFilter: 'blur(10px)',
+                                            WebkitBackdropFilter: 'blur(10px)',
+                                            border: `1px solid ${selectedUserIds.has(p.id) ? 'rgba(0,183,189,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                                            boxShadow: selectedUserIds.has(p.id)
+                                                ? '0 4px 20px rgba(0,183,189,0.15), inset 0 1px 0 rgba(255,255,255,0.07)'
+                                                : '0 2px 10px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04)',
                                             cursor: 'pointer',
-                                            transition: 'all 0.2s ease',
+                                            transition: 'all 0.25s ease',
                                             display: 'flex',
                                             gap: '12px',
                                             alignItems: 'center'
@@ -1154,11 +1254,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
                             {/* --- Individual Edit Section --- */}
                             {selectedUserIds.size === 1 && (
-                                <div style={{ 
-                                    padding: '25px', 
-                                    background: 'rgba(0,183,189,0.03)', 
-                                    borderRadius: '16px', 
-                                    border: '1px solid rgba(0,183,189,0.15)',
+                                <div style={{
+                                    padding: '25px',
+                                    background: 'linear-gradient(145deg, rgba(0,183,189,0.1) 0%, rgba(0,183,189,0.03) 100%)',
+                                    backdropFilter: 'blur(20px)',
+                                    WebkitBackdropFilter: 'blur(20px)',
+                                    borderRadius: '18px',
+                                    border: '1px solid rgba(0,183,189,0.3)',
+                                    boxShadow: '0 12px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 60px rgba(0,183,189,0.08)',
                                     animation: 'slideUp 0.3s ease-out'
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -1223,13 +1326,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                     </div>
                                                 )}
                                             </div>
-                                            <div style={{ 
-                                                padding: '15px', 
-                                                background: 'rgba(0,0,0,0.2)', 
-                                                borderRadius: '12px', 
-                                                display: 'flex', 
-                                                alignItems: 'center', 
-                                                gap: '12px' 
+                                            <div style={{
+                                                padding: '15px',
+                                                background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.1) 100%)',
+                                                backdropFilter: 'blur(8px)',
+                                                WebkitBackdropFilter: 'blur(8px)',
+                                                borderRadius: '12px',
+                                                border: '1px solid rgba(255,255,255,0.08)',
+                                                boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px'
                                             }}>
                                                 <input
                                                     type="checkbox"
@@ -1268,7 +1375,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         </div>
                     )}
 
-                    {activeTab === 'team-mgmt' && (isAdmin || canManageTeam) && (
+                    {activeTab === 'team-mgmt' && (isAdmin || canManageTeam || profile?.role !== 'Viewer') && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <h4 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>チーム管理</h4>

@@ -1418,19 +1418,31 @@ body:not(.light-mode) .rich-editor * {
     transform: scaleY(1);
 }
 
-/* Modal Base - slightly tighter */
+/* Modal Base - glass morphism */
 .modal {
-    background: var(--bg-secondary);
-    border-radius: 12px;
+    background: linear-gradient(145deg, rgba(30,32,56,0.92) 0%, rgba(20,22,42,0.96) 100%);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
     padding: 25px;
-    width: 600px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    width: 700px;
+    box-shadow:
+        0 24px 64px rgba(0, 0, 0, 0.6),
+        0 8px 24px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255,255,255,0.08);
     z-index: 20000;
-    /* Much higher than feed headers */
     max-height: 85vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+/* User card hover in admin tab */
+.user-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+    border-color: rgba(255,255,255,0.15) !important;
 }
 
 /* Fixed: Added closing brace */
@@ -2366,7 +2378,9 @@ body:not(.light-mode) .rich-editor .mention {
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     display: none;
     align-items: center;
     justify-content: center;
