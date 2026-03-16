@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 
 interface PreviewData {
     title?: string;
@@ -52,11 +52,11 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({ url }) => {
 
                     if (title || description) {
                         setPreview({
-                            title,
-                            description,
-                            image,
+                            title: title ?? undefined,
+                            description: description ?? undefined,
+                            image: image ?? undefined,
                             url,
-                            siteName
+                            siteName: siteName ?? undefined
                         });
                     } else {
                         setError(true);

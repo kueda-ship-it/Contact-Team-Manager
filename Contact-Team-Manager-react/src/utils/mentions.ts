@@ -1,4 +1,4 @@
-import { cleanText } from '../utils/text';
+﻿import { cleanText } from '../utils/text';
 
 interface Profile {
     id: string;
@@ -35,7 +35,7 @@ export function highlightMentions(text: string | null, options: HighlightMention
     // Helper to replace only in text nodes (roughly) by matching outside of tags
     const replaceOutsideTags = (str: string, regex: RegExp, replacement: string | ((match: string) => string)) => {
         // Matches HTML tags or content
-        return str.replace(/(<(?:"[^"]*"|'[^']*'|[^'">])*>)|([^<]+)/g, (match, tag, textNode) => {
+        return str.replace(/(<(?:"[^"]*"|'[^']*'|[^'">])*>)|([^<]+)/g, (_match, tag, textNode) => {
             if (tag) return tag; // Return tag as is
             if (typeof replacement === 'string') {
                 return textNode.replace(regex, replacement);
