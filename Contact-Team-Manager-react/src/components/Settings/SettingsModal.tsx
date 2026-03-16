@@ -577,6 +577,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     if (!isOpen) return null;
 
     return (
+        <>
         <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onClick={onClose}>
             <div className="modal" onClick={(e) => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -1538,5 +1539,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                 onCancel={() => setCropImageSrc(null)}
             />
         )}
+        </>
     );
 };
