@@ -7,6 +7,7 @@ import { msalInstance, signIn, signOut, initializeMsal } from '../../lib/microso
 import type { AccountInfo } from '@azure/msal-browser';
 import { CHANGELOG } from '../../data/changelog';
 import { TagMemberEditor } from './TagMemberEditor';
+import { ImageCropModal } from '../common/ImageCropModal';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -106,6 +107,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const [mgmtParentId, setMgmtParentId] = useState<string | null>(null);
     const [mgmtEmailAddress, setMgmtEmailAddress] = useState('');
     const [isCreatingTeam, setIsCreatingTeam] = useState(false);
+
+    // Image crop state
+    const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+    const cropConfirmRef = React.useRef<(blob: Blob) => Promise<void>>(async () => {});
+
+    const openCrop = (file: File, onConfirm: (blob: Blob) => Promise<void>) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            setCropImageSrc(ev.target?.result as string);
+            cropConfirmRef.current = onConfirm;
+        };
+        reader.readAsDataURL(file);
+    };
 
     // Microsoft Graph Status
     const [msAccount, setMsAccount] = useState<AccountInfo | null>(null);
@@ -645,19 +659,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                     accept="image/*"
                                     className="input-field"
                                     style={{ paddingTop: '10px' }}
-                                    onChange={async (e) => {
+                                    onChange={(e) => {
                                         const file = e.target.files?.[0];
                                         if (!file || !user) return;
-                                        try {
-                                            const fileExt = file.name.split('.').pop();
-                                            const fileName = `avatars/${user.id}-${Math.random()}.${fileExt}`;
-                                            const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
-                                            if (uploadError) throw uploadError;
-                                            const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
-                                            setAvatarUrl(data.publicUrl);
-                                        } catch (err: any) {
-                                            alert('アップロード失敗: ' + err.message);
-                                        }
+                                        openCrop(file, async (blob) => {
+                                            try {
+                                                const fileName = `avatars/${user.id}-${Math.random()}.png`;
+                                                const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, blob, { contentType: 'image/png' });
+                                                if (uploadError) throw uploadError;
+                                                const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
+                                                setAvatarUrl(data.publicUrl);
+                                            } catch (err: any) {
+                                                alert('アップロード失敗: ' + err.message);
+                                            }
+                                        });
+                                        e.target.value = '';
                                     }}
                                 />
                                 {avatarUrl && (
@@ -739,19 +755,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                 type="file"
                                                 accept="image/*"
                                                 style={{ fontSize: '0.8rem' }}
-                                                onChange={async (e) => {
+                                                onChange={(e) => {
                                                     const file = e.target.files?.[0];
                                                     if (!file || !currentTeamId) return;
-                                                    try {
-                                                        const fileExt = file.name.split('.').pop();
-                                                        const fileName = `avatars/team-${currentTeamId}-${Math.random()}.${fileExt}`;
-                                                        const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
-                                                        if (uploadError) throw uploadError;
-                                                        const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
-                                                        setTeamIconUrl(data.publicUrl);
-                                                    } catch (err: any) {
-                                                        alert('アップロード失敗: ' + err.message);
-                                                    }
+                                                    openCrop(file, async (blob) => {
+                                                        try {
+                                                            const fileName = `avatars/team-${currentTeamId}-${Math.random()}.png`;
+                                                            const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, blob, { contentType: 'image/png' });
+                                                            if (uploadError) throw uploadError;
+                                                            const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
+                                                            setTeamIconUrl(data.publicUrl);
+                                                        } catch (err: any) {
+                                                            alert('アップロード失敗: ' + err.message);
+                                                        }
+                                                    });
+                                                    e.target.value = '';
                                                 }}
                                             />
                                         </div>
@@ -1304,20 +1322,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                     accept="image/*"
                                                     className="input-field"
                                                     style={{ paddingTop: '8px' }}
-                                                    onChange={async (e) => {
+                                                    onChange={(e) => {
                                                         const file = e.target.files?.[0];
                                                         if (!file) return;
-                                                        try {
-                                                            const targetUserId = Array.from(selectedUserIds)[0];
-                                                            const fileExt = file.name.split('.').pop();
-                                                            const fileName = `avatars/${targetUserId}-${Math.random()}.${fileExt}`;
-                                                            const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
-                                                            if (uploadError) throw uploadError;
-                                                            const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
-                                                            setEditAvatarUrl(data.publicUrl);
-                                                        } catch (err: any) {
-                                                            alert('アップロード失敗: ' + err.message);
-                                                        }
+                                                        const targetUserId = Array.from(selectedUserIds)[0];
+                                                        openCrop(file, async (blob) => {
+                                                            try {
+                                                                const fileName = `avatars/${targetUserId}-${Math.random()}.png`;
+                                                                const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, blob, { contentType: 'image/png' });
+                                                                if (uploadError) throw uploadError;
+                                                                const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
+                                                                setEditAvatarUrl(data.publicUrl);
+                                                            } catch (err: any) {
+                                                                alert('アップロード失敗: ' + err.message);
+                                                            }
+                                                        });
+                                                        e.target.value = '';
                                                     }}
                                                 />
                                                 {editAvatarUrl && (
@@ -1435,19 +1455,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                                 type="file"
                                                                 accept="image/*"
                                                                 style={{ fontSize: '0.75rem' }}
-                                                                onChange={async (e) => {
+                                                                onChange={(e) => {
                                                                     const file = e.target.files?.[0];
                                                                     if (!file) return;
-                                                                    try {
-                                                                        const fileExt = file.name.split('.').pop();
-                                                                        const fileName = `avatars/mgmt-team-${Math.random()}.${fileExt}`;
-                                                                        const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, file);
-                                                                        if (uploadError) throw uploadError;
-                                                                        const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
-                                                                        setMgmtTeamIconUrl(data.publicUrl);
-                                                                    } catch (err: any) {
-                                                                        alert('アップロード失敗: ' + err.message);
-                                                                    }
+                                                                    openCrop(file, async (blob) => {
+                                                                        try {
+                                                                            const fileName = `avatars/mgmt-team-${Math.random()}.png`;
+                                                                            const { error: uploadError } = await supabase.storage.from('uploads').upload(fileName, blob, { contentType: 'image/png' });
+                                                                            if (uploadError) throw uploadError;
+                                                                            const { data } = supabase.storage.from('uploads').getPublicUrl(fileName);
+                                                                            setMgmtTeamIconUrl(data.publicUrl);
+                                                                        } catch (err: any) {
+                                                                            alert('アップロード失敗: ' + err.message);
+                                                                        }
+                                                                    });
+                                                                    e.target.value = '';
                                                                 }}
                                                             />
                                                         </div>
@@ -1505,5 +1527,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                 </div>
             </div>
         </div >
+
+        {cropImageSrc && (
+            <ImageCropModal
+                imageSrc={cropImageSrc}
+                onConfirm={async (blob) => {
+                    setCropImageSrc(null);
+                    await cropConfirmRef.current(blob);
+                }}
+                onCancel={() => setCropImageSrc(null)}
+            />
+        )}
     );
 };
