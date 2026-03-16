@@ -111,6 +111,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     // Image crop state
     const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
     const cropConfirmRef = React.useRef<(blob: Blob) => Promise<void>>(async () => {});
+    // Guard: prevent overlay from closing right after file picker opens (macOS ghost mousedown)
+    const filePickerActiveRef = React.useRef(false);
 
     const openCrop = (file: File, onConfirm: (blob: Blob) => Promise<void>) => {
         const reader = new FileReader();
@@ -578,7 +580,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
     return (
         <>
-        <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+        <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onMouseDown={(e) => { if (filePickerActiveRef.current) return; if (e.target === e.currentTarget) onClose(); }}>
             <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h2 style={{
@@ -660,6 +662,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                     accept="image/*"
                                     className="input-field"
                                     style={{ paddingTop: '10px' }}
+                                    onMouseDown={() => { filePickerActiveRef.current = true; setTimeout(() => { filePickerActiveRef.current = false; }, 2000); }}
                                     onChange={(e) => {
                                         const file = e.target.files?.[0];
                                         if (!file || !user) return;
@@ -756,6 +759,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                 type="file"
                                                 accept="image/*"
                                                 style={{ fontSize: '0.8rem' }}
+                                                onMouseDown={() => { filePickerActiveRef.current = true; setTimeout(() => { filePickerActiveRef.current = false; }, 2000); }}
                                                 onChange={(e) => {
                                                     const file = e.target.files?.[0];
                                                     if (!file || !currentTeamId) return;
@@ -1323,6 +1327,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                     accept="image/*"
                                                     className="input-field"
                                                     style={{ paddingTop: '8px' }}
+                                                    onMouseDown={() => { filePickerActiveRef.current = true; setTimeout(() => { filePickerActiveRef.current = false; }, 2000); }}
                                                     onChange={(e) => {
                                                         const file = e.target.files?.[0];
                                                         if (!file) return;
@@ -1456,6 +1461,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                                 type="file"
                                                                 accept="image/*"
                                                                 style={{ fontSize: '0.75rem' }}
+                                                                onMouseDown={() => { filePickerActiveRef.current = true; setTimeout(() => { filePickerActiveRef.current = false; }, 2000); }}
                                                                 onChange={(e) => {
                                                                     const file = e.target.files?.[0];
                                                                     if (!file) return;
