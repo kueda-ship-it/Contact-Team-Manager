@@ -1,4 +1,9 @@
 export const CHANGELOG = `
+# 2026-03-17 更新履歴
+
+## Teams @add thread 連携 - Part 23
+- **Power Automate フローの構築**: Microsoft Teams のチャンネル投稿・返信で \`@add thread\` タグをメンションすると、自動的に Contact Team Manager にスレッドが作成されます。（テスト運用　※特定チームのみ）
+
 # 2026-03-16 更新履歴
 
 ## 管理UI刷新・SSO修正・チーム機能強化 - Part 22
