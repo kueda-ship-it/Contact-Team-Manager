@@ -66,7 +66,25 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [remindInput, setRemindInput] = React.useState<{ threadId: string, remindAt: string } | null>(null);
     const [expandedThreads, setExpandedThreads] = React.useState<Set<string>>(new Set());
     const [needsExpandMap, setNeedsExpandMap] = React.useState<{ [key: string]: boolean }>({});
+    const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
     const measureRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+    // Close open menu when clicking outside
+    React.useEffect(() => {
+        const handleClickOutside = () => { setOpenMenuId(null); };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    // Disable pointer events on overlapping UI when menu is open
+    React.useEffect(() => {
+        if (openMenuId !== null) {
+            document.body.classList.add('menu-open');
+        } else {
+            document.body.classList.remove('menu-open');
+        }
+        return () => document.body.classList.remove('menu-open');
+    }, [openMenuId]);
 
     // Measure heights to detect if they exceed thresholds (200px for threads, 100px for replies)
     React.useLayoutEffect(() => {
@@ -630,7 +648,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                             <div
                                 key={thread.id}
                                 id={`thread-${thread.id}`}
-                                className={`task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''}`}
+                                className={`task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''} ${openMenuId === thread.id ? 'has-open-menu' : ''}`}
                                 style={{ position: 'relative', paddingBottom: '50px' }}
                             >
                                 {thread.is_pinned && <div className="pinned-badge">重要</div>}
@@ -641,12 +659,13 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                 )}
 
                                 <div className="dot-menu-container">
-                                    <div className="dot-menu-trigger">⋮</div>
-                                    <div className="dot-menu">
+                                    <div className="dot-menu-trigger" onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === thread.id ? null : thread.id); }}>⋮</div>
+                                    <div className={`dot-menu${openMenuId === thread.id ? ' dot-menu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
                                         {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
                                             <>
                                                 {user?.id === thread.user_id && (
                                                     <div className="menu-item" onClick={() => {
+                                                        setOpenMenuId(null);
                                                         setEditingThreadId(thread.id);
                                                     }}>
                                                         <span className="menu-icon">
@@ -657,7 +676,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                         </span> 編集
                                                     </div>
                                                 )}
-                                                <div className="menu-item menu-item-delete" onClick={() => handleDeleteThread(thread.id)}>
+                                                <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteThread(thread.id); }}>
                                                     <span className="menu-icon">
                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                             <polyline points="3 6 5 6 21 6"></polyline>
@@ -670,6 +689,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 <div className="menu-item" onClick={() => {
                                                     // Initialize with current remind_at if exists
                                                     const currentVal = thread.remind_at ? new Date(thread.remind_at - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
+                                                    setOpenMenuId(null);
                                                     setRemindInput({ threadId: thread.id, remindAt: currentVal });
                                                 }}>
                                                     <span className="menu-icon">
@@ -680,16 +700,17 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     </span> リマインド
                                                 </div>
                                                 {['Admin'].includes(currentProfile?.role || '') && (
-                                                    <div className="menu-item move-team-item">
+                                                    <div className="menu-item move-team-item" onClick={(e) => e.stopPropagation()}>
                                                         <span className="menu-icon">
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                                                             </svg>
                                                         </span> チーム移動
-                                                        <div className="submenu">
+                                                        <div className="submenu" onClick={(e) => e.stopPropagation()}>
                                                             {teams.filter(t => t.id !== thread.team_id).map(t => (
                                                                 <div key={t.id} className="menu-item" onClick={async (e) => {
                                                                     e.stopPropagation();
+                                                                    setOpenMenuId(null);
                                                                     if (window.confirm(`この投稿を「${t.name}」へ移動しますか？`)) {
                                                                         const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
                                                                         if (error) alert('移動に失敗しました: ' + error.message);
@@ -858,12 +879,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                             return (
                                                                 <div key={reply.id} className="reply-item" style={{ position: 'relative' }}>
                                                                     <div className="dot-menu-container" style={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}>
-                                                                        <div className="dot-menu-trigger">⋮</div>
-                                                                        <div className="dot-menu">
+                                                                        <div className="dot-menu-trigger" onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === reply.id ? null : reply.id); }}>⋮</div>
+                                                                        <div className={`dot-menu${openMenuId === reply.id ? ' dot-menu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
                                                                             {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
                                                                                 <>
                                                                                     {user?.id === reply.user_id && (
-                                                                                        <div className="menu-item" onClick={() => setEditingReplyId(reply.id)}>
+                                                                                        <div className="menu-item" onClick={() => { setOpenMenuId(null); setEditingReplyId(reply.id); }}>
                                                                                             <span className="menu-icon">
                                                                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -872,7 +893,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                                             </span> 編集
                                                                                         </div>
                                                                                     )}
-                                                                                    <div className="menu-item menu-item-delete" onClick={() => handleDeleteReply(reply.id)}>
+                                                                                    <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteReply(reply.id); }}>
                                                                                         <span className="menu-icon">
                                                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                                                 <polyline points="3 6 5 6 21 6"></polyline>

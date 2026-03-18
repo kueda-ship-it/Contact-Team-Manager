@@ -2175,9 +2175,7 @@ textarea.input-field {
 
 /* Bridge removed from here due to overflow-y clipping issues */
 
-.menu-item:hover .submenu {
-    display: block;
-}
+/* submenu is shown via JS click state (.submenu-open class) */
 
 .submenu .menu-item {
     font-size: 0.85rem;
@@ -2732,14 +2730,7 @@ body.light-mode .theme-toggle-btn:hover svg {
     background: transparent;
 }
 
-/* 繧�E�繝ｳ繝リ縺�E�繝帙ヰ繝ｼ縺�E�縺溘繝｡繝九Η繝ｼ閾�E�菴薙�E繝帙ヰ繝ｼ縺励◁E���E�縺阪↓陦�E�遉ｺ */
-.dot-menu-container:hover .dot-menu,
-.dot-menu:hover {
-    opacity: 1;
-    visibility: visible;
-    transform: scale(1) translateY(0);
-    pointer-events: auto;
-}
+/* dot-menu is shown only via JS click state (.dot-menu-open class) */
 
 .menu-item {
     padding: 10px 15px;
@@ -3158,7 +3149,8 @@ html {
     z-index: 1100;
 }
 
-.dot-menu-container:hover {
+.dot-menu-container:hover,
+.dot-menu-container:has(.dot-menu-open) {
     opacity: 1 !important;
     z-index: 1101;
 }
@@ -3199,16 +3191,26 @@ html {
     pointer-events: none;
 }
 
-.dot-menu-container:hover .dot-menu,
-.dot-menu:hover {
+.dot-menu.dot-menu-open {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
     transition: opacity 0.15s ease, visibility 0s 0s;
+    z-index: 9999;
 }
 
-.dot-menu:hover::before {
-    pointer-events: auto;
+/* Raise card above siblings when its menu is open */
+.task-card.has-open-menu {
+    z-index: 10001;
+    position: relative;
+}
+
+/* Disable pointer events on overlapping UI while any dot-menu is open */
+body.menu-open .static-form-container,
+body.menu-open .post-form-container,
+body.menu-open .reply-form,
+body.menu-open .quick-reply-form {
+    pointer-events: none !important;
 }
 
 .menu-item {
@@ -3244,11 +3246,12 @@ html {
     transform: translateX(5px);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
-    z-index: 1030;
+    z-index: 10000;
 }
 
-.move-team-item:hover .submenu,
-.submenu:hover {
+.submenu.submenu-open,
+.move-team-item:hover .submenu {
+    display: block;
     opacity: 1;
     visibility: visible;
     transform: translateX(0);
