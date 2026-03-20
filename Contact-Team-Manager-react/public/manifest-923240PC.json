@@ -1,0 +1,35 @@
+{
+    "name": "Contact Team Manager",
+    "short_name": "CT Manager",
+    "description": "チームと対応履歴の進捗を管理するアプリケーション",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#313338",
+    "theme_color": "#313338",
+    "icons": [
+        {
+            "src": "favicon-v3.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "favicon-v3.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "favicon-v3.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "favicon-v3.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

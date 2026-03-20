@@ -28,6 +28,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const [endDate, setEndDate] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+    const [selectedReplyCount, setSelectedReplyCount] = useState<string | null>(null);
+    const [replyChartType, setReplyChartType] = useState<'bar' | 'pie'>('bar');
 
     if (threadsLoading) return <div style={{ padding: '20px', color: 'var(--text-main)' }}>統計データを読み込み中...</div>;
 
@@ -123,12 +125,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     const overallAvgTime = calculateAvgTime(displayThreads);
 
-    const userStats: { [key: string]: { name: string; count: number; completedCount: number; avgTime: string; completionRate: number; dailySpan: string } } = {};
+    const userStats: { [key: string]: { name: string; count: number; completedCount: number; avgTime: string; completionRate: number; dailySpan: string; totalRepliesInCompleted: number; avgReplies: number } } = {};
 
     displayThreads.forEach(t => {
         const author = t.author_name || t.author || 'Unknown';
         if (!userStats[author]) {
-            userStats[author] = { name: author, count: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A' };
+            userStats[author] = { name: author, count: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A', totalRepliesInCompleted: 0, avgReplies: 0 };
         }
         userStats[author].count++;
 
@@ -137,9 +139,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             const completerName = completerProfile?.display_name || completerProfile?.email || t.author_name || t.author || 'Unknown';
 
             if (!userStats[completerName]) {
-                userStats[completerName] = { name: completerName, count: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A' };
+                userStats[completerName] = { name: completerName, count: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A', totalRepliesInCompleted: 0, avgReplies: 0 };
             }
             userStats[completerName].completedCount++;
+            userStats[completerName].totalRepliesInCompleted += (t.replies?.length || 0);
         }
     });
 
@@ -155,10 +158,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     // Reply Distribution Analysis
     const replyCountDist: { [key: string]: number } = { '1': 0, '2': 0, '3': 0, '4': 0, '5+': 0 };
+    const replyCountAvgTime: { [key: string]: string } = {};
+    const replyCountThreads: { [key: string]: any[] } = { '1': [], '2': [], '3': [], '4': [], '5+': [] };
+
     threadsWithReplies.forEach(t => {
         const count = t.replies?.length || 0;
-        if (count >= 5) replyCountDist['5+']++;
-        else replyCountDist[String(count)]++;
+        const key = count >= 5 ? '5+' : String(count);
+        replyCountDist[key]++;
+        replyCountThreads[key].push(t);
+    });
+
+    Object.keys(replyCountThreads).forEach(key => {
+        replyCountAvgTime[key] = calculateAvgTime(replyCountThreads[key]);
     });
 
     // Longest Completion Ranking (Top 100)
@@ -187,6 +198,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         stats.completionRate = stats.count > 0 ? Math.round((myThreadsCompleted / stats.count) * 100) : 0;
         stats.avgTime = calculateAvgTime(userThreadsAsAuthor);
         stats.dailySpan = calculateDailyActivitySpan(userThreadsAsAuthor);
+        stats.avgReplies = stats.completedCount > 0 ? Number((stats.totalRepliesInCompleted / stats.completedCount).toFixed(1)) : 0;
     });
 
     const completerStats: { [name: string]: number } = {};
@@ -198,11 +210,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         }
     });
 
-    const sortedUserStats = Object.values(userStats).sort((a, b) => b.count - a.count);
-    const sortedByCompletions = Object.entries(completerStats)
-        .map(([name, count]) => ({ name, completedCount: count }))
-        .sort((a, b) => b.completedCount - a.completedCount);
-    const maxCompletions = Math.max(...sortedByCompletions.map(s => s.completedCount), 1);
+    const sortedUserStats = Object.values(userStats).sort((a, b) => b.completedCount - a.completedCount);
+    const maxCompletions = Math.max(...sortedUserStats.map(s => s.completedCount), 1);
 
     const teamStats: { [key: string]: { id: number | string; name: string; completedCount: number } } = {};
     displayThreads.forEach(t => {
@@ -468,31 +477,119 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-                        <div className="task-card" style={{ padding: '25px' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>返信数の分布</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                {Object.entries(replyCountDist).map(([count, total]) => (
-                                    <div key={count}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.9rem' }}>
-                                            <span style={{ fontWeight: 600 }}>{count} 件の返信</span>
-                                            <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{total} スレッド</span>
-                                        </div>
-                                        <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                                            <div
-                                                style={{
-                                                    height: '100%',
-                                                    width: `${threadsWithReplies.length > 0 ? (total / threadsWithReplies.length) * 100 : 0}%`,
-                                                    background: 'var(--danger)',
-                                                    transition: 'width 1s ease-out'
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                                    <span style={{ color: 'var(--text-muted)' }}>総返信数</span>
-                                    <span style={{ fontWeight: 700 }}>{totalReplies} 件 (平均 {avgRepliesPerThread} 件)</span>
+                        <div className="task-card" style={{ padding: '25px', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: 'var(--text-muted)' }}>返信数の分布</h3>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button 
+                                        onClick={() => setReplyChartType('bar')}
+                                        style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', opacity: replyChartType === 'bar' ? 1 : 0.3, color: 'var(--text-main)', transition: 'opacity 0.2s' }}
+                                        title="棒グラフ"
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                                    </button>
+                                    <button 
+                                        onClick={() => setReplyChartType('pie')}
+                                        style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', opacity: replyChartType === 'pie' ? 1 : 0.3, color: 'var(--text-main)', transition: 'opacity 0.2s' }}
+                                        title="円グラフ"
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+                                    </button>
                                 </div>
+                            </div>
+                            
+                            {replyChartType === 'bar' ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                    {Object.entries(replyCountDist).map(([count, total]) => (
+                                        <div key={count}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.9rem' }}>
+                                                <span style={{ fontWeight: 600 }}>{count} 件の返信</span>
+                                                <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{total} スレッド <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>({Math.round(threadsWithReplies.length > 0 ? (total / threadsWithReplies.length) * 100 : 0)}%)</span></span>
+                                            </div>
+                                            <div 
+                                                style={{ height: '14px', background: 'rgba(255,255,255,0.05)', borderRadius: '7px', overflow: 'hidden', cursor: 'pointer' }}
+                                                onClick={() => setSelectedReplyCount(count)}
+                                                title="クリックして詳細分析を表示"
+                                            >
+                                                <div
+                                                    style={{
+                                                        height: '100%',
+                                                        width: `${threadsWithReplies.length > 0 ? (total / threadsWithReplies.length) * 100 : 0}%`,
+                                                        background: 'var(--danger)',
+                                                        transition: 'width 1s ease-out',
+                                                        position: 'relative',
+                                                        minWidth: '30px'
+                                                    }}
+                                                >
+                                                    <div style={{ position: 'absolute', right: '5px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.65rem', color: 'white', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                                                        {replyCountAvgTime[count]}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', minHeight: '180px' }}>
+                                    <div style={{ position: 'relative' }}>
+                                        <svg width="140" height="140" viewBox="0 0 100 100">
+                                            {(() => {
+                                                let currentPercent = 0;
+                                                const colors = ['#ff4d4d', '#ff8080', '#ffb3b3', '#ffe6e6', '#ffffff'];
+                                                return Object.entries(replyCountDist).map(([count, total], i) => {
+                                                    const percent = threadsWithReplies.length > 0 ? (total / threadsWithReplies.length) * 100 : 0;
+                                                    const startPercent = currentPercent;
+                                                    currentPercent += percent;
+                                                    
+                                                    if (percent === 0) return null;
+
+                                                    const radius = 35;
+                                                    const circumference = 2 * Math.PI * radius;
+                                                    const offset = circumference - (percent / 100) * circumference;
+                                                    const rotation = (startPercent / 100) * 360 - 90;
+
+                                                    return (
+                                                        <circle
+                                                            key={count}
+                                                            cx="50"
+                                                            cy="50"
+                                                            r={radius}
+                                                            fill="transparent"
+                                                            stroke={colors[i % colors.length]}
+                                                            strokeWidth="15"
+                                                            strokeDasharray={circumference}
+                                                            strokeDashoffset={offset}
+                                                            strokeLinecap="butt"
+                                                            transform={`rotate(${rotation} 50 50)`}
+                                                            style={{ transition: 'all 0.5s ease', cursor: 'pointer' }}
+                                                            onClick={() => setSelectedReplyCount(count)}
+                                                        >
+                                                            <title>{count}件の返信: {total}スレッド ({Math.round(percent)}%)</title>
+                                                        </circle>
+                                                    );
+                                                });
+                                            })()}
+                                            <text x="50" y="50" textAnchor="middle" dy=".3em" fill="var(--text-main)" fontSize="7" fontWeight="bold">返信数</text>
+                                        </svg>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {(() => {
+                                            const colors = ['#ff4d4d', '#ff8080', '#ffb3b3', '#ffe6e6', '#ffffff'];
+                                            return Object.entries(replyCountDist).map(([count, total], i) => (
+                                                <div key={count} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', opacity: total > 0 ? 1 : 0.3 }} onClick={() => setSelectedReplyCount(count)}>
+                                                    <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: colors[i % colors.length] }}></div>
+                                                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{count}件:</span>
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-main)', fontWeight: 700 }}>{Math.round(threadsWithReplies.length > 0 ? (total / threadsWithReplies.length) * 100 : 0)}%</span>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>総返信数</span>
+                                <span style={{ fontWeight: 700 }}>{totalReplies} 件 (平均 {avgRepliesPerThread} 件)</span>
                             </div>
                         </div>
 
@@ -521,21 +618,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-                        <div className="task-card" style={{ padding: '25px' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>完了数（メンバー別）</h3>
+                        <div className="card glass-panel" style={{ padding: '25px', overflow: 'hidden' }}>
+                            <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                メンバー分析 (対応実積)
+                            </h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                {sortedByCompletions.slice(0, 5).map((stat) => (
-                                    <div key={stat.name}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.9rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 80px 80px', gap: '10px', fontSize: '0.75rem', color: 'var(--text-muted)', paddingBottom: '5px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontWeight: 600 }}>
+                                    <div>メンバー</div>
+                                    <div style={{ textAlign: 'right' }}>完了数</div>
+                                    <div style={{ textAlign: 'right' }}>平均返信</div>
+                                    <div style={{ textAlign: 'right' }}>平均時間</div>
+                                </div>
+                                {sortedUserStats.filter(s => s.completedCount > 0).slice(0, 8).map((stat) => (
+                                    <div key={stat.name} style={{ cursor: 'pointer' }} onClick={() => setSelectedUser(stat.name)}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.85rem' }}>
                                             <span style={{ fontWeight: 600 }}>{stat.name}</span>
-                                            <span style={{ color: 'var(--success)', fontWeight: 700 }}>{stat.completedCount}件</span>
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <span style={{ fontWeight: 700, width: '40px', textAlign: 'right' }}>{stat.completedCount}件</span>
+                                                <span style={{ color: stat.avgReplies > 2.5 ? 'var(--danger)' : 'var(--text-main)', fontWeight: 700, width: '60px', textAlign: 'right' }}>{stat.avgReplies}件</span>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '70px', textAlign: 'right' }}>{stat.avgTime}</span>
+                                            </div>
                                         </div>
-                                        <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
                                             <div
                                                 style={{
                                                     height: '100%',
                                                     width: `${(stat.completedCount / maxCompletions) * 100}%`,
-                                                    background: 'var(--success)',
+                                                    background: stat.avgReplies > 2.5 ? 'linear-gradient(90deg, var(--danger), #ff8080)' : 'linear-gradient(90deg, var(--primary), var(--accent))',
+                                                    borderRadius: '3px',
                                                     transition: 'width 1s ease-out'
                                                 }}
                                             />
@@ -545,7 +656,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                         </div>
 
-                        <div className="task-card" style={{ padding: '25px' }}>
+                        <div className="card glass-panel" style={{ padding: '25px' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>完了数（チーム別）</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                 {sortedTeamStats.length === 0 ? (
@@ -773,8 +884,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                             return (
                                                 <tr 
                                                     key={t.id} 
-                                                    style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: onThreadClick ? 'pointer' : 'default' }}
-                                                    onClick={() => onThreadClick && onThreadClick(t.id)}
+                                                    style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        onThreadClick && onThreadClick(t.id);
+                                                    }}
                                                     className="dashboard-ranking-row"
                                                 >
                                                     <td style={{ padding: '12px 10px', maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -803,9 +917,59 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </>
             )}
 
+            {selectedReplyCount && (
+                <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000 }} onClick={() => setSelectedReplyCount(null)}>
+                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%', animation: 'modalFadeIn 0.3s ease-out', padding: '30px', maxHeight: '85vh', overflowY: 'auto', border: '1px solid var(--glass-border)', boxShadow: '0 15px 50px rgba(0,0,0,0.6)', position: 'relative', zIndex: 100001 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem' }}>返信数 {selectedReplyCount} 件の分析</h3>
+                                <p style={{ margin: '5px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>該当スレッド: {replyCountDist[selectedReplyCount]} 件</p>
+                            </div>
+                            <button className="btn btn-sm btn-outline" onClick={() => setSelectedReplyCount(null)} style={{ padding: '0 8px', height: '32px' }}>✕</button>
+                        </div>
+                        
+                        <div style={{ display: 'grid', gap: '20px' }}>
+                            <div style={{ background: 'rgba(220, 38, 38, 0.1)', padding: '20px', borderRadius: '15px', border: '1px solid rgba(220, 38, 38, 0.2)', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '10px' }}>このカテゴリの平均完了時間</div>
+                                <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--danger)' }}>{replyCountAvgTime[selectedReplyCount]}</div>
+                            </div>
+
+                            <div>
+                                <h4 style={{ fontSize: '0.9rem', marginBottom: '15px', color: 'var(--text-muted)' }}>解決まで時間がかかったスレッド (ワースト)</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {replyCountThreads[selectedReplyCount]
+                                        .filter(t => t.status === 'completed' && t.completed_at)
+                                        .map(t => ({ ...t, durationMs: new Date(t.completed_at!).getTime() - new Date(t.created_at).getTime() }))
+                                        .sort((a, b) => b.durationMs - a.durationMs)
+                                        .slice(0, 5)
+                                        .map(t => (
+                                            <div 
+                                                key={t.id} 
+                                                style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 15px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onThreadClick && onThreadClick(t.id);
+                                                    setSelectedReplyCount(null);
+                                                }}
+                                            >
+                                                <div style={{ maxWidth: '70%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t.title}</div>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>対応者: {profiles.find((p: any) => p.id === t.completed_by)?.display_name || 'Unknown'}</div>
+                                                </div>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--danger)' }}>{formatDuration(t.durationMs)}</div>
+                                            </div>
+                                        ))
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {selectedUser && (
-                <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setSelectedUser(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%', animation: 'modalFadeIn 0.3s ease-out' }}>
+                <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000 }} onClick={() => setSelectedUser(null)}>
+                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%', animation: 'modalFadeIn 0.3s ease-out', padding: '30px', border: '1px solid var(--glass-border)', boxShadow: '0 15px 50px rgba(0,0,0,0.6)', position: 'relative', zIndex: 100001 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
                             <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{selectedUser} の詳細統計</h3>
                             <button className="btn btn-sm btn-outline" onClick={() => setSelectedUser(null)} style={{ padding: '0 8px', height: '32px' }}>✕</button>

@@ -1,0 +1,70 @@
+﻿/* Update reaction menu hover area */
+.reaction-container-bottom {
+    margin: 12px 0 8px 0;
+    position: relative;
+    width: fit-content;
+}
+
+.reaction-container-bottom .plus-trigger {
+    width: 32px;
+    height: 32px;
+    background: #252423;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.reaction-container-bottom:hover .plus-trigger {
+    background: #3D3C3B;
+    transform: rotate(90deg) scale(1.1);
+}
+
+.reaction-container-bottom .reaction-menu {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #252423;
+    border-radius: 25px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.95);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.reaction-container-bottom:hover .reaction-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+.reaction-container-bottom .reaction-menu span {
+    cursor: pointer;
+    font-size: 1.4rem;
+    padding: 4px;
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.1s;
+    display: block;
+    line-height: 1;
+}
+
+.reaction-container-bottom .reaction-menu span:hover {
+    transform: scale(1.5);
+    background: rgba(255,255,255,0.1);
+}
+
+.reaction-container-bottom .reaction-menu span:active {
+    transform: scale(0.8);
+}

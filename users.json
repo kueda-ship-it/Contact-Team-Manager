@@ -1,0 +1,26 @@
+[
+  {
+    "id": "admin",
+    "pw": "admin123",
+    "name": "管理者",
+    "role": "master"
+  },
+  {
+    "id": "manager",
+    "pw": "manager123",
+    "name": "マネージャー",
+    "role": "Manager"
+  },
+  {
+    "id": "user",
+    "pw": "user123",
+    "name": "作業員",
+    "role": "user"
+  },
+  {
+    "id": "viewer",
+    "pw": "viewer123",
+    "name": "閲覧者",
+    "role": "viewer"
+  }
+]

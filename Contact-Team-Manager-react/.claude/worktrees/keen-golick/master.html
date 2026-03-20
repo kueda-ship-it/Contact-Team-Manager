@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ユーザーマスタ管理 - F-ace</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="nav">
+        <a href="index.html">← フォームへ戻る</a>
+        <span class="user-info" id="currentUserDisplay"></span>
+        <button type="button" onclick="logout()">ログアウト</button>
+    </div>
+
+    <h1>ユーザーマスタ管理</h1>
+
+    <div class="section">
+        <h2>ユーザー一覧</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ユーザーID</th>
+                        <th>表示名</th>
+                        <th>権限</th>
+                        <th style="width: 120px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="userListBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" id="addUserSection">
+        <h2>新規ユーザー追加</h2>
+        <div class="meta-grid">
+            <div class="field"><label>ユーザーID</label><input type="text" id="newUserId"></div>
+            <div class="field"><label>パスワード</label><input type="password" id="newUserPw"></div>
+            <div class="field"><label>表示名</label><input type="text" id="newUserName"></div>
+            <div class="field">
+                <label>権限</label>
+                <select id="newUserRole">
+                    <option value="viewer">viewer</option>
+                    <option value="user">user</option>
+                    <option value="Manager">Manager</option>
+                    <option value="master">master</option>
+                </select>
+            </div>
+            <div class="field" style="justify-content: flex-end; padding-top: 10px;">
+                <button type="button" class="primary" onclick="addUser()">ユーザーを追加</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="section" id="systemSettingsSection">
+        <h2>点検項目・設定値マスタ</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <h3>共通確認項目</h3>
+                <div id="commonItemsEditor"></div>
+                <button type="button" onclick="addCommonItem()" style="margin-top:10px;">＋ 項目追加</button>
+            </div>
+            <div>
+                <h3>Camera設定値確認 項目名</h3>
+                <div id="cameraSettingsEditor"></div>
+                <button type="button" onclick="addCameraSetting()" style="margin-top:10px;">＋ 項目追加</button>
+            </div>
+        </div>
+        <div style="margin-top: 30px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+            <button type="button" class="primary" style="padding: 12px 40px;"
+                onclick="saveSystemSettings()">システム設定を保存</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // master画面専用の初期化
+        document.addEventListener("DOMContentLoaded", () => {
+            const user = JSON.parse(localStorage.getItem("face_current_user"));
+            if (!user || (user.role !== 'master' && user.role !== 'Manager')) {
+                alert("アクセス権限がありません。");
+                location.href = "index.html";
+                return;
+            }
+            renderUserList();
+
+            const display = document.getElementById("currentUserDisplay");
+            if (display) display.textContent = `${user.name} (${user.role})`;
+
+            renderSystemSettings();
+        });
+
+        let systemSettings = { commonItems: [], cameraSettings: [] };
+
+        async function renderSystemSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                systemSettings = await res.json();
+
+                const commonDiv = document.getElementById("commonItemsEditor");
+                commonDiv.innerHTML = systemSettings.commonItems.map((item, i) => `
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" value="${item}" onchange="systemSettings.commonItems[${i}]=this.value" style="flex:1;">
+                        <button type="button" class="danger" onclick="removeCommonItem(${i})">✕</button>
+                    </div>
+                `).join("");
+
+                const cameraDiv = document.getElementById("cameraSettingsEditor");
+                cameraDiv.innerHTML = systemSettings.cameraSettings.map((item, i) => `
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" value="${item.name}" onchange="systemSettings.cameraSettings[${i}].name=this.value" style="flex:1;">
+                        <button type="button" class="danger" onclick="removeCameraSetting(${i})">✕</button>
+                    </div>
+                `).join("");
+            } catch (err) { console.error(err); }
+        }
+
+        window.addCommonItem = () => { systemSettings.commonItems.push(""); renderSystemSettings(); };
+        window.removeCommonItem = (i) => { systemSettings.commonItems.splice(i, 1); renderSystemSettings(); };
+        window.addCameraSetting = () => { systemSettings.cameraSettings.push({ id: Date.now(), name: "" }); renderSystemSettings(); };
+        window.removeCameraSetting = (i) => { systemSettings.cameraSettings.splice(i, 1); renderSystemSettings(); };
+
+        window.saveSystemSettings = async () => {
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(systemSettings)
+                });
+                if (response.ok) alert("マスタ設定を保存しました。");
+            } catch (err) { alert("保存に失敗しました。"); }
+        };
+
+        async function renderUserList() {
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+                const body = document.getElementById("userListBody");
+                body.innerHTML = "";
+                users.forEach(u => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${u.id}</td>
+                        <td>${u.name}</td>
+                        <td>
+                            <select onchange="updateUserRole('${u.id}', this.value)">
+                                <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>viewer</option>
+                                <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
+                                <option value="Manager" ${u.role === 'Manager' ? 'selected' : ''}>Manager</option>
+                                <option value="master" ${u.role === 'master' ? 'selected' : ''}>master</option>
+                            </select>
+                        </td>
+                        <td>
+                            <button type="button" class="danger" onclick="deleteUser('${u.id}')">削除</button>
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
+            } catch (err) {
+                alert("ユーザーリストの取得に失敗しました。");
+            }
+        }
+
+        window.addUser = async () => {
+            const id = document.getElementById("newUserId").value;
+            const pw = document.getElementById("newUserPw").value;
+            const name = document.getElementById("newUserName").value;
+            const role = document.getElementById("newUserRole").value;
+
+            if (!id || !pw || !name) {
+                alert("全ての項目を入力してください。");
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, pw, name, role })
+                });
+                if (response.ok) {
+                    renderUserList();
+                    document.getElementById("newUserId").value = "";
+                    document.getElementById("newUserPw").value = "";
+                    document.getElementById("newUserName").value = "";
+                }
+            } catch (err) {
+                alert("追加に失敗しました。");
+            }
+        };
+
+        window.updateUserRole = async (id, newRole) => {
+            try {
+                const res = await fetch('/api/users');
+                const users = await res.json();
+                const user = users.find(u => u.id === id);
+                if (user) {
+                    user.role = newRole;
+                    await fetch('/api/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(user)
+                    });
+                }
+            } catch (err) {
+                alert("更新に失敗しました。");
+            }
+        };
+
+        window.deleteUser = async (id) => {
+            if (!confirm("このユーザーを削除しますか？")) return;
+            try {
+                const response = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+                if (response.ok) renderUserList();
+            } catch (err) {
+                alert("削除に失敗しました。");
+            }
+        };
+
+        window.logout = () => {
+            localStorage.removeItem("face_current_user");
+            location.href = "login.html";
+        };
+    </script>
+</body>
+
+</html>
