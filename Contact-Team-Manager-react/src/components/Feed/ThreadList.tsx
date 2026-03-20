@@ -27,6 +27,16 @@ const ThreadImage: React.FC<{
     const [retryCount, setRetryCount] = React.useState(0);
     const [isAuthNeeded, setIsAuthNeeded] = React.useState(false);
 
+    // React to auth changes: If we were blocked and now authenticated, try again automatically.
+    React.useEffect(() => {
+        if (isAuthenticated && isAuthNeeded) {
+            console.log(`[ThreadImage] Authentication detected for ${att.id}, retrying load.`);
+            setIsAuthNeeded(false);
+            setRetryCount(0);
+            // This re-evaluates src or triggers handleError again if <img> still fails
+        }
+    }, [isAuthenticated, isAuthNeeded, att.id]);
+
     const handleError = async () => {
         if (!att.id || retryCount >= 1) {
             // If already retried and still fails, check if we need auth
@@ -574,13 +584,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 if (fresh) {
                                                     setPreviewImageUrl(fresh.downloadUrl || fresh.thumbnailUrl);
                                                 } else if (!isAuthenticated) {
-                                                    // Prompt login if metadata refresh fails due to auth
-                                                    if (window.confirm("画像の表示に認証が必要です。Microsoft にログインしますか？")) {
-                                                        const account = await login();
-                                                        if (account) {
-                                                            const freshAfter = await getFreshAttachmentMetadata(att.id);
-                                                            if (freshAfter) setPreviewImageUrl(freshAfter.downloadUrl || freshAfter.thumbnailUrl);
-                                                        }
+                                                    // Request login without confirmation for direct feedback
+                                                    const account = await login();
+                                                    if (account) {
+                                                        const freshAfter = await getFreshAttachmentMetadata(att.id);
+                                                        if (freshAfter) setPreviewImageUrl(freshAfter.downloadUrl || freshAfter.thumbnailUrl);
                                                     }
                                                 }
                                             }

@@ -116,9 +116,6 @@ export const signIn = async (promptType: "select_account" | "consent" = "select_
         isLoggingIn = true;
         console.log(`Attempting Popup Login with prompt: ${promptType}...`);
         
-        // Ensure MSAL is fully initialized before popup
-        await initializeMsal();
-
         const result = await msalInstance.loginPopup({
             ...loginRequest,
             prompt: promptType
