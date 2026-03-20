@@ -38,6 +38,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
     } = useOneDriveUpload();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pendingPastes, setPendingPastes] = useState<File[]>([]);
 
     const { members: teamMembers } = useTeamMembers(teamId);
     const memberIds = React.useMemo(() => 
@@ -59,6 +60,20 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
     React.useEffect(() => {
         initializeMsal().catch(console.error);
     }, []);
+
+    // Auto-upload pending pastes after login
+    React.useEffect(() => {
+        if (isAuthenticated && pendingPastes.length > 0) {
+            const uploadPending = async () => {
+                const files = [...pendingPastes];
+                setPendingPastes([]);
+                for (const file of files) {
+                    await uploadFile(file);
+                }
+            };
+            uploadPending();
+        }
+    }, [isAuthenticated, pendingPastes, uploadFile]);
 
     const handleSubmit = async () => {
         if (!title.trim() || !contentRef.current?.innerText.trim()) {
@@ -268,17 +283,63 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                     }
                                 }}
                                 onPaste={(e: React.ClipboardEvent) => {
-                                    e.preventDefault();
-                                    const text = e.clipboardData.getData('text/plain');
-                                    document.execCommand('insertText', false, text);
+                                    const items = e.clipboardData.items;
+                                    let hasImage = false;
+
+                                    for (let i = 0; i < items.length; i++) {
+                                        if (items[i].type.indexOf('image') !== -1) {
+                                            const blob = items[i].getAsFile();
+                                            if (blob) {
+                                                if (isAuthenticated) {
+                                                    uploadFile(blob);
+                                                } else {
+                                                    setPendingPastes(prev => [...prev, blob]);
+                                                }
+                                                hasImage = true;
+                                            }
+                                        }
+                                    }
+
+                                    if (hasImage) {
+                                        e.preventDefault();
+                                    } else {
+                                        e.preventDefault();
+                                        const text = e.clipboardData.getData('text/plain');
+                                        document.execCommand('insertText', false, text);
+                                    }
                                 }}
                             />
+                            {pendingPastes.length > 0 && !isAuthenticated && (
+                                <div style={{ 
+                                    marginTop: '8px', 
+                                    padding: '10px', 
+                                    background: 'rgba(255, 193, 7, 0.1)', 
+                                    border: '1px solid rgba(255, 193, 7, 0.3)', 
+                                    borderRadius: '8px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <span style={{ fontSize: '0.85rem', color: '#ffc107' }}>
+                                        画像がペーストされました。アップロードを完了するには Microsoft 連携が必要です。
+                                    </span>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-sm" 
+                                        style={{ background: '#ffc107', color: 'black' }}
+                                        onClick={() => login()}
+                                    >
+                                        ログインしてアップロード
+                                    </button>
+                                </div>
+                            )}
+
                             {attachments.length > 0 && (
                                 <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
                                     {attachments.map((att, index) => (
                                         <div key={index} className="attachment-item" style={{ position: 'relative', width: '120px', height: '120px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                             {att.type.startsWith('image/') ? (
-                                                <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={att.thumbnailUrl || att.downloadUrl} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
                                                 <span style={{ fontSize: '20px' }}>📄</span>
                                             )}

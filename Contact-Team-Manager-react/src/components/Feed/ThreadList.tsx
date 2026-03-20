@@ -12,6 +12,71 @@ import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
 import { LinkPreview } from '../common/LinkPreview';
 
+// Helper component for auto-refreshing images
+const ThreadImage: React.FC<{ 
+    att: any; 
+    getFreshMetadata: (id: string) => Promise<any>;
+    isAuthenticated: boolean;
+    onLogin: () => Promise<any>;
+}> = ({ att, getFreshMetadata, isAuthenticated, onLogin }) => {
+    // Initial src: priority to direct links. Only use .url if it seems to be a direct link or we have nothing else.
+    // OneDrive webUrls usually contain "view.aspx" or similar, which break <img>.
+    const isDirectLink = (url: string) => url && (url.includes('download.aspx') || url.includes('content.office.net') || url.includes('public.blob.core.windows.net'));
+    
+    const [src, setSrc] = React.useState(att.thumbnailUrl || att.downloadUrl || (isDirectLink(att.url) ? att.url : ''));
+    const [retryCount, setRetryCount] = React.useState(0);
+    const [isAuthNeeded, setIsAuthNeeded] = React.useState(false);
+
+    const handleError = async () => {
+        if (!att.id || retryCount >= 1) {
+            // If already retried and still fails, check if we need auth
+            if (!isAuthenticated) {
+                console.log("[ThreadImage] Still failing and not authenticated. Showing auth button.");
+                setIsAuthNeeded(true);
+            }
+            return;
+        }
+        
+        console.log(`[ThreadImage] Image failed to load, fetching fresh metadata for ${att.id}`);
+        setRetryCount(prev => prev + 1);
+        
+        const fresh = await getFreshMetadata(att.id);
+        if (fresh) {
+            setSrc(fresh.thumbnailUrl || fresh.downloadUrl);
+            setIsAuthNeeded(false);
+        } else if (!isAuthenticated) {
+            setIsAuthNeeded(true);
+        }
+    };
+
+    if (isAuthNeeded) {
+        return (
+            <div className="attachment-file-icon" style={{ cursor: 'pointer', width: '200px', height: '150px', background: 'rgba(0,183,195,0.05)', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px dashed rgba(0,183,195,0.3)' }} onClick={onLogin}>
+                <span style={{ fontSize: '1.2rem' }}>🔒</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>クリックして画像を表示</span>
+            </div>
+        );
+    }
+
+    if (!src && !att.thumbnailUrl && !att.downloadUrl) {
+         return (
+            <div className="attachment-file-icon" style={{ width: '60px', height: '60px', background: 'rgba(255,165,0,0.1)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', border: '1px solid rgba(255,165,0,0.3)' }}>
+                🖼️
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={src}
+            alt={att.name}
+            onError={handleError}
+            className="attachment-thumb-large"
+            style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}
+        />
+    );
+};
+
 // Helper to extract URLs from text
 const extractUrls = (text: string | null): string[] => {
     if (!text) return [];
@@ -56,6 +121,13 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const { user, profile: currentProfile } = useAuth();
     const [editingThreadId, setEditingThreadId] = React.useState<string | null>(null);
     const [editingReplyId, setEditingReplyId] = React.useState<string | null>(null);
+    const {
+        uploadFile,
+        downloadFileFromOneDrive,
+        getFreshAttachmentMetadata,
+        isAuthenticated,
+        login
+    } = useOneDriveUpload();
     const editRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
     const fileInputRefs = React.useRef<{ [key: string]: HTMLInputElement | null }>({});
 
@@ -68,6 +140,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [needsExpandMap, setNeedsExpandMap] = React.useState<{ [key: string]: boolean }>({});
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
     const measureRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
+    const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
 
     // Close open menu when clicking outside
     React.useEffect(() => {
@@ -124,7 +197,6 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         });
     };
 
-    const { uploadFile, downloadFileFromOneDrive, isAuthenticated, login } = useOneDriveUpload(); // Use OneDrive instead of Supabase
 
     const { members: teamMembers } = useTeamMembers(currentTeamId);
     const memberIds = React.useMemo(() => 
@@ -228,20 +300,27 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     // Handle scroll to specific thread (from sidebar navigation)
     React.useEffect(() => {
         if (scrollToThreadId && !threadsLoading && threads.length > 0) {
-            // Find the element
-            const el = document.getElementById(`thread-${scrollToThreadId}`);
-            if (el) {
-                // Scroll into view
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Add highlight class
-                el.classList.add('highlight-thread');
-                setTimeout(() => el.classList.remove('highlight-thread'), 2000);
+            let retryCount = 0;
+            const maxRetries = 20; // 2 seconds total
 
-                // Notify parent that scroll is handled
-                if (onScrollComplete) {
-                    onScrollComplete();
+            const tryScroll = () => {
+                const el = document.getElementById(`thread-${scrollToThreadId}`);
+                if (el) {
+                    console.log('Scrolling to thread:', scrollToThreadId);
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('highlight-thread');
+                    setTimeout(() => el.classList.remove('highlight-thread'), 3000);
+                    if (onScrollComplete) onScrollComplete();
+                } else if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(tryScroll, 100);
+                } else {
+                    console.warn('Scroll target not found after retries:', scrollToThreadId);
+                    if (onScrollComplete) onScrollComplete();
                 }
-            }
+            };
+
+            tryScroll();
         }
     }, [scrollToThreadId, threadsLoading, threads.length, onScrollComplete]);
 
@@ -472,36 +551,77 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             <div className="attachment-display" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
                 {attachments.map((att: any, idx: number) => {
                     const isOneDrive = att.storageProvider === 'onedrive' || att.id;
+                    const isImageFile = (name?: string, type?: string) => {
+                        const imgExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+                        return (type?.startsWith('image/')) || (name && imgExtensions.some(ext => name.toLowerCase().endsWith(ext)));
+                    };
+                    const isImage = isImageFile(att.name, att.type);
                     return (
                         <div key={idx} className="attachment-group" style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                             <div className="attachment-wrapper" style={{ position: 'relative' }}>
-                                <div onClick={() => window.open(att.url, '_blank')} style={{ cursor: 'pointer' }}>
-                                    {att.type?.startsWith('image/') ? (
-                                        <img src={att.thumbnailUrl || att.url} alt={att.name} className="attachment-thumb-large" style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                                <div
+                                    onClick={async () => {
+                                        if (isImage) {
+                                            // Prefer direct link for <img> tag. If only webUrl exists, wait for refresh.
+                                            const isDirectLink = (url: string) => url && (url.includes('download.aspx') || url.includes('content.office.net') || url.includes('public.blob.core.windows.net'));
+                                            const initialUrl = isDirectLink(att.downloadUrl) ? att.downloadUrl : (isDirectLink(att.thumbnailUrl) ? att.thumbnailUrl : null);
+                                            
+                                            setPreviewImageUrl(initialUrl);
+
+                                            // Always attempt to refresh on click to get the high-res direct link
+                                            if (att.id) {
+                                                const fresh = await getFreshAttachmentMetadata(att.id);
+                                                if (fresh) {
+                                                    setPreviewImageUrl(fresh.downloadUrl || fresh.thumbnailUrl);
+                                                } else if (!isAuthenticated) {
+                                                    // Prompt login if metadata refresh fails due to auth
+                                                    if (window.confirm("画像の表示に認証が必要です。Microsoft にログインしますか？")) {
+                                                        const account = await login();
+                                                        if (account) {
+                                                            const freshAfter = await getFreshAttachmentMetadata(att.id);
+                                                            if (freshAfter) setPreviewImageUrl(freshAfter.downloadUrl || freshAfter.thumbnailUrl);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            if (att.id) {
+                                                downloadFileFromOneDrive(att.id, att.name);
+                                            } else {
+                                                window.open(att.url, '_blank');
+                                            }
+                                        }
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    {isImage ? (
+                                        <ThreadImage 
+                                            att={att} 
+                                            getFreshMetadata={getFreshAttachmentMetadata} 
+                                            isAuthenticated={isAuthenticated}
+                                            onLogin={login}
+                                        />
                                     ) : (
-                                        <div className="file-link" style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ fontSize: '1.2rem' }}>📄</span>
-                                            <span style={{ fontSize: '0.85rem' }}>{att.name}</span>
+                                        <div className="attachment-file-icon" style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            📄
                                         </div>
                                     )}
                                 </div>
+                                <div className="attachment-name" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {att.name}
+                                </div>
                             </div>
-                            {isOneDrive && att.id && (
+                            {isOneDrive && (
                                 <button
-                                    className="btn-download-orange"
+                                    className="btn-download-icon"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        downloadFileFromOneDrive(att.id, att.name!);
+                                        downloadFileFromOneDrive(att.id || att.url, att.name);
                                     }}
-                                    title="ダウンロード"
-                                    style={{
-                                        marginTop: '4px',
-                                        height: '32px',
-                                        width: '32px',
-                                        padding: 0
-                                    }}
+                                    title="OneDriveからダウンロード"
+                                    style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', marginTop: '4px' }}
                                 >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                         <polyline points="7 10 12 15 17 10"></polyline>
                                         <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -1026,10 +1146,38 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                 handleAddReply(thread.id);
                                                             }
                                                         }}
-                                                        onPaste={(e: React.ClipboardEvent) => {
-                                                            e.preventDefault();
-                                                            const text = e.clipboardData.getData('text/plain');
-                                                            document.execCommand('insertText', false, text);
+                                                        onPaste={async (e: React.ClipboardEvent) => {
+                                                            const items = e.clipboardData.items;
+                                                            let hasImage = false;
+
+                                                            for (let i = 0; i < items.length; i++) {
+                                                                if (items[i].type.indexOf('image') !== -1) {
+                                                                    const blob = items[i].getAsFile();
+                                                                    if (blob && user) {
+                                                                        hasImage = true;
+                                                                        setReplyUploading(prev => ({ ...prev, [thread.id]: true }));
+                                                                        try {
+                                                                            const uploaded = await uploadFile(blob);
+                                                                            if (uploaded) {
+                                                                                setReplyAttachments(prev => ({
+                                                                                    ...prev,
+                                                                                    [thread.id]: [...(prev[thread.id] || []), uploaded]
+                                                                                }));
+                                                                            }
+                                                                        } finally {
+                                                                            setReplyUploading(prev => ({ ...prev, [thread.id]: false }));
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            if (hasImage) {
+                                                                e.preventDefault();
+                                                            } else {
+                                                                e.preventDefault();
+                                                                const text = e.clipboardData.getData('text/plain');
+                                                                document.execCommand('insertText', false, text);
+                                                            }
                                                         }}
                                                     />
                                                     {isOpen && targetThreadId === thread.id && (
@@ -1169,6 +1317,99 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 )
             }
             <div ref={bottomAnchorRef} style={{ height: '1px' }} />
-        </div >
+
+            {/* Image Preview Modal */}
+            {previewImageUrl && (
+                <div
+                    className="image-preview-overlay"
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0,0,0,0.85)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 20000,
+                        cursor: 'zoom-out',
+                        backdropFilter: 'blur(5px)'
+                    }}
+                    onClick={() => setPreviewImageUrl(null)}
+                >
+                    <div
+                        style={{
+                            position: 'relative',
+                            maxWidth: '90%',
+                            maxHeight: '90%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {previewImageUrl ? (
+                            <img
+                                src={previewImageUrl}
+                                alt="Preview"
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    objectFit: 'contain',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                                    border: '1px solid rgba(255,255,255,0.1)'
+                                }}
+                            />
+                        ) : (
+                            <div style={{ color: 'white', textAlign: 'center' }}>
+                                <div className="spinner" style={{ marginBottom: '10px' }}></div>
+                                <p>読み込み中...</p>
+                                {!isAuthenticated && (
+                                    <button 
+                                        className="btn btn-sm btn-primary" 
+                                        style={{ marginTop: '10px' }}
+                                        onClick={() => login()}
+                                    >
+                                        Microsoft にログインして表示
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setPreviewImageUrl(null)}
+                            style={{
+                                position: 'absolute',
+                                top: '-40px',
+                                right: '-40px',
+                                background: 'white',
+                                color: 'black',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '32px',
+                                height: '32px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            ×
+                        </button>
+                        <div style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
+                            <button
+                                className="btn btn-sm btn-primary"
+                                onClick={() => window.open(previewImageUrl, '_blank')}
+                            >
+                                元のサイズで表示
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };

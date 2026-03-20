@@ -115,6 +115,10 @@ export const signIn = async (promptType: "select_account" | "consent" = "select_
     try {
         isLoggingIn = true;
         console.log(`Attempting Popup Login with prompt: ${promptType}...`);
+        
+        // Ensure MSAL is fully initialized before popup
+        await initializeMsal();
+
         const result = await msalInstance.loginPopup({
             ...loginRequest,
             prompt: promptType
@@ -122,6 +126,10 @@ export const signIn = async (promptType: "select_account" | "consent" = "select_
         msalInstance.setActiveAccount(result.account);
         return result.account;
     } catch (error: any) {
+        if (error.errorCode === "block_nested_popups") {
+             console.warn("Popup blocked (nested). Fallback to redirect may be needed via user action.");
+             throw new Error("ポップアップがブロックされました。ブラウザの設定で許可するか、もう一度クリックしてください。");
+        }
         if (error.errorCode !== "interaction_in_progress") {
             console.warn("Popup Login failed, attempting Redirect...", error);
             // ポップアップが失敗した場合はリダイレクトで試行
@@ -233,7 +241,7 @@ export const getGraphClient = async (scopes: string[] = loginRequest.scopes) => 
     const authProvider = new AuthCodeMSALBrowserAuthenticationProvider(msalInstance, {
         account: account,
         scopes: scopes,
-        interactionType: InteractionType.Redirect, // Fixed generic usage
+        interactionType: InteractionType.Popup,
     });
 
     return Client.initWithMiddleware({
