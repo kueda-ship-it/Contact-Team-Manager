@@ -14,7 +14,7 @@ import { useNotifications } from './hooks/useNotifications';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import './styles/style.css';
 
-import { initializeMsal, ssoLogin } from './lib/microsoftGraph';
+import { initializeMsal, ssoLogin, setExternalAccessToken } from './lib/microsoftGraph';
 
 const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
@@ -47,7 +47,7 @@ const ThemeToggle = () => {
 };
 
 function App() {
-  const { user, profile, loading: authLoading, signOut } = useAuth();
+  const { user, profile, session, loading: authLoading, signOut } = useAuth();
   useNotifications(); // Initialize notifications
 
 
@@ -112,13 +112,16 @@ function App() {
 
   // Auto-login to Microsoft Graph (OneDrive) when Supabase user is available
   useEffect(() => {
-    if (user?.email) {
-      console.log('[App] Attempting auto-login to Microsoft Graph for:', user.email);
+    if (session?.provider_token) {
+      console.log('[App] Reusing Supabase provider token for Microsoft Graph.');
+      setExternalAccessToken(session.provider_token);
+    } else if (user?.email) {
+      console.log('[App] Attempting auto-login to Microsoft Graph via MSAL for:', user.email);
       ssoLogin(user.email).catch(err => {
         console.warn('[App] MSAL auto-login failed:', err);
       });
     }
-  }, [user]);
+  }, [user, session]);
 
   // Clear hash from URL behavior removed to prevent conflict with MSAL popup handling
   // MSAL handles hash processing and clearing automatically.

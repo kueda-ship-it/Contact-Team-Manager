@@ -52,6 +52,15 @@ export const loginRequest = {
     scopes: ["User.Read", "Files.ReadWrite"]
 };
 
+// 外部トークン（Supabase SSO から取得したもの）の保持
+let externalAccessToken: string | null = null;
+export const setExternalAccessToken = (token: string | null) => {
+    externalAccessToken = token;
+    if (token) {
+        console.log("[MSAL] External access token updated.");
+    }
+};
+
 // MSALインスタンス作成
 export const msalInstance = new PublicClientApplication(msalConfig);
 
@@ -228,6 +237,16 @@ export const getToken = async (): Promise<string | null> => {
 
 // Graphクライアントの取得
 export const getGraphClient = async (scopes: string[] = loginRequest.scopes) => {
+    // 外部トークン（Supabase SSO経由）が利用可能な場合はそれを使用する
+    if (externalAccessToken) {
+        // console.log("[MSAL] Using external access token from Supabase.");
+        return Client.init({
+            authProvider: (done) => {
+                done(null, externalAccessToken!);
+            }
+        });
+    }
+
     await initializeMsal();
 
     const account = msalInstance.getActiveAccount();

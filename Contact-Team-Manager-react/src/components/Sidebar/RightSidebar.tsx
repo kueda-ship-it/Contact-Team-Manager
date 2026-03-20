@@ -230,7 +230,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         }
     };
     return (
-        <aside className="side-panel">
+        <aside className="side-panel glass-panel">
             <div style={{ paddingBottom: '20px' }}>
                 <div className="side-panel-section">
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', marginBottom: '15px' }}>
