@@ -23,7 +23,8 @@ const ThreadImage: React.FC<{
     // OneDrive webUrls usually contain "view.aspx" or similar, which break <img>.
     const isDirectLink = (url: string) => url && (url.includes('download.aspx') || url.includes('content.office.net') || url.includes('public.blob.core.windows.net'));
     
-    const [src, setSrc] = React.useState(att.thumbnailUrl || att.downloadUrl || (isDirectLink(att.url) ? att.url : ''));
+    // Quality improvement: Prefer downloadUrl (high res) over thumbnailUrl
+    const [src, setSrc] = React.useState(att.downloadUrl || att.thumbnailUrl || (isDirectLink(att.url) ? att.url : ''));
     const [retryCount, setRetryCount] = React.useState(0);
     const [isAuthNeeded, setIsAuthNeeded] = React.useState(false);
 
@@ -52,7 +53,7 @@ const ThreadImage: React.FC<{
         
         const fresh = await getFreshMetadata(att.id);
         if (fresh) {
-            setSrc(fresh.thumbnailUrl || fresh.downloadUrl);
+            setSrc(fresh.downloadUrl || fresh.thumbnailUrl);
             setIsAuthNeeded(false);
         } else if (!isAuthenticated) {
             setIsAuthNeeded(true);
@@ -146,11 +147,14 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [replyAttachments, setReplyAttachments] = React.useState<{ [key: string]: Attachment[] }>({});
     const [replyUploading, setReplyUploading] = React.useState<{ [key: string]: boolean }>({});
     const [remindInput, setRemindInput] = React.useState<{ threadId: string, remindAt: string } | null>(null);
+    const [replyPendingFiles, setReplyPendingFiles] = React.useState<{ [key: string]: { id: string, file: File, previewUrl: string }[] }>({});
     const [expandedThreads, setExpandedThreads] = React.useState<Set<string>>(new Set());
     const [needsExpandMap, setNeedsExpandMap] = React.useState<{ [key: string]: boolean }>({});
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
+    const [selectedPreviewUrl, setSelectedPreviewUrl] = React.useState<string | null>(null);
     const measureRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
     const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
+    const [previewAttId, setPreviewAttId] = React.useState<string | null>(null);
 
     // Close open menu when clicking outside
     React.useEffect(() => {
@@ -440,8 +444,26 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         try {
             const newAtts: Attachment[] = [];
             for (const file of files) {
-                const uploaded = await uploadFile(file);
-                if (uploaded) newAtts.push(uploaded);
+                const pendingId = Math.random().toString(36).substring(7);
+                const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+                
+                // Add to local pending state
+                setReplyPendingFiles(prev => ({
+                    ...prev,
+                    [threadId]: [...(prev[threadId] || []), { id: pendingId, file, previewUrl }]
+                }));
+
+                try {
+                    const uploaded = await uploadFile(file);
+                    if (uploaded) newAtts.push(uploaded);
+                } finally {
+                    // Remove from local pending state
+                    setReplyPendingFiles(prev => ({
+                        ...prev,
+                        [threadId]: (prev[threadId] || []).filter(p => p.id !== pendingId)
+                    }));
+                    if (previewUrl) URL.revokeObjectURL(previewUrl);
+                }
             }
             setReplyAttachments(prev => ({
                 ...prev,
@@ -576,6 +598,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                             const isDirectLink = (url: string) => url && (url.includes('download.aspx') || url.includes('content.office.net') || url.includes('public.blob.core.windows.net'));
                                             const initialUrl = isDirectLink(att.downloadUrl) ? att.downloadUrl : (isDirectLink(att.thumbnailUrl) ? att.thumbnailUrl : null);
                                             
+                                            setPreviewAttId(att.id);
                                             setPreviewImageUrl(initialUrl);
 
                                             // Always attempt to refresh on click to get the high-res direct link
@@ -1205,21 +1228,38 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                             }}
                                                         />
                                                     )}
-                                                    {(replyAttachments[thread.id]?.length || 0) > 0 && (
+                                                    {((replyAttachments[thread.id]?.length || 0) > 0 || (replyPendingFiles[thread.id]?.length || 0) > 0) && (
                                                         <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                                                            {replyAttachments[thread.id].map((att, idx) => (
-                                                                <div key={idx} className="attachment-item" style={{ position: 'relative', width: '40px', height: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            {/* すでにアップロード済みのファイル */}
+                                                            {(replyAttachments[thread.id] || []).map((att, idx) => (
+                                                                <div key={`att-${idx}`} className="attachment-item" style={{ position: 'relative', width: '80px', height: '80px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(att.downloadUrl || att.thumbnailUrl || null)}>
                                                                     {att.type.startsWith('image/') ? (
-                                                                        <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                        <img src={att.downloadUrl || att.thumbnailUrl || ''} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} title="クリックで拡大表示" />
                                                                     ) : (
                                                                         <span style={{ fontSize: '14px' }}>📄</span>
                                                                     )}
                                                                     <div
                                                                         className="attachment-remove"
-                                                                        onClick={() => removeReplyAttachment(thread.id, idx)}
-                                                                        style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            removeReplyAttachment(thread.id, idx);
+                                                                        }}
+                                                                        style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', zIndex: 2 }}
                                                                     >
                                                                         ×
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                            {/* アップロード中のファイル (即時プレビュー) */}
+                                                            {(replyPendingFiles[thread.id] || []).map((pf) => (
+                                                                <div key={`pending-${pf.id}`} className="attachment-item uploading" style={{ position: 'relative', width: '80px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--primary-light)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(pf.previewUrl)}>
+                                                                    {pf.file.type.startsWith('image/') ? (
+                                                                        <img src={pf.previewUrl} alt={pf.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} title="クリックで拡大表示" />
+                                                                    ) : (
+                                                                        <span style={{ fontSize: '14px', opacity: 0.6 }}>📄</span>
+                                                                    )}
+                                                                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1 }}>
+                                                                        <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -1357,17 +1397,26 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {previewImageUrl ? (
+                         {previewImageUrl ? (
                             <img
                                 src={previewImageUrl}
                                 alt="Preview"
+                                onError={async () => {
+                                    if (previewAttId) {
+                                        console.log("[Preview] Image failed, refreshing metadata...");
+                                        const fresh = await getFreshAttachmentMetadata(previewAttId);
+                                        if (fresh) {
+                                            setPreviewImageUrl(fresh.downloadUrl || fresh.thumbnailUrl);
+                                        }
+                                    }
+                                }}
                                 style={{
                                     maxWidth: '100%',
                                     maxHeight: '100%',
                                     objectFit: 'contain',
-                                    borderRadius: '8px',
-                                    boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-                                    border: '1px solid rgba(255,255,255,0.1)'
+                                    borderRadius: '12px',
+                                    boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+                                    border: '1px solid rgba(255,255,255,0.2)'
                                 }}
                             />
                         ) : (
@@ -1415,6 +1464,38 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                 元のサイズで表示
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Image Preview Overlay Modal */}
+            {selectedPreviewUrl && (
+                <div 
+                    className="preview-overlay" 
+                    style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.92)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+                    onClick={() => setSelectedPreviewUrl(null)}
+                >
+                    <div style={{ position: 'relative', width: '75vw', height: '75vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <img 
+                            src={selectedPreviewUrl} 
+                            alt="Full Preview" 
+                            style={{ 
+                                maxWidth: '100%', 
+                                maxHeight: '100%', 
+                                objectFit: 'contain', 
+                                borderRadius: '4px', 
+                                boxShadow: '0 0 50px rgba(0,0,0,0.8)',
+                                imageRendering: 'auto',
+                                transform: 'translate3d(0,0,0)',
+                                backfaceVisibility: 'hidden'
+                            }} 
+                        />
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setSelectedPreviewUrl(null); }}
+                            style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'var(--brand-primary, #00d2ff)', color: 'black', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.5)', zIndex: 10001 }}
+                            title="閉じる"
+                        >
+                            ×
+                        </button>
                     </div>
                 </div>
             )}

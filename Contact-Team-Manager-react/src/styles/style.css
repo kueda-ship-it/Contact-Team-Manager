@@ -14,6 +14,7 @@
     --glass-blur: 20px;
     --glass-highlight: rgba(255, 255, 255, 0.15);
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --img-rendering: -webkit-optimize-contrast;
 }
 
 .glass-panel {
@@ -406,6 +407,7 @@ body {
     width: 100vw;
     scrollbar-gutter: stable;
     /* Prevent layout shift when scrollbars appear */
+    image-rendering: var(--img-rendering);
 }
 
 .container {
@@ -611,20 +613,24 @@ body.light-mode .custom-select-option:hover {
 
 .search-input {
     margin: 0 !important;
-    height: 32px !important;
+    height: 36px !important;
     display: block !important;
     background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    height: 32px !important;
-    font-size: 0.85rem !important;
-    border-radius: 4px !important;
-    padding: 0 35px 0 12px !important;
+    font-size: 0.9rem !important;
+    border-radius: 20px !important; /* Liquid PILL */
+    padding: 0 40px 0 16px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .search-input:focus {
-    background: #1E1E1E !important;
+    background: rgba(255, 255, 255, 0.1) !important;
     color: #fff !important;
-    border-color: var(--primary) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 15px rgba(0, 183, 195, 0.3), inset 0 2px 4px rgba(0,0,0,0.1) !important;
+    transform: translateY(-1px);
 }
 
 .user-profile {
@@ -741,22 +747,42 @@ body {
 }
 
 .side-panel-title {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
-    color: var(--text-main);
-    letter-spacing: 0.1em;
+    color: #fff;
+    letter-spacing: 0.12em;
     margin-bottom: 20px;
-    font-weight: 700;
+    font-weight: 800;
     margin-top: 0;
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 4px 14px;
+    background: linear-gradient(135deg, rgba(0, 183, 195, 0.3), rgba(0, 183, 195, 0.1));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 183, 195, 0.4);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 6px 16px;
+    border-radius: 30px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255,255,255,0.2);
+}
+
+.liquid-badge {
+    padding: 4px 10px;
     border-radius: 20px;
-    display: inline-block;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    font-weight: 800;
+    font-size: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    backdrop-filter: blur(5px);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+.liquid-badge:hover {
+    transform: scale(1.05);
 }
 
 /* --- Teams Sidebar --- */
@@ -4340,8 +4366,8 @@ body.light-mode #root a.post-link {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(25px); /* Stronger glass blur for focus */
+    -webkit-backdrop-filter: blur(25px);
     display: flex;
     align-items: center;
     justify-content: center;

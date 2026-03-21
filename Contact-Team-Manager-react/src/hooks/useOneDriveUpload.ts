@@ -8,6 +8,7 @@ export function useOneDriveUpload() {
     const [uploading, setUploading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string>('');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [pendingFiles, setPendingFiles] = useState<{ id: string, file: File, previewUrl: string }[]>([]);
 
     // 初期化 & イベントリスナー (SSO検知用)
     useEffect(() => {
@@ -69,6 +70,10 @@ export function useOneDriveUpload() {
     const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     const uploadFile = async (file: File): Promise<Attachment | null> => {
+        const pendingId = Math.random().toString(36).substring(7);
+        const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+        
+        setPendingFiles(prev => [...prev, { id: pendingId, file, previewUrl }]);
         setUploading(true);
         setStatusMessage('準備中...');
 
@@ -205,21 +210,31 @@ export function useOneDriveUpload() {
                 console.warn("Organization link creation failed, using webUrl", linkError);
             }
 
-            // 6. サムネイル取得 (画像ファイルの場合) - Poll up to 3 times
+            // 6. サムネイルと確実なダウンロードURLを再取得 (画像ファイルの場合)
+            // アップロード直後の response には @microsoft.graph.downloadUrl が含まれない場合があるため
             let thumbnailUrl = '';
+            let finalDownloadUrl = downloadUrlFallback || '';
+
             if (file.type.startsWith('image/')) {
-                setStatusMessage('プレビューを作成中...');
-                for (let i = 0; i < 3; i++) {
+                setStatusMessage('プレビューを生成中...');
+                for (let i = 0; i < 4; i++) {
                     try {
-                        const thumbResponse = await client.api(`/me/drive/items/${resultItemId}/thumbnails`).select('large').get();
+                        const itemResponse = await client.api(`/me/drive/items/${resultItemId}`).select('id,@microsoft.graph.downloadUrl').get();
+                        if (itemResponse["@microsoft.graph.downloadUrl"]) {
+                            finalDownloadUrl = itemResponse["@microsoft.graph.downloadUrl"];
+                        }
+
+                        const thumbResponse = await client.api(`/me/drive/items/${resultItemId}/thumbnails`).get();
                         if (thumbResponse.value && thumbResponse.value.length > 0) {
-                            thumbnailUrl = thumbResponse.value[0].large?.url || '';
-                            if (thumbnailUrl) break;
+                            const thumb = thumbResponse.value[0];
+                            // 解像度優先順位: c1600x1600 > large > medium
+                            thumbnailUrl = thumb.c1600x1600?.url || thumb.large?.url || thumb.medium?.url || '';
+                            if (thumbnailUrl && finalDownloadUrl) break;
                         }
                     } catch (thumbError) {
-                        console.warn(`Thumbnail fetch attempt ${i + 1} failed`, thumbError);
+                        console.warn(`Metadata fetch attempt ${i + 1} failed`, thumbError);
                     }
-                    if (i < 2) await wait(1500); // Wait 1.5s between retries
+                    if (i < 3) await wait(1000 + i * 500); 
                 }
             }
 
@@ -230,7 +245,7 @@ export function useOneDriveUpload() {
                 type: file.type,
                 size: file.size,
                 thumbnailUrl: thumbnailUrl,
-                downloadUrl: downloadUrlFallback,
+                downloadUrl: finalDownloadUrl,
                 storageProvider: 'onedrive'
             };
 
@@ -253,6 +268,9 @@ export function useOneDriveUpload() {
         } finally {
             setUploading(false);
             setStatusMessage('');
+            // Remove from pending files after upload attempt (success or fail)
+            // Note: Not revoking here to avoid breaking active previews in modals
+            setPendingFiles(prev => prev.filter(p => p.id !== pendingId));
         }
     };
 
@@ -303,11 +321,12 @@ export function useOneDriveUpload() {
             const client = await getGraphClient();
             // Get thumbnails and downloadUrl in one call if possible, or two
             const item = await client.api(`/me/drive/items/${fileId}`).select('id,name,description,@microsoft.graph.downloadUrl').get();
-            const thumbResponse = await client.api(`/me/drive/items/${fileId}/thumbnails`).select('large').get();
+            const thumbResponse = await client.api(`/me/drive/items/${fileId}/thumbnails`).select('large,c1600x1600').get();
             
             let thumbnailUrl = '';
             if (thumbResponse.value && thumbResponse.value.length > 0) {
-                thumbnailUrl = thumbResponse.value[0].large?.url || '';
+                const thumb = thumbResponse.value[0];
+                thumbnailUrl = thumb.c1600x1600?.url || thumb.large?.url || '';
             }
 
             return {
@@ -332,6 +351,7 @@ export function useOneDriveUpload() {
         removeFile,
         clearFiles,
         downloadFileFromOneDrive,
-        getFreshAttachmentMetadata
+        getFreshAttachmentMetadata,
+        pendingFiles
     };
 }

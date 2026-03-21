@@ -329,11 +329,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                                     );
                                                 }
 
-                                                return (
-                                                    <span className={blinkClass} style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: color, color: '#fff', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
-                                                        <span>{icon}</span> Day {dayCount}
-                                                    </span>
-                                                );
+                                                 return (
+                                                     <span className={`liquid-badge ${blinkClass}`} style={{ backgroundColor: color, color: '#fff' }}>
+                                                         <span>{icon}</span> Day {dayCount}
+                                                     </span>
+                                                 );
                                             })()}
                                             <span>{formatDate(t.created_at)}</span>
                                         </span>
