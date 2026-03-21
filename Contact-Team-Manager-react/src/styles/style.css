@@ -9,9 +9,10 @@
     --accent: #00B7C3;
     --danger: #C4314B;
     --success: #92C353;
-    --glass: rgba(255, 255, 255, 0.08);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-blur: 12px;
+    --glass: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-blur: 20px;
+    --glass-highlight: rgba(255, 255, 255, 0.15);
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -20,6 +21,7 @@
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-highlight);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
@@ -467,10 +469,10 @@ body.light-mode .mention-email {
     padding-top: 20px !important;
     height: 100%;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.015);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .side-panel-title {
@@ -912,12 +914,16 @@ body {
 .side-panel .task-card {
     position: relative;
     padding: 12px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 12px;
     margin-bottom: 12px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
+    overflow: hidden; /* Fix color bar overflow */
 }
 
 .side-panel .task-card:hover {
@@ -1511,14 +1517,15 @@ body:not(.light-mode) .rich-editor * {
 
 .task-card {
     background: var(--glass);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
     border-radius: 12px;
     padding: 14px 18px;
     border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-highlight);
     margin-bottom: 16px;
     position: relative;
-    overflow: visible !important;
+    overflow: hidden; /* Fix color bar overflow */
     min-height: auto;
     display: flex;
     flex-direction: column;
