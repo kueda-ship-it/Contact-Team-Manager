@@ -739,14 +739,22 @@ body {
 }
 
 .side-panel-title {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
-    color: var(--text-muted);
-    letter-spacing: 0.05em;
-    margin-bottom: 10px;
-    font-weight: 600;
+    color: var(--text-main);
+    letter-spacing: 0.1em;
+    margin-bottom: 20px;
+    font-weight: 700;
     margin-top: 0;
-    /* Remove top margin completely */
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 4px 14px;
+    border-radius: 20px;
+    display: inline-block;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* --- Teams Sidebar --- */
@@ -2364,8 +2372,24 @@ textarea.input-field {
 /* メインスレチE��・共通�Eメンション�E�紫色�E�E*/
 .mention {
     color: var(--primary-light) !important;
-    font-weight: bold !important;
+    font-weight: 700 !important;
     cursor: pointer;
+    background: rgba(var(--primary-rgb), 0.15);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(var(--primary-rgb), 0.3);
+    padding: 0px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 2px;
+    transition: all 0.2s ease;
+}
+
+.mention:hover {
+    background: rgba(var(--primary-rgb), 0.25);
+    border-color: rgba(var(--primary-rgb), 0.5);
+    transform: scale(1.05);
 }
 
 /* Force override for light mode generic text color rule */
@@ -4262,12 +4286,18 @@ body.menu-open .quick-reply-form {
 
 .mention.mention-me {
     color: #FFD700 !important;
-    background: rgba(255, 215, 0, 0.1) !important;
+    background: rgba(255, 215, 0, 0.15) !important;
+    border: 1px solid rgba(255, 215, 0, 0.3) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
 
 .mention.mention-all {
     color: #00B7C3 !important; /* Matching accent */
-    background: rgba(0, 183, 195, 0.1) !important;
+    background: rgba(0, 183, 195, 0.15) !important;
+    border: 1px solid rgba(0, 183, 195, 0.3) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
 
 /* Light mode overrides */
