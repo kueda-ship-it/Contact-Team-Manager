@@ -1,4 +1,5 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
 
 interface PreviewData {
     title?: string;
@@ -23,44 +24,22 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({ url }) => {
         const fetchPreview = async () => {
             setLoading(true);
             try {
-                // Since this is a demo/internal app, we'll try a public fetch proxy or similar 
-                // In a production app, this should be a backend call to avoid CORS
-                // For now, we'll implement a simple fetching logic and fallback to basic link view
+                // Use Supabase Edge Function to fetch link preview (avoids CORS)
+                const { data, error: invokeError } = await supabase.functions.invoke('get-link-preview', {
+                    body: { url }
+                });
                 
-                // We'll use a simple proxy for OGP if available, or just try fetching
-                // Note: Direct fetch will likely fail CORS for many sites.
-                // A better way is using a Supabase Edge Function "get-link-preview"
-                
-                // For now, let's try a common free service OR just a simplified view
-                const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-                const data = await response.json();
-                
+                if (invokeError) throw invokeError;
                 if (!isMounted) return;
 
-                if (data.contents) {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(data.contents, 'text/html');
-                    
-                    const getMeta = (name: string) => 
-                        doc.querySelector(`meta[property="${name}"]`)?.getAttribute('content') ||
-                        doc.querySelector(`meta[name="${name}"]`)?.getAttribute('content');
-
-                    const title = doc.querySelector('title')?.innerText || getMeta('og:title') || getMeta('twitter:title');
-                    const description = getMeta('og:description') || getMeta('description') || getMeta('twitter:description');
-                    const image = getMeta('og:image') || getMeta('twitter:image');
-                    const siteName = getMeta('og:site_name');
-
-                    if (title || description) {
-                        setPreview({
-                            title: title ?? undefined,
-                            description: description ?? undefined,
-                            image: image ?? undefined,
-                            url,
-                            siteName: siteName ?? undefined
-                        });
-                    } else {
-                        setError(true);
-                    }
+                if (data && (data.title || data.description)) {
+                    setPreview({
+                        title: data.title ?? undefined,
+                        description: data.description ?? undefined,
+                        image: data.image ?? undefined,
+                        url,
+                        siteName: data.siteName ?? undefined
+                    });
                 } else {
                     setError(true);
                 }

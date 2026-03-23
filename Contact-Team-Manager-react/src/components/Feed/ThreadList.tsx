@@ -15,7 +15,7 @@ import { LinkPreview } from '../common/LinkPreview';
 // Helper component for auto-refreshing images
 const ThreadImage: React.FC<{ 
     att: any; 
-    getFreshMetadata: (id: string) => Promise<any>;
+    getFreshMetadata: (id: string, driveId?: string) => Promise<any>;
     isAuthenticated: boolean;
     onLogin: () => Promise<any>;
 }> = ({ att, getFreshMetadata, isAuthenticated, onLogin }) => {
@@ -48,10 +48,10 @@ const ThreadImage: React.FC<{
             return;
         }
         
-        console.log(`[ThreadImage] Image failed to load, fetching fresh metadata for ${att.id}`);
+        console.log(`[ThreadImage] Image failed to load, fetching fresh metadata for ${att.id} (drive: ${att.driveId})`);
         setRetryCount(prev => prev + 1);
         
-        const fresh = await getFreshMetadata(att.id);
+        const fresh = await getFreshMetadata(att.id, att.driveId);
         if (fresh) {
             setSrc(fresh.downloadUrl || fresh.thumbnailUrl);
             setIsAuthNeeded(false);
@@ -603,21 +603,21 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
                                             // Always attempt to refresh on click to get the high-res direct link
                                             if (att.id) {
-                                                const fresh = await getFreshAttachmentMetadata(att.id);
+                                                const fresh = await getFreshAttachmentMetadata(att.id, att.driveId);
                                                 if (fresh) {
                                                     setPreviewImageUrl(fresh.downloadUrl || fresh.thumbnailUrl);
                                                 } else if (!isAuthenticated) {
                                                     // Request login without confirmation for direct feedback
                                                     const account = await login();
                                                     if (account) {
-                                                        const freshAfter = await getFreshAttachmentMetadata(att.id);
+                                                        const freshAfter = await getFreshAttachmentMetadata(att.id, att.driveId);
                                                         if (freshAfter) setPreviewImageUrl(freshAfter.downloadUrl || freshAfter.thumbnailUrl);
                                                     }
                                                 }
                                             }
                                         } else {
                                             if (att.id) {
-                                                downloadFileFromOneDrive(att.id, att.name);
+                                                downloadFileFromOneDrive(att.id, att.name, att.driveId);
                                             } else {
                                                 window.open(att.url, '_blank');
                                             }
@@ -647,7 +647,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     className="btn-download-icon"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        downloadFileFromOneDrive(att.id || att.url, att.name);
+                                        downloadFileFromOneDrive(att.id || att.url, att.name, att.driveId);
                                     }}
                                     title="OneDriveからダウンロード"
                                     style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', marginTop: '4px' }}

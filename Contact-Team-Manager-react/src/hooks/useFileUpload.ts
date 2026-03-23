@@ -7,6 +7,7 @@ export interface Attachment {
     url: string;
     thumbnailUrl?: string; // Support for OneDrive thumbnails
     downloadUrl?: string; // Direct link for preview fallback
+    driveId?: string; // OneDrive drive ID for multi-user access
     type: string;
     size: number;
     storageProvider?: 'supabase' | 'onedrive';

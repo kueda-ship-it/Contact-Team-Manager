@@ -192,6 +192,7 @@ export function useOneDriveUpload() {
 
             const driveItem = await executeWithRetry(performUpload);
             const resultItemId = driveItem.id;
+            const driveId = driveItem.parentReference?.driveId;
             // Also get the direct download URL as it's guaranteed to be a direct image link initially
             const downloadUrlFallback = driveItem["@microsoft.graph.downloadUrl"];
 
@@ -217,14 +218,15 @@ export function useOneDriveUpload() {
 
             if (file.type.startsWith('image/')) {
                 setStatusMessage('プレビューを生成中...');
+                const itemPath = driveId ? `/drives/${driveId}/items/${resultItemId}` : `/me/drive/items/${resultItemId}`;
                 for (let i = 0; i < 4; i++) {
                     try {
-                        const itemResponse = await client.api(`/me/drive/items/${resultItemId}`).select('id,@microsoft.graph.downloadUrl').get();
+                        const itemResponse = await client.api(itemPath).select('id,@microsoft.graph.downloadUrl').get();
                         if (itemResponse["@microsoft.graph.downloadUrl"]) {
                             finalDownloadUrl = itemResponse["@microsoft.graph.downloadUrl"];
                         }
 
-                        const thumbResponse = await client.api(`/me/drive/items/${resultItemId}/thumbnails`).get();
+                        const thumbResponse = await client.api(`${itemPath}/thumbnails`).get();
                         if (thumbResponse.value && thumbResponse.value.length > 0) {
                             const thumb = thumbResponse.value[0];
                             // 解像度優先順位: c1600x1600 > large > medium
@@ -246,6 +248,7 @@ export function useOneDriveUpload() {
                 size: file.size,
                 thumbnailUrl: thumbnailUrl,
                 downloadUrl: finalDownloadUrl,
+                driveId: driveId,
                 storageProvider: 'onedrive'
             };
 
@@ -282,7 +285,7 @@ export function useOneDriveUpload() {
         setAttachments([]);
     };
 
-    const downloadFileFromOneDrive = async (fileId: string, fileName: string) => {
+    const downloadFileFromOneDrive = async (fileId: string, fileName: string, driveId?: string) => {
         try {
             let client;
             try {
@@ -293,7 +296,8 @@ export function useOneDriveUpload() {
                 client = await getGraphClient();
             }
 
-            const response = await client.api(`/me/drive/items/${fileId}`)
+            const itemPath = driveId ? `/drives/${driveId}/items/${fileId}` : `/me/drive/items/${fileId}`;
+            const response = await client.api(itemPath)
                 .select('@microsoft.graph.downloadUrl')
                 .get();
 
@@ -316,12 +320,14 @@ export function useOneDriveUpload() {
         }
     };
 
-    const getFreshAttachmentMetadata = useCallback(async (fileId: string): Promise<{ thumbnailUrl: string, downloadUrl: string } | null> => {
+    const getFreshAttachmentMetadata = useCallback(async (fileId: string, driveId?: string): Promise<{ thumbnailUrl: string, downloadUrl: string } | null> => {
         try {
             const client = await getGraphClient();
+            const itemPath = driveId ? `/drives/${driveId}/items/${fileId}` : `/me/drive/items/${fileId}`;
+            
             // Get thumbnails and downloadUrl in one call if possible, or two
-            const item = await client.api(`/me/drive/items/${fileId}`).select('id,name,description,@microsoft.graph.downloadUrl').get();
-            const thumbResponse = await client.api(`/me/drive/items/${fileId}/thumbnails`).select('large,c1600x1600').get();
+            const item = await client.api(itemPath).select('id,name,description,@microsoft.graph.downloadUrl').get();
+            const thumbResponse = await client.api(`${itemPath}/thumbnails`).select('large,c1600x1600').get();
             
             let thumbnailUrl = '';
             if (thumbResponse.value && thumbResponse.value.length > 0) {
