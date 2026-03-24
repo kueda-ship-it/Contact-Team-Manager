@@ -343,7 +343,18 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     }
 
     if (error) {
-        return <div style={{ padding: '20px', color: 'var(--danger)' }}>Error: {error.message}</div>;
+        return (
+            <div style={{ padding: '20px', color: 'var(--danger)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>通信エラーが発生しました。ネットワーク接続を確認してください。</div>
+                <button
+                    className="btn btn-outline"
+                    style={{ width: 'fit-content' }}
+                    onClick={() => refetch()}
+                >
+                    再試行
+                </button>
+            </div>
+        );
     }
 
     const currentTeamName = currentTeamId
