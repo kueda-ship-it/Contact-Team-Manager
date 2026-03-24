@@ -112,12 +112,15 @@ function App() {
 
   // Auto-login to Microsoft Graph (OneDrive) when Supabase user is available
   useEffect(() => {
+    const provider = session?.user?.app_metadata?.provider;
+    const isMicrosoftUser = provider === 'azure';
+
     if (session?.provider_token) {
       console.log('[App] Reusing Supabase provider token for Microsoft Graph.');
       setExternalAccessToken(session.provider_token);
     }
-    // Always try MSAL silent SSO regardless of provider_token, to set up MSAL account cache
-    if (user?.email) {
+    // ssoSilentはMicrosoftログインユーザーのみ試行（email/passユーザーではタイムアウトする）
+    if (isMicrosoftUser && user?.email) {
       ssoLogin(user.email).catch(err => {
         console.warn('[App] MSAL auto-login failed (non-critical):', err);
       });

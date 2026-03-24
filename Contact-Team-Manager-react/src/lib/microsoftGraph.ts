@@ -60,8 +60,10 @@ export const setExternalAccessToken = (token: string | null) => {
     externalAccessToken = token;
     if (token) {
         console.log("[MSAL] External access token updated.");
+        window.dispatchEvent(new CustomEvent('externalTokenUpdated'));
     }
 };
+export const hasExternalAccessToken = () => !!externalAccessToken;
 
 // MSALインスタンス作成
 export const msalInstance = new PublicClientApplication(msalConfig);
