@@ -115,13 +115,14 @@ function App() {
     if (session?.provider_token) {
       console.log('[App] Reusing Supabase provider token for Microsoft Graph.');
       setExternalAccessToken(session.provider_token);
-    } else if (user?.email) {
-      console.log('[App] Attempting auto-login to Microsoft Graph via MSAL for:', user.email);
+    }
+    // Always try MSAL silent SSO regardless of provider_token, to set up MSAL account cache
+    if (user?.email) {
       ssoLogin(user.email).catch(err => {
-        console.warn('[App] MSAL auto-login failed:', err);
+        console.warn('[App] MSAL auto-login failed (non-critical):', err);
       });
     }
-  }, [user, session]);
+  }, [user?.id, session?.provider_token]);
 
   // Clear hash from URL behavior removed to prevent conflict with MSAL popup handling
   // MSAL handles hash processing and clearing automatically.
@@ -221,17 +222,7 @@ function App() {
   };
 
   if (authLoading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        background: 'var(--bg-dark)'
-      }}>
-        <div style={{ color: 'var(--text-main)' }}>Loading...</div>
-      </div>
-    );
+    return null;
   }
 
   if (!user) {

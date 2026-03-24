@@ -168,8 +168,8 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
         setDraggedId(null);
     };
 
-    if (loading) {
-        return <div style={{ padding: '20px', color: 'var(--text-muted)' }}>Loading teams...</div>;
+    if (loading && rawTeams.length === 0) {
+        return null;
     }
 
     const renderTeamIcon = (team: any) => {

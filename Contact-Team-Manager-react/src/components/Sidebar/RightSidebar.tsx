@@ -78,7 +78,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
     // Fetch all pending threads separately
     const fetchPendingThreads = React.useCallback(async (silent = false) => {
         if (!user) return;
-        if (!silent) setPendingLoading(true);
+        
+        // Only show loading if we really have nothing to show
+        if (!silent && pendingThreads.length === 0) setPendingLoading(true);
+        
         try {
             // Fetch pending threads regardless of limit (up to 2000 safe limit)
             // Filter by currentTeamId if selected, or all if not.
@@ -110,7 +113,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         } finally {
             setPendingLoading(false);
         }
-    }, [currentTeamId, user, currentProfile]);
+    }, [currentTeamId, user, currentProfile, pendingThreads.length]);
 
     // Initial fetch and on team change
     React.useEffect(() => {
@@ -134,8 +137,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         insertMention
     } = useMentions({ profiles, tags, currentTeamId, teams });
 
-    if (mainLoading && pendingLoading) {
-        return <aside className="side-panel"><div style={{ padding: '20px', color: 'var(--text-muted)' }}>Loading...</div></aside>;
+    if (mainLoading && pendingLoading && pendingThreads.length === 0) {
+        return <aside className="side-panel"></aside>;
     }
 
     const mentionOptions = {

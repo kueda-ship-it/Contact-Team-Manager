@@ -338,8 +338,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         }
     }, [scrollToThreadId, threadsLoading, threads.length, onScrollComplete]);
 
-    if (threadsLoading) {
-        return <div style={{ padding: '20px', textAlign: 'center' }}>Loading threads...</div>;
+    if (threadsLoading && threads.length === 0) {
+        return null;
     }
 
     if (error) {

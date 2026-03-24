@@ -97,8 +97,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .eq('id', userId)
                 .single();
 
-            if (error) {
-                console.warn('[AuthContext] Fetched profile failed, checking fallback...', error);
+            // PGRST116 = "no rows returned" (not found). Other errors are network/transient - don't logout for those.
+            const isNotFound = error?.code === 'PGRST116';
+
+            if (error && isNotFound) {
+                console.warn('[AuthContext] Profile not found, checking fallback...');
                 const { data: { user: currentUser } } = await supabase.auth.getUser();
                 if (currentUser?.email) {
                     // Step 1: Check if a profile with this email already exists (Microsoft SSO re-login)
@@ -148,14 +151,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 data = newProfile;
                                 error = null as any;
                             }
+                        } else {
+                            // Not in whitelist → unauthorized
+                            await signOut();
+                            setAuthError('このアカウントは許可されていません。管理者に登録を依頼してください。');
+                            return;
                         }
                     }
                 }
+            } else if (error && !isNotFound) {
+                // Network or other transient error - don't logout, just log and continue
+                console.warn('[AuthContext] Transient error loading profile, will retry on next auth event:', error);
             }
 
-            if (error) {
-                // Still no profile and not in whitelist
-                console.error('[AuthContext] Still no profile after fallback:', error);
+            if (!data && isNotFound) {
+                // Still no profile after all fallbacks
+                console.error('[AuthContext] Still no profile after fallback.');
                 await signOut();
                 setAuthError('このアカウントは許可されていません。管理者に登録を依頼してください。');
                 return;
@@ -195,8 +206,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error };
     }
 
+    const value = React.useMemo(() => ({
+        user,
+        profile,
+        session,
+        loading,
+        authError,
+        signIn,
+        signOut
+    }), [user, profile, session, loading, authError]);
+
     return (
-        <AuthContext.Provider value={{ user, profile, session, loading, authError, signIn, signOut }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );
