@@ -8,6 +8,7 @@ export function useOneDriveUpload() {
     const [uploading, setUploading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string>('');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [pendingFiles, setPendingFiles] = useState<{ id: string, file: File, previewUrl: string }[]>([]);
 
     // 初期化 & イベントリスナー (SSO検知用)
     useEffect(() => {
@@ -52,20 +53,27 @@ export function useOneDriveUpload() {
             const account = await signIn(promptType);
             if (account) {
                 setIsAuthenticated(true);
+                // Also set this as active account forcefully if not set
+                if (!msalInstance.getActiveAccount()) {
+                    msalInstance.setActiveAccount(account);
+                }
             }
             return account;
         } catch (error: any) {
             console.error("Microsoft login failed:", error);
-            if (error.message && !error.message.includes("ポップアップ")) {
-                // ポップアップブロッカー以外のエラー
-            }
             return null;
         } finally {
             setStatusMessage('');
         }
     };
 
+    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
     const uploadFile = async (file: File): Promise<Attachment | null> => {
+        const pendingId = Math.random().toString(36).substring(7);
+        const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+        
+        setPendingFiles(prev => [...prev, { id: pendingId, file, previewUrl }]);
         setUploading(true);
         setStatusMessage('準備中...');
 
@@ -75,23 +83,10 @@ export function useOneDriveUpload() {
             try {
                 client = await getGraphClient();
             } catch (authError: any) {
-                console.warn("Auth check failed, attempting login...", authError);
-                // Check for interaction required OR consent required (invalid_grant)
-                if (
-                    authError.message?.includes("InteractionRequired") ||
-                    authError.message?.includes("ui_required") ||
-                    authError.message?.includes("invalid_grant") ||
-                    authError.message?.includes("AADSTS65001") ||
-                    JSON.stringify(authError).includes("AADSTS65001")
-                ) {
-                    const account = await login();
-                    if (!account) {
-                        throw new Error("LoginRequired");
-                    }
-                    client = await getGraphClient();
-                } else {
-                    throw authError;
-                }
+                console.warn("Auth check failed in uploadFile", authError);
+                // Don't auto-login here because this might be triggered from onPaste (async),
+                // which would be blocked by popups.
+                throw new Error("Microsoft連携の認証が必要です。");
             }
 
             // Helper to execute with retry on auth error
@@ -197,6 +192,9 @@ export function useOneDriveUpload() {
 
             const driveItem = await executeWithRetry(performUpload);
             const resultItemId = driveItem.id;
+            const driveId = driveItem.parentReference?.driveId;
+            // Also get the direct download URL as it's guaranteed to be a direct image link initially
+            const downloadUrlFallback = driveItem["@microsoft.graph.downloadUrl"];
 
             setStatusMessage('リンクを取得中...');
 
@@ -213,26 +211,44 @@ export function useOneDriveUpload() {
                 console.warn("Organization link creation failed, using webUrl", linkError);
             }
 
-            // 6. サムネイル取得 (画像ファイルの場合)
+            // 6. サムネイルと確実なダウンロードURLを再取得 (画像ファイルの場合)
+            // アップロード直後の response には @microsoft.graph.downloadUrl が含まれない場合があるため
             let thumbnailUrl = '';
+            let finalDownloadUrl = downloadUrlFallback || '';
+
             if (file.type.startsWith('image/')) {
-                try {
-                    const thumbResponse = await client.api(`/me/drive/items/${resultItemId}/thumbnails`).select('large').get();
-                    if (thumbResponse.value && thumbResponse.value.length > 0) {
-                        thumbnailUrl = thumbResponse.value[0].large?.url || '';
+                setStatusMessage('プレビューを生成中...');
+                const itemPath = driveId ? `/drives/${driveId}/items/${resultItemId}` : `/me/drive/items/${resultItemId}`;
+                for (let i = 0; i < 4; i++) {
+                    try {
+                        const itemResponse = await client.api(itemPath).select('id,@microsoft.graph.downloadUrl').get();
+                        if (itemResponse["@microsoft.graph.downloadUrl"]) {
+                            finalDownloadUrl = itemResponse["@microsoft.graph.downloadUrl"];
+                        }
+
+                        const thumbResponse = await client.api(`${itemPath}/thumbnails`).get();
+                        if (thumbResponse.value && thumbResponse.value.length > 0) {
+                            const thumb = thumbResponse.value[0];
+                            // 解像度優先順位: c1600x1600 > large > medium
+                            thumbnailUrl = thumb.c1600x1600?.url || thumb.large?.url || thumb.medium?.url || '';
+                            if (thumbnailUrl && finalDownloadUrl) break;
+                        }
+                    } catch (thumbError) {
+                        console.warn(`Metadata fetch attempt ${i + 1} failed`, thumbError);
                     }
-                } catch (thumbError) {
-                    console.warn("Thumbnail fetch failed", thumbError);
+                    if (i < 3) await wait(1000 + i * 500); 
                 }
             }
 
             const newAttachment: Attachment = {
                 id: resultItemId,
-                url: webUrl, // Fixed property name from path to url
+                url: webUrl,
                 name: file.name,
                 type: file.type,
                 size: file.size,
                 thumbnailUrl: thumbnailUrl,
+                downloadUrl: finalDownloadUrl,
+                driveId: driveId,
                 storageProvider: 'onedrive'
             };
 
@@ -241,14 +257,23 @@ export function useOneDriveUpload() {
 
         } catch (error: any) {
             console.error("OneDrive upload error:", error);
-            if (error.message === "LoginRequired") {
+            const errMsg = error.message || String(error);
+            if (
+                errMsg.toLowerCase().includes("user not signed in") || 
+                errMsg.includes("InteractionRequired") ||
+                errMsg.includes("ui_required")
+            ) {
+                // Ignore alert for auth errors, they are handled by login triggers
                 return null;
             }
-            alert(`アップロードに失敗しました。\n${error.message || error}`);
-            return null; // Return null handled by caller
+            alert(`アップロードに失敗しました。\n${errMsg}`);
+            return null;
         } finally {
             setUploading(false);
             setStatusMessage('');
+            // Remove from pending files after upload attempt (success or fail)
+            // Note: Not revoking here to avoid breaking active previews in modals
+            setPendingFiles(prev => prev.filter(p => p.id !== pendingId));
         }
     };
 
@@ -260,7 +285,7 @@ export function useOneDriveUpload() {
         setAttachments([]);
     };
 
-    const downloadFileFromOneDrive = async (fileId: string, fileName: string) => {
+    const downloadFileFromOneDrive = async (fileId: string, fileName: string, driveId?: string) => {
         try {
             let client;
             try {
@@ -271,7 +296,8 @@ export function useOneDriveUpload() {
                 client = await getGraphClient();
             }
 
-            const response = await client.api(`/me/drive/items/${fileId}`)
+            const itemPath = driveId ? `/drives/${driveId}/items/${fileId}` : `/me/drive/items/${fileId}`;
+            const response = await client.api(itemPath)
                 .select('@microsoft.graph.downloadUrl')
                 .get();
 
@@ -294,6 +320,31 @@ export function useOneDriveUpload() {
         }
     };
 
+    const getFreshAttachmentMetadata = useCallback(async (fileId: string, driveId?: string): Promise<{ thumbnailUrl: string, downloadUrl: string } | null> => {
+        try {
+            const client = await getGraphClient();
+            const itemPath = driveId ? `/drives/${driveId}/items/${fileId}` : `/me/drive/items/${fileId}`;
+            
+            // Get thumbnails and downloadUrl in one call if possible, or two
+            const item = await client.api(itemPath).select('id,name,description,@microsoft.graph.downloadUrl').get();
+            const thumbResponse = await client.api(`${itemPath}/thumbnails`).select('large,c1600x1600').get();
+            
+            let thumbnailUrl = '';
+            if (thumbResponse.value && thumbResponse.value.length > 0) {
+                const thumb = thumbResponse.value[0];
+                thumbnailUrl = thumb.c1600x1600?.url || thumb.large?.url || '';
+            }
+
+            return {
+                thumbnailUrl,
+                downloadUrl: item["@microsoft.graph.downloadUrl"] || ''
+            };
+        } catch (error) {
+            console.error("Failed to refresh attachment metadata:", error);
+            return null;
+        }
+    }, []);
+
     return {
         uploadFile,
         uploading,
@@ -305,6 +356,8 @@ export function useOneDriveUpload() {
         checkLoginStatus,
         removeFile,
         clearFiles,
-        downloadFileFromOneDrive
+        downloadFileFromOneDrive,
+        getFreshAttachmentMetadata,
+        pendingFiles
     };
 }

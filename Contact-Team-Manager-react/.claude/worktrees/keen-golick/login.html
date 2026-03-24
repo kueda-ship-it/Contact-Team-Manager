@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - F-ace 管理システム</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #003366 0%, #2563eb 100%);
+        }
+
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-card h2 {
+            margin-bottom: 25px;
+            color: var(--primary);
+            text-align: center;
+        }
+
+        .login-card .field {
+            margin-bottom: 20px;
+        }
+
+        .login-card label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .login-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .error-msg {
+            color: #ef4444;
+            font-size: 14px;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-card">
+        <h2>F-ace Dashboard</h2>
+        <div class="field">
+            <label>ユーザーID</label>
+            <input type="text" id="userId" placeholder="IDを入力">
+        </div>
+        <div class="field">
+            <label>パスワード</label>
+            <input type="password" id="password" placeholder="パスワードを入力">
+        </div>
+        <button class="login-btn" onclick="login()">ログイン</button>
+        <div id="errorMsg" class="error-msg">IDまたはパスワードが正しくありません</div>
+    </div>
+
+    <script>
+        async function login() {
+            const id = document.getElementById('userId').value;
+            const pw = document.getElementById('password').value;
+
+            // ローカル認証 (admin/admin123)
+            if (id === 'admin' && pw === 'admin123') {
+                const adminUser = { id: "admin", pw: "admin123", name: "管理者", role: "master" };
+                localStorage.setItem('face_current_user', JSON.stringify(adminUser));
+                location.href = 'index.html';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/users');
+                if (!res.ok) throw new Error();
+                const users = await res.json();
+                const user = users.find(u => u.id === id && u.pw === pw);
+
+                if (user) {
+                    localStorage.setItem('face_current_user', JSON.stringify(user));
+                    location.href = 'index.html';
+                } else {
+                    document.getElementById('errorMsg').style.display = 'block';
+                }
+            } catch (err) {
+                // サーバー通信エラー時でもID/PWが合っていれば入らせる（簡易的なフォールバック）
+                alert('サーバーとの通信に失敗しました。adminアカウントを使用してください。');
+            }
+        }
+
+        // Enterキーでログイン
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+    </script>
+</body>
+
+</html>

@@ -115,12 +115,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const filePickerActiveRef = React.useRef(false);
 
     const openCrop = (file: File, onConfirm: (blob: Blob) => Promise<void>) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            setCropImageSrc(ev.target?.result as string);
-            cropConfirmRef.current = onConfirm;
-        };
-        reader.readAsDataURL(file);
+        const url = URL.createObjectURL(file);
+        cropConfirmRef.current = onConfirm;
+        setCropImageSrc(url);
     };
 
     // Microsoft Graph Status
@@ -140,14 +137,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     const handleMsLogin = async () => {
         setMsLoading(true);
         try {
-            await initializeMsal();
+            // signIn calls initializeMsal internally and we also do it on mount.
+            // Calling it again here might cause an extra async hop that triggers popup blockers.
             const account = await signIn();
             setMsAccount(account);
-            alert("Microsoft 連携に成功しました。");
+            if (account) alert("Microsoft 連携に成功しました。");
         } catch (err: any) {
-            // Error is already alerted in signIn or can be handled here
+            console.error("Login failed:", err);
             if (err.message && !err.message.includes("ポップアップ")) {
                 alert("Microsoft 連携に失敗しました: " + err.message);
+            } else if (err.message && err.message.includes("ポップアップ")) {
+                alert(err.message); // Show the specific "blocked" message from microsoftGraph.ts
             }
         } finally {
             setMsLoading(false);
@@ -1539,10 +1539,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
             <ImageCropModal
                 imageSrc={cropImageSrc}
                 onConfirm={async (blob) => {
+                    const src = cropImageSrc;
                     setCropImageSrc(null);
+                    URL.revokeObjectURL(src);
                     await cropConfirmRef.current(blob);
                 }}
-                onCancel={() => setCropImageSrc(null)}
+                onCancel={() => {
+                    URL.revokeObjectURL(cropImageSrc);
+                    setCropImageSrc(null);
+                }}
             />
         )}
         </>

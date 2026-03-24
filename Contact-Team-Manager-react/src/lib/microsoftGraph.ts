@@ -5,7 +5,9 @@ import { AuthCodeMSALBrowserAuthenticationProvider } from "@microsoft/microsoft-
 // 1. 環境変数の取得と検証
 const clientId = import.meta.env.VITE_AZURE_CLIENT_ID?.trim();
 const tenantId = import.meta.env.VITE_AZURE_TENANT_ID?.trim();
-const redirectUri = window.location.origin + import.meta.env.BASE_URL;
+// .env の値を優先し、なければ動的に生成（末尾の / 修飾を避けるため trim 等で調整）
+const envRedirectUri = import.meta.env.VITE_AZURE_REDIRECT_URI?.trim();
+const redirectUri = envRedirectUri || (window.location.origin + (import.meta.env.BASE_URL || ""));
 
 if (!clientId || !tenantId) {
     console.error("Azure Client ID or Tenant ID is missing in .env");
@@ -52,6 +54,15 @@ export const loginRequest = {
     scopes: ["User.Read", "Files.ReadWrite"]
 };
 
+// 外部トークン（Supabase SSO から取得したもの）の保持
+let externalAccessToken: string | null = null;
+export const setExternalAccessToken = (token: string | null) => {
+    externalAccessToken = token;
+    if (token) {
+        console.log("[MSAL] External access token updated.");
+    }
+};
+
 // MSALインスタンス作成
 export const msalInstance = new PublicClientApplication(msalConfig);
 
@@ -69,7 +80,9 @@ export const initializeMsal = async () => {
 
             // リダイレクトからの復帰を処理
             try {
-                const response = await msalInstance.handleRedirectPromise();
+                const response = await msalInstance.handleRedirectPromise({
+                    navigateToLoginRequestUrl: false // MSALによる自動リダイレクトを抑制
+                });
                 if (response) {
                     console.log("Redirect Login Success:", response);
                     msalInstance.setActiveAccount(response.account);
@@ -104,17 +117,20 @@ export const signIn = async (promptType: "select_account" | "consent" = "select_
         return null;
     }
 
-    await initializeMsal();
-
-    const activeAccount = msalInstance.getActiveAccount();
-    // If we are forcing consent, we ignore the active account check and proceed to interactive login
-    if (activeAccount && promptType !== "consent") {
-        return activeAccount;
-    }
-
+    // 早めにフラグを立てて、initializeMsal の待機中も二重起動を防ぐ
+    isLoggingIn = true;
+    
     try {
-        isLoggingIn = true;
+        await initializeMsal();
+
+        const activeAccount = msalInstance.getActiveAccount();
+        // If we are forcing consent, we ignore the active account check and proceed to interactive login
+        if (activeAccount && promptType !== "consent") {
+            return activeAccount;
+        }
+
         console.log(`Attempting Popup Login with prompt: ${promptType}...`);
+        
         const result = await msalInstance.loginPopup({
             ...loginRequest,
             prompt: promptType
@@ -122,6 +138,10 @@ export const signIn = async (promptType: "select_account" | "consent" = "select_
         msalInstance.setActiveAccount(result.account);
         return result.account;
     } catch (error: any) {
+        if (error.errorCode === "block_nested_popups") {
+             console.warn("Popup blocked (nested). Fallback to redirect may be needed via user action.");
+             throw new Error("ポップアップがブロックされました。ブラウザの設定で許可するか、もう一度クリックしてください。");
+        }
         if (error.errorCode !== "interaction_in_progress") {
             console.warn("Popup Login failed, attempting Redirect...", error);
             // ポップアップが失敗した場合はリダイレクトで試行
@@ -223,6 +243,16 @@ export const getToken = async (): Promise<string | null> => {
 
 // Graphクライアントの取得
 export const getGraphClient = async (scopes: string[] = loginRequest.scopes) => {
+    // 外部トークン（Supabase SSO経由）が利用可能な場合はそれを使用する
+    if (externalAccessToken) {
+        // console.log("[MSAL] Using external access token from Supabase.");
+        return Client.init({
+            authProvider: (done) => {
+                done(null, externalAccessToken!);
+            }
+        });
+    }
+
     await initializeMsal();
 
     const account = msalInstance.getActiveAccount();
@@ -233,7 +263,7 @@ export const getGraphClient = async (scopes: string[] = loginRequest.scopes) => 
     const authProvider = new AuthCodeMSALBrowserAuthenticationProvider(msalInstance, {
         account: account,
         scopes: scopes,
-        interactionType: InteractionType.Redirect, // Fixed generic usage
+        interactionType: InteractionType.Popup,
     });
 
     return Client.initWithMiddleware({

@@ -12,6 +12,82 @@ import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
 import { LinkPreview } from '../common/LinkPreview';
 
+// Helper component for auto-refreshing images
+const ThreadImage: React.FC<{ 
+    att: any; 
+    getFreshMetadata: (id: string, driveId?: string) => Promise<any>;
+    isAuthenticated: boolean;
+    onLogin: () => Promise<any>;
+}> = ({ att, getFreshMetadata, isAuthenticated, onLogin }) => {
+    // Initial src: priority to direct links. Only use .url if it seems to be a direct link or we have nothing else.
+    // OneDrive webUrls usually contain "view.aspx" or similar, which break <img>.
+    const isDirectLink = (url: string) => url && (url.includes('download.aspx') || url.includes('content.office.net') || url.includes('public.blob.core.windows.net'));
+    
+    // Quality improvement: Prefer downloadUrl (high res) over thumbnailUrl
+    const [src, setSrc] = React.useState(att.downloadUrl || att.thumbnailUrl || (isDirectLink(att.url) ? att.url : ''));
+    const [retryCount, setRetryCount] = React.useState(0);
+    const [isAuthNeeded, setIsAuthNeeded] = React.useState(false);
+
+    // React to auth changes: If we were blocked and now authenticated, try again automatically.
+    React.useEffect(() => {
+        if (isAuthenticated && isAuthNeeded) {
+            console.log(`[ThreadImage] Authentication detected for ${att.id}, retrying load.`);
+            setIsAuthNeeded(false);
+            setRetryCount(0);
+            // This re-evaluates src or triggers handleError again if <img> still fails
+        }
+    }, [isAuthenticated, isAuthNeeded, att.id]);
+
+    const handleError = async () => {
+        if (!att.id || retryCount >= 1) {
+            // If already retried and still fails, check if we need auth
+            if (!isAuthenticated) {
+                console.log("[ThreadImage] Still failing and not authenticated. Showing auth button.");
+                setIsAuthNeeded(true);
+            }
+            return;
+        }
+        
+        console.log(`[ThreadImage] Image failed to load, fetching fresh metadata for ${att.id} (drive: ${att.driveId})`);
+        setRetryCount(prev => prev + 1);
+        
+        const fresh = await getFreshMetadata(att.id, att.driveId);
+        if (fresh) {
+            setSrc(fresh.downloadUrl || fresh.thumbnailUrl);
+            setIsAuthNeeded(false);
+        } else if (!isAuthenticated) {
+            setIsAuthNeeded(true);
+        }
+    };
+
+    if (isAuthNeeded) {
+        return (
+            <div className="attachment-file-icon" style={{ cursor: 'pointer', width: '200px', height: '150px', background: 'rgba(0,183,195,0.05)', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px dashed rgba(0,183,195,0.3)' }} onClick={onLogin}>
+                <span style={{ fontSize: '1.2rem' }}>🔒</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>クリックして画像を表示</span>
+            </div>
+        );
+    }
+
+    if (!src && !att.thumbnailUrl && !att.downloadUrl) {
+         return (
+            <div className="attachment-file-icon" style={{ width: '60px', height: '60px', background: 'rgba(255,165,0,0.1)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', border: '1px solid rgba(255,165,0,0.3)' }}>
+                🖼️
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={src}
+            alt={att.name}
+            onError={handleError}
+            className="attachment-thumb-large"
+            style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}
+        />
+    );
+};
+
 // Helper to extract URLs from text
 const extractUrls = (text: string | null): string[] => {
     if (!text) return [];
@@ -56,6 +132,13 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const { user, profile: currentProfile } = useAuth();
     const [editingThreadId, setEditingThreadId] = React.useState<string | null>(null);
     const [editingReplyId, setEditingReplyId] = React.useState<string | null>(null);
+    const {
+        uploadFile,
+        downloadFileFromOneDrive,
+        getFreshAttachmentMetadata,
+        isAuthenticated,
+        login
+    } = useOneDriveUpload();
     const editRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
     const fileInputRefs = React.useRef<{ [key: string]: HTMLInputElement | null }>({});
 
@@ -64,9 +147,31 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [replyAttachments, setReplyAttachments] = React.useState<{ [key: string]: Attachment[] }>({});
     const [replyUploading, setReplyUploading] = React.useState<{ [key: string]: boolean }>({});
     const [remindInput, setRemindInput] = React.useState<{ threadId: string, remindAt: string } | null>(null);
+    const [replyPendingFiles, setReplyPendingFiles] = React.useState<{ [key: string]: { id: string, file: File, previewUrl: string }[] }>({});
     const [expandedThreads, setExpandedThreads] = React.useState<Set<string>>(new Set());
     const [needsExpandMap, setNeedsExpandMap] = React.useState<{ [key: string]: boolean }>({});
+    const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
+    const [selectedPreviewUrl, setSelectedPreviewUrl] = React.useState<string | null>(null);
     const measureRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
+    const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
+    const [previewAttId, setPreviewAttId] = React.useState<string | null>(null);
+
+    // Close open menu when clicking outside
+    React.useEffect(() => {
+        const handleClickOutside = () => { setOpenMenuId(null); };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    // Disable pointer events on overlapping UI when menu is open
+    React.useEffect(() => {
+        if (openMenuId !== null) {
+            document.body.classList.add('menu-open');
+        } else {
+            document.body.classList.remove('menu-open');
+        }
+        return () => document.body.classList.remove('menu-open');
+    }, [openMenuId]);
 
     // Measure heights to detect if they exceed thresholds (200px for threads, 100px for replies)
     React.useLayoutEffect(() => {
@@ -106,7 +211,6 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         });
     };
 
-    const { uploadFile, downloadFileFromOneDrive, isAuthenticated, login } = useOneDriveUpload(); // Use OneDrive instead of Supabase
 
     const { members: teamMembers } = useTeamMembers(currentTeamId);
     const memberIds = React.useMemo(() => 
@@ -210,20 +314,27 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     // Handle scroll to specific thread (from sidebar navigation)
     React.useEffect(() => {
         if (scrollToThreadId && !threadsLoading && threads.length > 0) {
-            // Find the element
-            const el = document.getElementById(`thread-${scrollToThreadId}`);
-            if (el) {
-                // Scroll into view
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Add highlight class
-                el.classList.add('highlight-thread');
-                setTimeout(() => el.classList.remove('highlight-thread'), 2000);
+            let retryCount = 0;
+            const maxRetries = 20; // 2 seconds total
 
-                // Notify parent that scroll is handled
-                if (onScrollComplete) {
-                    onScrollComplete();
+            const tryScroll = () => {
+                const el = document.getElementById(`thread-${scrollToThreadId}`);
+                if (el) {
+                    console.log('Scrolling to thread:', scrollToThreadId);
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('highlight-thread');
+                    setTimeout(() => el.classList.remove('highlight-thread'), 3000);
+                    if (onScrollComplete) onScrollComplete();
+                } else if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(tryScroll, 100);
+                } else {
+                    console.warn('Scroll target not found after retries:', scrollToThreadId);
+                    if (onScrollComplete) onScrollComplete();
                 }
-            }
+            };
+
+            tryScroll();
         }
     }, [scrollToThreadId, threadsLoading, threads.length, onScrollComplete]);
 
@@ -232,7 +343,18 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     }
 
     if (error) {
-        return <div style={{ padding: '20px', color: 'var(--danger)' }}>Error: {error.message}</div>;
+        return (
+            <div style={{ padding: '20px', color: 'var(--danger)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>通信エラーが発生しました。ネットワーク接続を確認してください。</div>
+                <button
+                    className="btn btn-outline"
+                    style={{ width: 'fit-content' }}
+                    onClick={() => refetch()}
+                >
+                    再試行
+                </button>
+            </div>
+        );
     }
 
     const currentTeamName = currentTeamId
@@ -333,8 +455,26 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         try {
             const newAtts: Attachment[] = [];
             for (const file of files) {
-                const uploaded = await uploadFile(file);
-                if (uploaded) newAtts.push(uploaded);
+                const pendingId = Math.random().toString(36).substring(7);
+                const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+                
+                // Add to local pending state
+                setReplyPendingFiles(prev => ({
+                    ...prev,
+                    [threadId]: [...(prev[threadId] || []), { id: pendingId, file, previewUrl }]
+                }));
+
+                try {
+                    const uploaded = await uploadFile(file);
+                    if (uploaded) newAtts.push(uploaded);
+                } finally {
+                    // Remove from local pending state
+                    setReplyPendingFiles(prev => ({
+                        ...prev,
+                        [threadId]: (prev[threadId] || []).filter(p => p.id !== pendingId)
+                    }));
+                    if (previewUrl) URL.revokeObjectURL(previewUrl);
+                }
             }
             setReplyAttachments(prev => ({
                 ...prev,
@@ -454,36 +594,76 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             <div className="attachment-display" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
                 {attachments.map((att: any, idx: number) => {
                     const isOneDrive = att.storageProvider === 'onedrive' || att.id;
+                    const isImageFile = (name?: string, type?: string) => {
+                        const imgExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+                        return (type?.startsWith('image/')) || (name && imgExtensions.some(ext => name.toLowerCase().endsWith(ext)));
+                    };
+                    const isImage = isImageFile(att.name, att.type);
                     return (
                         <div key={idx} className="attachment-group" style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                             <div className="attachment-wrapper" style={{ position: 'relative' }}>
-                                <div onClick={() => window.open(att.url, '_blank')} style={{ cursor: 'pointer' }}>
-                                    {att.type?.startsWith('image/') ? (
-                                        <img src={att.thumbnailUrl || att.url} alt={att.name} className="attachment-thumb-large" style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                                <div
+                                    onClick={async () => {
+                                        if (isImage) {
+                                            // Prefer direct link for <img> tag. If only webUrl exists, wait for refresh.
+                                            const isDirectLink = (url: string) => url && (url.includes('download.aspx') || url.includes('content.office.net') || url.includes('public.blob.core.windows.net'));
+                                            const initialUrl = isDirectLink(att.downloadUrl) ? att.downloadUrl : (isDirectLink(att.thumbnailUrl) ? att.thumbnailUrl : null);
+                                            
+                                            setPreviewAttId(att.id);
+                                            setPreviewImageUrl(initialUrl);
+
+                                            // Always attempt to refresh on click to get the high-res direct link
+                                            if (att.id) {
+                                                const fresh = await getFreshAttachmentMetadata(att.id, att.driveId);
+                                                if (fresh) {
+                                                    setPreviewImageUrl(fresh.downloadUrl || fresh.thumbnailUrl);
+                                                } else if (!isAuthenticated) {
+                                                    // Request login without confirmation for direct feedback
+                                                    const account = await login();
+                                                    if (account) {
+                                                        const freshAfter = await getFreshAttachmentMetadata(att.id, att.driveId);
+                                                        if (freshAfter) setPreviewImageUrl(freshAfter.downloadUrl || freshAfter.thumbnailUrl);
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            if (att.id) {
+                                                downloadFileFromOneDrive(att.id, att.name, att.driveId);
+                                            } else {
+                                                window.open(att.url, '_blank');
+                                            }
+                                        }
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    {isImage ? (
+                                        <ThreadImage 
+                                            att={att} 
+                                            getFreshMetadata={getFreshAttachmentMetadata} 
+                                            isAuthenticated={isAuthenticated}
+                                            onLogin={login}
+                                        />
                                     ) : (
-                                        <div className="file-link" style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ fontSize: '1.2rem' }}>📄</span>
-                                            <span style={{ fontSize: '0.85rem' }}>{att.name}</span>
+                                        <div className="attachment-file-icon" style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            📄
                                         </div>
                                     )}
                                 </div>
+                                <div className="attachment-name" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {att.name}
+                                </div>
                             </div>
-                            {isOneDrive && att.id && (
+                            {isOneDrive && (
                                 <button
-                                    className="btn-download-orange"
+                                    className="btn-download-icon"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        downloadFileFromOneDrive(att.id, att.name!);
+                                        downloadFileFromOneDrive(att.id || att.url, att.name, att.driveId);
                                     }}
-                                    title="ダウンロード"
-                                    style={{
-                                        marginTop: '4px',
-                                        height: '32px',
-                                        width: '32px',
-                                        padding: 0
-                                    }}
+                                    title="OneDriveからダウンロード"
+                                    style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', marginTop: '4px' }}
                                 >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                         <polyline points="7 10 12 15 17 10"></polyline>
                                         <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -630,7 +810,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                             <div
                                 key={thread.id}
                                 id={`thread-${thread.id}`}
-                                className={`task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''}`}
+                                className={`task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''} ${openMenuId === thread.id ? 'has-open-menu' : ''}`}
                                 style={{ position: 'relative', paddingBottom: '50px' }}
                             >
                                 {thread.is_pinned && <div className="pinned-badge">重要</div>}
@@ -641,12 +821,13 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                 )}
 
                                 <div className="dot-menu-container">
-                                    <div className="dot-menu-trigger">⋮</div>
-                                    <div className="dot-menu">
+                                    <div className="dot-menu-trigger" onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === thread.id ? null : thread.id); }}>⋮</div>
+                                    <div className={`dot-menu${openMenuId === thread.id ? ' dot-menu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
                                         {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
                                             <>
                                                 {user?.id === thread.user_id && (
                                                     <div className="menu-item" onClick={() => {
+                                                        setOpenMenuId(null);
                                                         setEditingThreadId(thread.id);
                                                     }}>
                                                         <span className="menu-icon">
@@ -657,7 +838,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                         </span> 編集
                                                     </div>
                                                 )}
-                                                <div className="menu-item menu-item-delete" onClick={() => handleDeleteThread(thread.id)}>
+                                                <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteThread(thread.id); }}>
                                                     <span className="menu-icon">
                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                             <polyline points="3 6 5 6 21 6"></polyline>
@@ -670,6 +851,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 <div className="menu-item" onClick={() => {
                                                     // Initialize with current remind_at if exists
                                                     const currentVal = thread.remind_at ? new Date(thread.remind_at - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
+                                                    setOpenMenuId(null);
                                                     setRemindInput({ threadId: thread.id, remindAt: currentVal });
                                                 }}>
                                                     <span className="menu-icon">
@@ -680,16 +862,17 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     </span> リマインド
                                                 </div>
                                                 {['Admin'].includes(currentProfile?.role || '') && (
-                                                    <div className="menu-item move-team-item">
+                                                    <div className="menu-item move-team-item" onClick={(e) => e.stopPropagation()}>
                                                         <span className="menu-icon">
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                                                             </svg>
                                                         </span> チーム移動
-                                                        <div className="submenu">
+                                                        <div className="submenu" onClick={(e) => e.stopPropagation()}>
                                                             {teams.filter(t => t.id !== thread.team_id).map(t => (
                                                                 <div key={t.id} className="menu-item" onClick={async (e) => {
                                                                     e.stopPropagation();
+                                                                    setOpenMenuId(null);
                                                                     if (window.confirm(`この投稿を「${t.name}」へ移動しますか？`)) {
                                                                         const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
                                                                         if (error) alert('移動に失敗しました: ' + error.message);
@@ -858,12 +1041,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                             return (
                                                                 <div key={reply.id} className="reply-item" style={{ position: 'relative' }}>
                                                                     <div className="dot-menu-container" style={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}>
-                                                                        <div className="dot-menu-trigger">⋮</div>
-                                                                        <div className="dot-menu">
+                                                                        <div className="dot-menu-trigger" onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === reply.id ? null : reply.id); }}>⋮</div>
+                                                                        <div className={`dot-menu${openMenuId === reply.id ? ' dot-menu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
                                                                             {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
                                                                                 <>
                                                                                     {user?.id === reply.user_id && (
-                                                                                        <div className="menu-item" onClick={() => setEditingReplyId(reply.id)}>
+                                                                                        <div className="menu-item" onClick={() => { setOpenMenuId(null); setEditingReplyId(reply.id); }}>
                                                                                             <span className="menu-icon">
                                                                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -872,7 +1055,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                                             </span> 編集
                                                                                         </div>
                                                                                     )}
-                                                                                    <div className="menu-item menu-item-delete" onClick={() => handleDeleteReply(reply.id)}>
+                                                                                    <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteReply(reply.id); }}>
                                                                                         <span className="menu-icon">
                                                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -1005,10 +1188,38 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                 handleAddReply(thread.id);
                                                             }
                                                         }}
-                                                        onPaste={(e: React.ClipboardEvent) => {
-                                                            e.preventDefault();
-                                                            const text = e.clipboardData.getData('text/plain');
-                                                            document.execCommand('insertText', false, text);
+                                                        onPaste={async (e: React.ClipboardEvent) => {
+                                                            const items = e.clipboardData.items;
+                                                            let hasImage = false;
+
+                                                            for (let i = 0; i < items.length; i++) {
+                                                                if (items[i].type.indexOf('image') !== -1) {
+                                                                    const blob = items[i].getAsFile();
+                                                                    if (blob && user) {
+                                                                        hasImage = true;
+                                                                        setReplyUploading(prev => ({ ...prev, [thread.id]: true }));
+                                                                        try {
+                                                                            const uploaded = await uploadFile(blob);
+                                                                            if (uploaded) {
+                                                                                setReplyAttachments(prev => ({
+                                                                                    ...prev,
+                                                                                    [thread.id]: [...(prev[thread.id] || []), uploaded]
+                                                                                }));
+                                                                            }
+                                                                        } finally {
+                                                                            setReplyUploading(prev => ({ ...prev, [thread.id]: false }));
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            if (hasImage) {
+                                                                e.preventDefault();
+                                                            } else {
+                                                                e.preventDefault();
+                                                                const text = e.clipboardData.getData('text/plain');
+                                                                document.execCommand('insertText', false, text);
+                                                            }
                                                         }}
                                                     />
                                                     {isOpen && targetThreadId === thread.id && (
@@ -1028,21 +1239,38 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                             }}
                                                         />
                                                     )}
-                                                    {(replyAttachments[thread.id]?.length || 0) > 0 && (
+                                                    {((replyAttachments[thread.id]?.length || 0) > 0 || (replyPendingFiles[thread.id]?.length || 0) > 0) && (
                                                         <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                                                            {replyAttachments[thread.id].map((att, idx) => (
-                                                                <div key={idx} className="attachment-item" style={{ position: 'relative', width: '40px', height: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            {/* すでにアップロード済みのファイル */}
+                                                            {(replyAttachments[thread.id] || []).map((att, idx) => (
+                                                                <div key={`att-${idx}`} className="attachment-item" style={{ position: 'relative', width: '80px', height: '80px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(att.downloadUrl || att.thumbnailUrl || null)}>
                                                                     {att.type.startsWith('image/') ? (
-                                                                        <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                        <img src={att.downloadUrl || att.thumbnailUrl || ''} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} title="クリックで拡大表示" />
                                                                     ) : (
                                                                         <span style={{ fontSize: '14px' }}>📄</span>
                                                                     )}
                                                                     <div
                                                                         className="attachment-remove"
-                                                                        onClick={() => removeReplyAttachment(thread.id, idx)}
-                                                                        style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            removeReplyAttachment(thread.id, idx);
+                                                                        }}
+                                                                        style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', zIndex: 2 }}
                                                                     >
                                                                         ×
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                            {/* アップロード中のファイル (即時プレビュー) */}
+                                                            {(replyPendingFiles[thread.id] || []).map((pf) => (
+                                                                <div key={`pending-${pf.id}`} className="attachment-item uploading" style={{ position: 'relative', width: '80px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--primary-light)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(pf.previewUrl)}>
+                                                                    {pf.file.type.startsWith('image/') ? (
+                                                                        <img src={pf.previewUrl} alt={pf.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} title="クリックで拡大表示" />
+                                                                    ) : (
+                                                                        <span style={{ fontSize: '14px', opacity: 0.6 }}>📄</span>
+                                                                    )}
+                                                                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1 }}>
+                                                                        <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -1148,6 +1376,140 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 )
             }
             <div ref={bottomAnchorRef} style={{ height: '1px' }} />
-        </div >
+
+            {/* Image Preview Modal */}
+            {previewImageUrl && (
+                <div
+                    className="image-preview-overlay"
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0,0,0,0.85)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 20000,
+                        cursor: 'zoom-out',
+                        backdropFilter: 'blur(5px)'
+                    }}
+                    onClick={() => setPreviewImageUrl(null)}
+                >
+                    <div
+                        style={{
+                            position: 'relative',
+                            maxWidth: '90%',
+                            maxHeight: '90%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                         {previewImageUrl ? (
+                            <img
+                                src={previewImageUrl}
+                                alt="Preview"
+                                onError={async () => {
+                                    if (previewAttId) {
+                                        console.log("[Preview] Image failed, refreshing metadata...");
+                                        const fresh = await getFreshAttachmentMetadata(previewAttId);
+                                        if (fresh) {
+                                            setPreviewImageUrl(fresh.downloadUrl || fresh.thumbnailUrl);
+                                        }
+                                    }
+                                }}
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    objectFit: 'contain',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+                                    border: '1px solid rgba(255,255,255,0.2)'
+                                }}
+                            />
+                        ) : (
+                            <div style={{ color: 'white', textAlign: 'center' }}>
+                                <div className="spinner" style={{ marginBottom: '10px' }}></div>
+                                <p>読み込み中...</p>
+                                {!isAuthenticated && (
+                                    <button 
+                                        className="btn btn-sm btn-primary" 
+                                        style={{ marginTop: '10px' }}
+                                        onClick={() => login()}
+                                    >
+                                        Microsoft にログインして表示
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setPreviewImageUrl(null)}
+                            style={{
+                                position: 'absolute',
+                                top: '-40px',
+                                right: '-40px',
+                                background: 'white',
+                                color: 'black',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '32px',
+                                height: '32px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            ×
+                        </button>
+                        <div style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
+                            <button
+                                className="btn btn-sm btn-primary"
+                                onClick={() => window.open(previewImageUrl, '_blank')}
+                            >
+                                元のサイズで表示
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Image Preview Overlay Modal */}
+            {selectedPreviewUrl && (
+                <div 
+                    className="preview-overlay" 
+                    style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.92)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+                    onClick={() => setSelectedPreviewUrl(null)}
+                >
+                    <div style={{ position: 'relative', width: '75vw', height: '75vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <img 
+                            src={selectedPreviewUrl} 
+                            alt="Full Preview" 
+                            style={{ 
+                                maxWidth: '100%', 
+                                maxHeight: '100%', 
+                                objectFit: 'contain', 
+                                borderRadius: '4px', 
+                                boxShadow: '0 0 50px rgba(0,0,0,0.8)',
+                                imageRendering: 'auto',
+                                transform: 'translate3d(0,0,0)',
+                                backfaceVisibility: 'hidden'
+                            }} 
+                        />
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setSelectedPreviewUrl(null); }}
+                            style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'var(--brand-primary, #00d2ff)', color: 'black', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.5)', zIndex: 10001 }}
+                            title="閉じる"
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };

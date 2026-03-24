@@ -17,6 +17,7 @@ export interface Profile {
 interface AuthContextType {
     user: User | null;
     profile: Profile | null;
+    session: Session | null;
     loading: boolean;
     authError: string | null;
     signIn: (email: string, password: string) => Promise<{ data: { user: User | null; session: Session | null; }; error: any }>;
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
+    const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
     const [authError, setAuthError] = useState<string | null>(null);
 
@@ -37,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (!mounted) return;
+            setSession(session);
             if (session?.user) {
                 setUser(session.user);
                 loadProfile(session.user.id);
@@ -50,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (!mounted) return;
+            setSession(session);
 
             if (session?.user) {
                 // Only update if user changed to avoid unnecessary re-fetches
@@ -79,9 +83,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     async function loadProfile(userId: string) {
+        console.log(`[AuthContext] Starting loadProfile for user: ${userId}`);
         try {
             // Check if we already have the profile for this user
-            if (profile && profile.id === userId) return;
+            if (profile && profile.id === userId) {
+                console.log('[AuthContext] Profile already loaded.');
+                return;
+            }
 
             let { data, error } = await supabase
                 .from('profiles')
@@ -90,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .single();
 
             if (error) {
+                console.warn('[AuthContext] Fetched profile failed, checking fallback...', error);
                 const { data: { user: currentUser } } = await supabase.auth.getUser();
                 if (currentUser?.email) {
                     // Step 1: Check if a profile with this email already exists (Microsoft SSO re-login)
@@ -101,6 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                     if (existingProfile) {
                         // Profile exists with old auth ID - update it to new auth ID
+                        console.log('[AuthContext] Found existing profile with email, updating ID...');
                         const { data: updatedProfile, error: updateError } = await supabase
                             .from('profiles')
                             .update({ id: userId })
@@ -113,6 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         }
                     } else {
                         // Step 2: Check whitelist for new user onboarding
+                        console.log('[AuthContext] Checking whitelist...');
                         const { data: whitelistData, error: whitelistError } = await supabase
                             .from('whitelist')
                             .select('*')
@@ -120,6 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             .single();
 
                         if (!whitelistError && whitelistData) {
+                            console.log('[AuthContext] User in whitelist, creating profile...');
                             const { data: newProfile, error: createError } = await supabase
                                 .from('profiles')
                                 .insert({
@@ -143,12 +155,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (error) {
                 // Still no profile and not in whitelist
+                console.error('[AuthContext] Still no profile after fallback:', error);
                 await signOut();
                 setAuthError('このアカウントは許可されていません。管理者に登録を依頼してください。');
                 return;
             }
 
             if (data && data.is_active === false) {
+                console.warn('[AuthContext] Account is inactive.');
                 await signOut();
                 setAuthError('このアカウントは現在無効化されています。管理者に問い合わせてください。');
                 return;
@@ -157,8 +171,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setProfile(data);
             setAuthError(null);
         } catch (error) {
-            console.error('Error loading profile:', error);
+            console.error('[AuthContext] Error loading profile:', error);
         } finally {
+            console.log('[AuthContext] loadProfile finished. Setting loading to false.');
             setLoading(false);
         }
     }
@@ -175,12 +190,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async function signOut() {
         const { error } = await supabase.auth.signOut();
         setUser(null);
+        setSession(null);
         setProfile(null);
         return { error };
     }
 
     return (
-        <AuthContext.Provider value={{ user, profile, loading, authError, signIn, signOut }}>
+        <AuthContext.Provider value={{ user, profile, session, loading, authError, signIn, signOut }}>
             {children}
         </AuthContext.Provider>
     );

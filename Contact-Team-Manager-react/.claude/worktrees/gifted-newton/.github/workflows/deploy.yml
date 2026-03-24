@@ -1,0 +1,76 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - new_260204
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build_site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: List files (DEBUG)
+        run: ls -R
+
+      - name: Detect project directory
+        id: detect
+        run: |
+          if [ -d "Contact-Team-Manager-react" ]; then
+            echo "dir=Contact-Team-Manager-react" >> $GITHUB_OUTPUT
+          elif [ -f "package.json" ]; then
+            echo "dir=." >> $GITHUB_OUTPUT
+          else
+            echo "Error: package.json not found"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: ${{ steps.detect.outputs.dir }}
+
+      - name: Build
+        run: |
+          rm -f src/components/MentionInput.tsx || true
+          rm -f postcss.config.js tailwind.config.js ../postcss.config.js ../tailwind.config.js || true
+          npx vite build --base /Contact-Team-Manager/
+        working-directory: ${{ steps.detect.outputs.dir }}
+        env:
+          CI: false
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_AZURE_CLIENT_ID: ${{ secrets.VITE_AZURE_CLIENT_ID }}
+          VITE_AZURE_TENANT_ID: ${{ secrets.VITE_AZURE_TENANT_ID }}
+          VITE_AZURE_REDIRECT_URI: ${{ secrets.VITE_AZURE_REDIRECT_URI }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: contact-team-manager-build
+          path: ${{ steps.detect.outputs.dir }}/dist/
+
+  deploy:
+    needs: build_site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: contact-team-manager-build

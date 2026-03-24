@@ -33,11 +33,13 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
         uploadFile,
         removeFile,
         clearFiles,
-        isAuthenticated, // Added
-        login // Added
+        isAuthenticated,
+        login,
+        pendingFiles
     } = useOneDriveUpload();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pendingPastes, setPendingPastes] = useState<File[]>([]);
 
     const { members: teamMembers } = useTeamMembers(teamId);
     const memberIds = React.useMemo(() => 
@@ -59,6 +61,20 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
     React.useEffect(() => {
         initializeMsal().catch(console.error);
     }, []);
+
+    // Auto-upload pending pastes after login
+    React.useEffect(() => {
+        if (isAuthenticated && pendingPastes.length > 0) {
+            const uploadPending = async () => {
+                const files = [...pendingPastes];
+                setPendingPastes([]);
+                for (const file of files) {
+                    await uploadFile(file);
+                }
+            };
+            uploadPending();
+        }
+    }, [isAuthenticated, pendingPastes, uploadFile]);
 
     const handleSubmit = async () => {
         if (!title.trim() || !contentRef.current?.innerText.trim()) {
@@ -88,8 +104,6 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
 
             if (error) throw error;
 
-            if (error) throw error;
-
             setTitle('');
             setRemindAt('');
             if (contentRef.current) contentRef.current.innerHTML = '';
@@ -107,9 +121,6 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
 
-        // Reset input value locally to allow re-selecting same file if needed in future,
-        // but carefully to not break current loop
-
         for (const file of files) {
             await uploadFile(file);
         }
@@ -117,13 +128,10 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const [isLoggingIn, setIsLoggingIn] = useState(false);
+    const [isLoggingIn, setIsLoggingIn] = React.useState(false);
+    const [selectedPreviewUrl, setSelectedPreviewUrl] = React.useState<string | null>(null);
 
     const handleAttachClick = async () => {
-        // Auth check before opening file picker to avoid "popup blocked" issues during upload
-        // 1. If authenticated, OPEN FILE PICKER IMMEDIATELY
-        // 2. If not, trigger login (popup) synchronously
-
         if (isAuthenticated) {
             fileInputRef.current?.click();
         } else {
@@ -138,8 +146,6 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
             }
         }
     };
-
-
 
     return (
         <div className="static-form-container">
@@ -268,23 +274,73 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                     }
                                 }}
                                 onPaste={(e: React.ClipboardEvent) => {
-                                    e.preventDefault();
-                                    const text = e.clipboardData.getData('text/plain');
-                                    document.execCommand('insertText', false, text);
+                                    const items = e.clipboardData.items;
+                                    let hasImage = false;
+
+                                    for (let i = 0; i < items.length; i++) {
+                                        if (items[i].type.indexOf('image') !== -1) {
+                                            const blob = items[i].getAsFile();
+                                            if (blob) {
+                                                if (isAuthenticated) {
+                                                    uploadFile(blob);
+                                                } else {
+                                                    setPendingPastes(prev => [...prev, blob]);
+                                                }
+                                                hasImage = true;
+                                            }
+                                        }
+                                    }
+
+                                    if (hasImage) {
+                                        e.preventDefault();
+                                    } else {
+                                        e.preventDefault();
+                                        const text = e.clipboardData.getData('text/plain');
+                                        document.execCommand('insertText', false, text);
+                                    }
                                 }}
                             />
-                            {attachments.length > 0 && (
+                            {pendingPastes.length > 0 && !isAuthenticated && (
+                                <div style={{ 
+                                    marginTop: '8px', 
+                                    padding: '10px', 
+                                    background: 'rgba(255, 193, 7, 0.1)', 
+                                    border: '1px solid rgba(255, 193, 7, 0.3)', 
+                                    borderRadius: '8px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <span style={{ fontSize: '0.85rem', color: '#ffc107' }}>
+                                        画像がペーストされました。アップロードを完了するには Microsoft 連携が必要です。
+                                    </span>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-sm" 
+                                        style={{ background: '#ffc107', color: 'black' }}
+                                        onClick={() => login()}
+                                    >
+                                        ログインしてアップロード
+                                    </button>
+                                </div>
+                            )}
+
+                            {(attachments.length > 0 || pendingFiles.length > 0) && (
                                 <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                                    {/* Uploaded files */}
                                     {attachments.map((att, index) => (
-                                        <div key={index} className="attachment-item" style={{ position: 'relative', width: '120px', height: '120px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div key={`att-${index}`} className="attachment-item" style={{ position: 'relative', width: '200px', height: '150px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(att.downloadUrl || att.thumbnailUrl || null)}>
                                             {att.type.startsWith('image/') ? (
-                                                <img src={att.thumbnailUrl || att.url} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={att.thumbnailUrl || att.downloadUrl} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} title="クリックで拡大表示" />
                                             ) : (
                                                 <span style={{ fontSize: '20px' }}>📄</span>
                                             )}
                                             <div
                                                 className="attachment-remove"
-                                                onClick={() => removeFile(index)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeFile(index);
+                                                }}
                                                 style={{
                                                     position: 'absolute',
                                                     top: 0,
@@ -297,10 +353,27 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
                                                     cursor: 'pointer',
-                                                    fontSize: '12px'
+                                                    fontSize: '12px',
+                                                    zIndex: 2
                                                 }}
                                             >
                                                 ×
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {/* Pending files (uploading) */}
+                                    {pendingFiles.map((pf) => (
+                                        <div key={`pending-${pf.id}`} className="attachment-item uploading" style={{ position: 'relative', width: '200px', height: '150px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--primary-light)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(pf.previewUrl)}>
+                                            {pf.file.type.startsWith('image/') ? (
+                                                <img src={pf.previewUrl} alt={pf.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} title="クリックで拡大表示" />
+                                            ) : (
+                                                <span style={{ fontSize: '20px', opacity: 0.6 }}>📄</span>
+                                            )}
+                                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1 }}>
+                                                <div className="spinner-small" style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                            </div>
+                                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: '0.6rem', padding: '2px', textAlign: 'center' }}>
+                                                アップロード中...
                                             </div>
                                         </div>
                                     ))}
@@ -402,6 +475,38 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                     </div>
                 )}
             </section>
+            {/* Image Preview Overlay Modal */}
+            {selectedPreviewUrl && (
+                <div 
+                    className="preview-overlay" 
+                    style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.92)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+                    onClick={() => setSelectedPreviewUrl(null)}
+                >
+                    <div style={{ position: 'relative', width: '75vw', height: '75vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <img 
+                            src={selectedPreviewUrl} 
+                            alt="Full Preview" 
+                            style={{ 
+                                maxWidth: '100%', 
+                                maxHeight: '100%', 
+                                objectFit: 'contain', 
+                                borderRadius: '4px', 
+                                boxShadow: '0 0 50px rgba(0,0,0,0.8)',
+                                imageRendering: 'auto',
+                                transform: 'translate3d(0,0,0)',
+                                backfaceVisibility: 'hidden'
+                            }} 
+                        />
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setSelectedPreviewUrl(null); }}
+                            style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'var(--brand-primary, #00d2ff)', color: 'black', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.5)', zIndex: 10001 }}
+                            title="閉じる"
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

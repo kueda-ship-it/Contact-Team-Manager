@@ -103,6 +103,7 @@ export function useThreads(
             console.log(`[useThreads] Fetching. Filter: ${filter}, Search: ${searchQuery}, Limit: ${limit}, Effective: ${effectiveLimit}`);
 
             if (!silent) setLoading(true);
+            setError(null);
 
             let query = supabase
                 .from('threads')

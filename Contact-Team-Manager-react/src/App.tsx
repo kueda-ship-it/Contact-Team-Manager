@@ -14,7 +14,7 @@ import { useNotifications } from './hooks/useNotifications';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import './styles/style.css';
 
-import { initializeMsal } from './lib/microsoftGraph';
+import { initializeMsal, ssoLogin, setExternalAccessToken } from './lib/microsoftGraph';
 
 const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
@@ -47,7 +47,7 @@ const ThemeToggle = () => {
 };
 
 function App() {
-  const { user, profile, loading: authLoading, signOut } = useAuth();
+  const { user, profile, session, loading: authLoading, signOut } = useAuth();
   useNotifications(); // Initialize notifications
 
 
@@ -109,6 +109,19 @@ function App() {
   useEffect(() => {
     initializeMsal().catch(console.error);
   }, []);
+
+  // Auto-login to Microsoft Graph (OneDrive) when Supabase user is available
+  useEffect(() => {
+    if (session?.provider_token) {
+      console.log('[App] Reusing Supabase provider token for Microsoft Graph.');
+      setExternalAccessToken(session.provider_token);
+    } else if (user?.email) {
+      console.log('[App] Attempting auto-login to Microsoft Graph via MSAL for:', user.email);
+      ssoLogin(user.email).catch(err => {
+        console.warn('[App] MSAL auto-login failed:', err);
+      });
+    }
+  }, [user, session]);
 
   // Clear hash from URL behavior removed to prevent conflict with MSAL popup handling
   // MSAL handles hash processing and clearing automatically.
@@ -180,23 +193,30 @@ function App() {
   const currentTeam = teams.find(t => String(t.id) === String(currentTeamId));
   const currentTeamName = currentTeam?.name || 'チーム未選択';
 
-  const handleSidebarThreadClick = (threadId: string) => {
-    // 1. Ensure we are in feed mode
-    setViewMode('feed');
-    // 2. Ensure we can see the thread (switch to all or pending? 'all' is safest)
-    setStatusFilter('all');
-
-    // 3. Check if thread is currently loaded
-    const isLoaded = rawThreads.some(t => t.id === threadId);
-    if (!isLoaded) {
-      // Expand limit if not loaded (temporary expansion to ensure we find it)
-      // Check if 500 is enough? Maybe 1000?
-      if (threadsLimit < 500) {
-        setThreadsLimit(500);
-      }
+  const handleSidebarThreadClick = async (threadId: string) => {
+    // 1. Find thread to get its team_id
+    let targetTeamId = currentTeamId;
+    const thread = (rawThreads || []).find(t => t.id === threadId);
+    
+    if (thread) {
+      targetTeamId = thread.team_id;
+    } else {
+      // If not in current rawThreads, fetch from DB
+      const { data } = await supabase.from('threads').select('team_id').eq('id', threadId).single();
+      if (data) targetTeamId = data.team_id;
     }
 
-    // 4. Set target to scroll
+    // 2. Ensure we are in feed mode
+    setViewMode('feed');
+    // 3. Ensure we can see the thread
+    setStatusFilter('all');
+
+    // 4. Switch team if necessary
+    if (String(targetTeamId) !== String(currentTeamId)) {
+      setCurrentTeamId(targetTeamId);
+    }
+
+    // 5. Set target to scroll
     setScrollToThreadId(threadId);
   };
 

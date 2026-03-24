@@ -5,14 +5,25 @@
     --bg-dark: #11100F;
     --card-bg: #1F1E1D;
     --text-main: #FFFFFF;
-    /* Pure white for better visibility */
     --text-muted: #D1D1D1;
-    /* Brighter gray */
     --accent: #00B7C3;
     --danger: #C4314B;
     --success: #92C353;
-    --glass: rgba(255, 255, 255, 0.05);
+    --glass: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-blur: 20px;
+    --glass-highlight: rgba(255, 255, 255, 0.15);
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --img-rendering: -webkit-optimize-contrast;
+}
+
+.glass-panel {
+    background: var(--glass);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-highlight);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 body.light-mode {
@@ -21,11 +32,11 @@ body.light-mode {
     --text-main: #3c4043;
     --text-muted: #5f6368;
     --primary: #5b5fc7;
-    /* Teams-like purple */
     --primary-light: #7f85f5;
     --primary-dark: #444b93;
-    --glass: rgba(0, 0, 0, 0.05);
-    /* Darker glass for light mode */
+    --glass: rgba(255, 255, 255, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.5);
+    --glass-blur: 8px;
     --border-color: #e1e1e1;
     --bg-elevated: #ffffff;
 }
@@ -396,6 +407,7 @@ body {
     width: 100vw;
     scrollbar-gutter: stable;
     /* Prevent layout shift when scrollbars appear */
+    image-rendering: var(--img-rendering);
 }
 
 .container {
@@ -459,6 +471,10 @@ body.light-mode .mention-email {
     padding-top: 20px !important;
     height: 100%;
     overflow: hidden;
+    background: rgba(255, 255, 255, 0.015);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .side-panel-title {
@@ -481,8 +497,10 @@ header {
     align-items: center;
     justify-content: space-between;
     padding: 0 20px;
-    background: var(--bg-dark);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--glass);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-bottom: 1px solid var(--glass-border);
     position: fixed;
     top: 0;
     left: 0;
@@ -557,10 +575,12 @@ body.light-mode .btn-revert:hover svg {
     top: 100%;
     left: 0;
     width: 100%;
-    background: var(--card-bg);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    background: var(--glass);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     z-index: 10000;
     margin-top: 4px;
     overflow: hidden;
@@ -593,20 +613,24 @@ body.light-mode .custom-select-option:hover {
 
 .search-input {
     margin: 0 !important;
-    height: 32px !important;
+    height: 36px !important;
     display: block !important;
     background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    height: 32px !important;
-    font-size: 0.85rem !important;
-    border-radius: 4px !important;
-    padding: 0 35px 0 12px !important;
+    font-size: 0.9rem !important;
+    border-radius: 20px !important; /* Liquid PILL */
+    padding: 0 40px 0 16px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .search-input:focus {
-    background: #1E1E1E !important;
+    background: rgba(255, 255, 255, 0.1) !important;
     color: #fff !important;
-    border-color: var(--primary) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 15px rgba(0, 183, 195, 0.3), inset 0 2px 4px rgba(0,0,0,0.1) !important;
+    transform: translateY(-1px);
 }
 
 .user-profile {
@@ -725,49 +749,70 @@ body {
 .side-panel-title {
     font-size: 0.75rem;
     text-transform: uppercase;
-    color: var(--text-muted);
-    letter-spacing: 0.05em;
-    margin-bottom: 10px;
-    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.12em;
+    margin-bottom: 20px;
+    font-weight: 800;
     margin-top: 0;
-    /* Remove top margin completely */
+    background: linear-gradient(135deg, rgba(0, 183, 195, 0.3), rgba(0, 183, 195, 0.1));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 183, 195, 0.4);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 6px 16px;
+    border-radius: 30px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255,255,255,0.2);
+}
+
+.liquid-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 800;
+    font-size: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    backdrop-filter: blur(5px);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+.liquid-badge:hover {
+    transform: scale(1.05);
 }
 
 /* --- Teams Sidebar --- */
 .teams-sidebar {
     width: 72px;
-    /* Default narrow width (Icons only) */
-    background: #1E1F22;
+    background: var(--glass);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* Center icons */
     padding: 12px 0;
     gap: 8px;
-    /* Gap between items */
     flex-shrink: 0;
-    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    border-right: 1px solid var(--glass-border);
     position: fixed;
     top: 50px;
     left: 0;
     bottom: 0;
     z-index: 6000;
     transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    /* Smooth expansion */
     overflow-x: hidden;
-    /* Hide overflowing text when narrow */
     overflow-y: auto;
-    /* Scrollable if many teams */
 }
 
 /* Expand on Hover */
 .teams-sidebar:hover {
-    background: #1E1F22;
-    /* Ensure opacity on expand */
+    background: var(--glass);
     width: 260px;
-    /* Expanded width */
     align-items: stretch;
-    /* Stretch items to fill width */
     padding-left: 0;
 }
 
@@ -894,13 +939,24 @@ body {
 /* --- Side Panel Specifics --- */
 .side-panel .task-card {
     position: relative;
-    padding: 10px;
-    /* Reduced vertical padding */
-    /* No padding-bottom reserved */
-    background: #25262B;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    /* Reduced margin */
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    overflow: hidden; /* Fix color bar overflow */
+}
+
+.side-panel .task-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
 .side-panel .task-content {
@@ -1163,25 +1219,23 @@ body:not(.light-mode) .rich-editor * {
 .side-panel {
     width: 320px;
     flex-shrink: 0;
-    flex-shrink: 0;
     height: auto;
     max-height: calc(100vh - 60px);
-    /* Use max-height as requested, with buffer */
     align-self: flex-start;
     overflow-y: auto !important;
-    /* Force scroll capability */
     display: flex;
     flex-direction: column;
     scrollbar-width: thin;
     scrollbar-color: var(--accent) rgba(255, 255, 255, 0.05);
-    background: rgba(17, 16, 15, 0.85);
-    border-radius: 8px 8px 0 0;
+    background: var(--glass);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
     padding: 0;
-    z-index: 10;
     z-index: 10;
     margin-top: 0;
     position: static;
-    /* Let flexbox handle positioning */
 }
 
 /* Ensure the sections inside don't collapse */
@@ -1488,25 +1542,28 @@ body:not(.light-mode) .rich-editor * {
 }
 
 .task-card {
-    background: var(--card-bg);
-    border-radius: 8px;
-    padding: 10px 14px;
-    /* Even more tightened */
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    margin-bottom: 12px;
+    background: var(--glass);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border-radius: 12px;
+    padding: 14px 18px;
+    border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-highlight);
+    margin-bottom: 16px;
     position: relative;
-    overflow: visible !important;
+    overflow: hidden; /* Fix color bar overflow */
     min-height: auto;
     display: flex;
     flex-direction: column;
     transition: var(--transition);
     scroll-margin-top: 170px;
-    /* Offset for sticky header jump */
 }
 
 .task-card:hover {
-    background: #2D2C2B;
-    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
 }
 
 .task-card::after {
@@ -2175,9 +2232,7 @@ textarea.input-field {
 
 /* Bridge removed from here due to overflow-y clipping issues */
 
-.menu-item:hover .submenu {
-    display: block;
-}
+/* submenu is shown via JS click state (.submenu-open class) */
 
 .submenu .menu-item {
     font-size: 0.85rem;
@@ -2350,8 +2405,24 @@ textarea.input-field {
 /* メインスレチE��・共通�Eメンション�E�紫色�E�E*/
 .mention {
     color: var(--primary-light) !important;
-    font-weight: bold !important;
+    font-weight: 700 !important;
     cursor: pointer;
+    background: rgba(var(--primary-rgb), 0.15);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(var(--primary-rgb), 0.3);
+    padding: 0px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 2px;
+    transition: all 0.2s ease;
+}
+
+.mention:hover {
+    background: rgba(var(--primary-rgb), 0.25);
+    border-color: rgba(var(--primary-rgb), 0.5);
+    transform: scale(1.05);
 }
 
 /* Force override for light mode generic text color rule */
@@ -2707,17 +2778,18 @@ body.light-mode .theme-toggle-btn:hover svg {
     position: absolute;
     top: 35px;
     right: 0;
-    background: #252423;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    background: var(--glass);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     opacity: 0;
     visibility: hidden;
     transform: scale(0.9) translateY(-10px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     min-width: 140px;
     z-index: 9999 !important;
-    /* Extremely high layer */
     pointer-events: none;
 }
 
@@ -2732,14 +2804,7 @@ body.light-mode .theme-toggle-btn:hover svg {
     background: transparent;
 }
 
-/* 繧�E�繝ｳ繝リ縺�E�繝帙ヰ繝ｼ縺�E�縺溘繝｡繝九Η繝ｼ閾�E�菴薙�E繝帙ヰ繝ｼ縺励◁E���E�縺阪↓陦�E�遉ｺ */
-.dot-menu-container:hover .dot-menu,
-.dot-menu:hover {
-    opacity: 1;
-    visibility: visible;
-    transform: scale(1) translateY(0);
-    pointer-events: auto;
-}
+/* dot-menu is shown only via JS click state (.dot-menu-open class) */
 
 .menu-item {
     padding: 10px 15px;
@@ -3158,7 +3223,8 @@ html {
     z-index: 1100;
 }
 
-.dot-menu-container:hover {
+.dot-menu-container:hover,
+.dot-menu-container:has(.dot-menu-open) {
     opacity: 1 !important;
     z-index: 1101;
 }
@@ -3173,16 +3239,17 @@ html {
     top: 100%;
     right: 0;
     width: 180px;
-    background: #2B2D31;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    border-radius: 6px;
+    background: var(--glass);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
     padding: 4px;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
     z-index: 1010;
-    /* Longer transition delay for maximum safety */
     transition: opacity 0.15s ease, visibility 0s 1s;
 }
 
@@ -3199,16 +3266,26 @@ html {
     pointer-events: none;
 }
 
-.dot-menu-container:hover .dot-menu,
-.dot-menu:hover {
+.dot-menu.dot-menu-open {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
     transition: opacity 0.15s ease, visibility 0s 0s;
+    z-index: 9999;
 }
 
-.dot-menu:hover::before {
-    pointer-events: auto;
+/* Raise card above siblings when its menu is open */
+.task-card.has-open-menu {
+    z-index: 10001;
+    position: relative;
+}
+
+/* Disable pointer events on overlapping UI while any dot-menu is open */
+body.menu-open .static-form-container,
+body.menu-open .post-form-container,
+body.menu-open .reply-form,
+body.menu-open .quick-reply-form {
+    pointer-events: none !important;
 }
 
 .menu-item {
@@ -3244,11 +3321,12 @@ html {
     transform: translateX(5px);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
-    z-index: 1030;
+    z-index: 10000;
 }
 
-.move-team-item:hover .submenu,
-.submenu:hover {
+.submenu.submenu-open,
+.move-team-item:hover .submenu {
+    display: block;
     opacity: 1;
     visibility: visible;
     transform: translateX(0);
@@ -3548,8 +3626,10 @@ html {
         left: 0;
         right: 0;
         height: calc(60px + env(safe-area-inset-bottom, 12px) - 16px);
-        background: #2B2D31;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: var(--glass);
+        backdrop-filter: blur(var(--glass-blur));
+        -webkit-backdrop-filter: blur(var(--glass-blur));
+        border-top: 1px solid var(--glass-border);
         z-index: 9000;
         justify-content: space-around;
         align-items: center;
@@ -4239,12 +4319,18 @@ html {
 
 .mention.mention-me {
     color: #FFD700 !important;
-    background: rgba(255, 215, 0, 0.1) !important;
+    background: rgba(255, 215, 0, 0.15) !important;
+    border: 1px solid rgba(255, 215, 0, 0.3) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
 
 .mention.mention-all {
     color: #00B7C3 !important; /* Matching accent */
-    background: rgba(0, 183, 195, 0.1) !important;
+    background: rgba(0, 183, 195, 0.15) !important;
+    border: 1px solid rgba(0, 183, 195, 0.3) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
 
 /* Light mode overrides */
@@ -4270,4 +4356,70 @@ body.light-mode #root a.post-link {
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Image Preview Modal --- */
+.image-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(25px); /* Stronger glass blur for focus */
+    -webkit-backdrop-filter: blur(25px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 11000;
+    cursor: zoom-out;
+    animation: fadeIn 0.3s ease;
+}
+
+.image-preview-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    cursor: default;
+}
+
+.image-preview-content img {
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.image-preview-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.preview-close-btn {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.preview-close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
