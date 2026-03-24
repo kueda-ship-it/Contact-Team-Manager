@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useTeamMembers, useProfiles, useTeams, usePermissions, useUserMemberships, useTags } from '../../hooks/useSupabase';
 import { CustomSelect } from '../common/CustomSelect';
-import { msalInstance, signIn, signOut, initializeMsal } from '../../lib/microsoftGraph';
+import { msalInstance, signIn, signOut, initializeMsal, hasExternalAccessToken } from '../../lib/microsoftGraph';
 import type { AccountInfo } from '@azure/msal-browser';
 import { CHANGELOG } from '../../data/changelog';
 import { TagMemberEditor } from './TagMemberEditor';
@@ -123,15 +123,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     // Microsoft Graph Status
     const [msAccount, setMsAccount] = useState<AccountInfo | null>(null);
     const [msLoading, setMsLoading] = useState(false);
+    const [hasExternalToken, setHasExternalToken] = useState(false);
 
     useEffect(() => {
         const checkMsAccount = async () => {
             await initializeMsal();
             setMsAccount(msalInstance.getActiveAccount());
+            setHasExternalToken(hasExternalAccessToken());
         };
         if (isOpen) {
             checkMsAccount();
         }
+
+        const handleExternalToken = () => {
+            setHasExternalToken(true);
+        };
+        window.addEventListener('externalTokenUpdated', handleExternalToken);
+        return () => window.removeEventListener('externalTokenUpdated', handleExternalToken);
     }, [isOpen]);
 
     const handleMsLogin = async () => {
@@ -706,20 +714,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                     ファイルを OneDrive にアップロードしたり、添付ファイルをダウンロードしたりするために必要です。
                                 </p>
 
-                                {msAccount ? (
+                                {(msAccount || hasExternalToken) ? (
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '10px 15px', borderRadius: '8px' }}>
                                         <div>
-                                            <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{msAccount.name || msAccount.username}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{msAccount.username}</div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{msAccount?.name || msAccount?.username || profile?.display_name || profile?.email || '連携済み'}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{msAccount?.username || profile?.email}</div>
                                         </div>
-                                        <button
-                                            className="btn btn-sm"
-                                            style={{ color: 'var(--danger)', background: 'rgba(196, 49, 75, 0.1)', border: '1px solid rgba(196, 49, 75, 0.2)' }}
-                                            onClick={handleMsLogout}
-                                            disabled={msLoading}
-                                        >
-                                            連携解除
-                                        </button>
+                                        {msAccount && (
+                                            <button
+                                                className="btn btn-sm"
+                                                style={{ color: 'var(--danger)', background: 'rgba(196, 49, 75, 0.1)', border: '1px solid rgba(196, 49, 75, 0.2)' }}
+                                                onClick={handleMsLogout}
+                                                disabled={msLoading}
+                                            >
+                                                連携解除
+                                            </button>
+                                        )}
                                     </div>
                                 ) : (
                                     <div style={{ textAlign: 'center', padding: '10px' }}>
