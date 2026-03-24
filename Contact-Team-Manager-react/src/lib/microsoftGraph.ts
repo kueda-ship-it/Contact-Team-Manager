@@ -5,7 +5,9 @@ import { AuthCodeMSALBrowserAuthenticationProvider } from "@microsoft/microsoft-
 // 1. 環境変数の取得と検証
 const clientId = import.meta.env.VITE_AZURE_CLIENT_ID?.trim();
 const tenantId = import.meta.env.VITE_AZURE_TENANT_ID?.trim();
-const redirectUri = window.location.origin + import.meta.env.BASE_URL;
+// .env の値を優先し、なければ動的に生成（末尾の / 修飾を避けるため trim 等で調整）
+const envRedirectUri = import.meta.env.VITE_AZURE_REDIRECT_URI?.trim();
+const redirectUri = envRedirectUri || (window.location.origin + (import.meta.env.BASE_URL || ""));
 
 if (!clientId || !tenantId) {
     console.error("Azure Client ID or Tenant ID is missing in .env");
@@ -78,7 +80,9 @@ export const initializeMsal = async () => {
 
             // リダイレクトからの復帰を処理
             try {
-                const response = await msalInstance.handleRedirectPromise();
+                const response = await msalInstance.handleRedirectPromise({
+                    navigateToLoginRequestUrl: false // MSALによる自動リダイレクトを抑制
+                });
                 if (response) {
                     console.log("Redirect Login Success:", response);
                     msalInstance.setActiveAccount(response.account);
@@ -113,16 +117,18 @@ export const signIn = async (promptType: "select_account" | "consent" = "select_
         return null;
     }
 
-    await initializeMsal();
-
-    const activeAccount = msalInstance.getActiveAccount();
-    // If we are forcing consent, we ignore the active account check and proceed to interactive login
-    if (activeAccount && promptType !== "consent") {
-        return activeAccount;
-    }
-
+    // 早めにフラグを立てて、initializeMsal の待機中も二重起動を防ぐ
+    isLoggingIn = true;
+    
     try {
-        isLoggingIn = true;
+        await initializeMsal();
+
+        const activeAccount = msalInstance.getActiveAccount();
+        // If we are forcing consent, we ignore the active account check and proceed to interactive login
+        if (activeAccount && promptType !== "consent") {
+            return activeAccount;
+        }
+
         console.log(`Attempting Popup Login with prompt: ${promptType}...`);
         
         const result = await msalInstance.loginPopup({
