@@ -1300,7 +1300,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                             placeholder="チームを選択..."
                                             options={[
                                                 { value: '', label: '選択してください...' },
-                                                ...(isAdmin ? [{ value: 'new', label: '+ 新規チーム作成' }] : []),
+                                                ...((isAdmin || canManageTeam) ? [{ value: 'new', label: '+ 新規チーム作成' }] : []),
                                                 ...teams.filter(t => {
                                                     if (isAdmin) return true;
                                                     const isDirectManager = memberships.some(m => String(m.team_id) === String(t.id) && m.role === 'Manager');
