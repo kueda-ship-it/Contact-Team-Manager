@@ -1024,6 +1024,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 </p>
                             </div>
 
+                            {/* --- Role Permissions Table --- */}
+                            <div style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <h4 style={{ margin: '0 0 14px 0', fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--text-muted)' }}></span>
+                                    ロール別権限一覧
+                                </h4>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 600, width: '40%' }}>機能</th>
+                                                {(['Admin', 'Manager', 'Member', 'Viewer'] as const).map(r => (
+                                                    <th key={r} style={{ textAlign: 'center', padding: '8px 12px', color: r === 'Admin' ? '#FF6B6B' : r === 'Manager' ? 'var(--accent)' : 'var(--text-muted)', fontWeight: 600 }}>{r}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {[
+                                                { label: 'ユーザー招待・ロール変更', admin: true, manager: false, member: false, viewer: false },
+                                                { label: 'チーム作成（管理画面）', admin: true, manager: false, member: false, viewer: false },
+                                                { label: 'チーム作成（サイドバー）', admin: true, manager: true, member: true, viewer: false },
+                                                { label: 'チーム設定・メンバー管理', admin: true, manager: true, member: false, viewer: false },
+                                                { label: '投稿・コメント', admin: true, manager: true, member: true, viewer: false },
+                                                { label: '閲覧', admin: true, manager: true, member: true, viewer: true },
+                                            ].map((row, i) => (
+                                                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', transition: 'background 0.15s' }}
+                                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                                    <td style={{ padding: '8px 12px', color: 'var(--text-main)' }}>{row.label}</td>
+                                                    {(['admin', 'manager', 'member', 'viewer'] as const).map(r => (
+                                                        <td key={r} style={{ textAlign: 'center', padding: '8px 12px' }}>
+                                                            {row[r]
+                                                                ? <span style={{ color: '#33cc33', fontWeight: 700, fontSize: '1rem' }}>✓</span>
+                                                                : <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.9rem' }}>—</span>}
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
                             {/* --- Search & Bulk Action Bar --- */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '12px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <div style={{ flex: 1, maxWidth: '300px' }}>
