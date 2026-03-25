@@ -1134,7 +1134,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                             {[
                                                 { label: 'ユーザー招待・ロール変更', admin: true, manager: false, member: false, viewer: false },
                                                 { label: 'チーム作成（管理画面）', admin: true, manager: false, member: false, viewer: false },
-                                                { label: 'チーム作成（サイドバー）', admin: true, manager: true, member: true, viewer: false },
+                                                { label: 'チーム作成（サイドバー）', admin: true, manager: true, member: false, viewer: false },
                                                 { label: 'チーム設定・メンバー管理', admin: true, manager: true, member: false, viewer: false },
                                                 { label: '投稿・コメント', admin: true, manager: true, member: true, viewer: false },
                                                 { label: '閲覧', admin: true, manager: true, member: true, viewer: true },

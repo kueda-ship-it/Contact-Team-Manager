@@ -447,7 +447,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                 <div className="sidebar-divider"></div>
 
                 {(() => {
-                    const canCreate = profile?.role !== 'Viewer';
+                    const canCreate = profile?.role === 'Admin' || profile?.role === 'Manager';
                     return (
                         <div
                             className="team-list-item"
