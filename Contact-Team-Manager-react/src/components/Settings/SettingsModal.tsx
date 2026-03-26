@@ -375,6 +375,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                 alert('チームの作成に失敗しました: ' + error.message);
             } else {
                 console.log('[handleSaveMgmtTeam] Create Success:', data);
+                
+                // Automatically add the creator as Admin
+                if (user && data) {
+                    const { error: memberError } = await supabase
+                        .from('team_members')
+                        .insert({
+                            team_id: data.id,
+                            user_id: user.id,
+                            role: 'Admin'
+                        });
+                    
+                    if (memberError) {
+                        console.error('[handleSaveMgmtTeam] Member Auto-Add Error:', memberError);
+                    } else {
+                        console.log('[handleSaveMgmtTeam] Member Auto-Add Success for user:', user.id);
+                    }
+                }
+
                 alert('チームを作成しました');
                 setSelectedTeamId(data.id);
                 setIsCreatingTeam(false);
