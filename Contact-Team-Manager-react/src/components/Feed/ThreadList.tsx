@@ -1280,14 +1280,14 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 <div style={{ display: 'flex', gap: '5px', marginTop: '0px' }}>
                                                     <button
                                                         className="btn-sm btn-clip-yellow"
-                                                        style={{ padding: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                                        style={{ padding: 0, width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                                                         onClick={() => handleReplyAttachClick(thread.id)}
                                                         disabled={replyUploading[thread.id]}
                                                     >
                                                         {replyUploading[thread.id] ? (
-                                                            <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                            <div className="spinner-small" style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                                                         ) : (
-                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
                                                             </svg>
                                                         )}
@@ -1305,11 +1305,15 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                         className="btn-send-blue"
                                                         title="送信"
                                                         style={{
-                                                            width: '38px',
-                                                            height: '38px',
+                                                            width: '40px',
+                                                            height: '40px',
                                                             padding: 0,
                                                             flexShrink: 0,
-                                                            cursor: 'pointer'
+                                                            cursor: 'pointer',
+                                                            borderRadius: '50%',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center'
                                                         }}
                                                         onClick={() => handleAddReply(thread.id)}
                                                     >
@@ -1344,9 +1348,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 </div>
                                             )}
                                             <button
-                                                className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}`}
+                                                className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : 'btn-complete'}`}
                                                 title={thread.status === 'completed' ? '未完了に戻す' : '完了にする'}
-                                                style={{ width: '38px', height: '38px' }}
+                                                style={{ width: '40px', height: '40px' }}
                                                 onClick={() => handleToggleStatus(thread.id, thread.status)}
                                             >
                                                 {thread.status === 'completed' ? (

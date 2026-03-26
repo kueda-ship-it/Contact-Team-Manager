@@ -39,6 +39,7 @@ body.light-mode {
     --glass-blur: 8px;
     --border-color: #e1e1e1;
     --bg-elevated: #ffffff;
+    --success: #107c10; /* Darker green for visibility */
 }
 
 /* Specific overrides for light mode components */
@@ -207,13 +208,30 @@ body.light-mode .icon-btn,
 body.light-mode .quick-reply-btn,
 body.light-mode .reaction-bubble,
 body.light-mode .gear-btn-unified,
-body.light-mode .team-settings-icon,
-body.light-mode .btn-send-blue,
-body.light-mode .btn-clip-yellow {
+body.light-mode .team-settings-icon {
     color: #666666 !important;
-    /* Default gray */
     border-color: #cccccc !important;
     background: transparent !important;
+}
+
+/* Specific Action Buttons in Light Mode - High Visibility */
+body.light-mode .btn-send-blue {
+    color: #0078d4 !important; /* Azure Blue */
+    border-color: #0078d4 !important;
+}
+body.light-mode .btn-clip-yellow {
+    color: #b8860b !important; /* Dark Goldenrod for visibility */
+    border-color: #b8860b !important;
+}
+body.light-mode .btn-complete,
+body.light-mode .check-btn,
+body.light-mode .action-btn-complete {
+    color: #00b28a !important; /* Cyan Green as requested */
+    border-color: #00b28a !important;
+}
+body.light-mode .btn-revert {
+    color: #5c2d91 !important; /* Teams Purple */
+    border-color: #5c2d91 !important;
 }
 
 /* Hover states - Color on hover */
@@ -527,12 +545,10 @@ body.light-mode .btn-complete:hover,
 body.light-mode .check-btn:hover,
 body.light-mode .action-btn-complete:hover,
 body.light-mode .btn-status:hover {
-    color: #1bffa4 !important;
-    /* Neon Mint / Dark Mode Glow */
-    background: rgba(27, 255, 164, 0.1) !important;
-    border-color: #1bffa4 !important;
-    box-shadow: 0 0 10px rgba(27, 255, 164, 0.4) !important;
-    /* Mint Glow */
+    color: #00b28a !important;
+    background: rgba(0, 178, 138, 0.1) !important;
+    border-color: #00b28a !important;
+    box-shadow: 0 0 10px rgba(0, 178, 138, 0.2) !important;
 }
 
 /* Ensure the icon inside also changes color */
@@ -540,18 +556,19 @@ body.light-mode .btn-complete:hover svg,
 body.light-mode .check-btn:hover svg,
 body.light-mode .action-btn-complete:hover svg,
 body.light-mode .btn-status:hover svg {
-    stroke: #1bffa4 !important;
+    stroke: #00b28a !important;
 }
 
 /* Return (Undo) Button Hover in Light Mode */
 body.light-mode .btn-revert:hover {
-    color: #0078d4 !important;
-    background: rgba(0, 120, 212, 0.1) !important;
-    border-color: #0078d4 !important;
+    color: #5c2d91 !important;
+    background: rgba(92, 45, 145, 0.1) !important;
+    border-color: #5c2d91 !important;
+    box-shadow: 0 0 10px rgba(92, 45, 145, 0.2) !important;
 }
 
 body.light-mode .btn-revert:hover svg {
-    stroke: #0078d4 !important;
+    stroke: #5c2d91 !important;
 }
 
 .logo {
