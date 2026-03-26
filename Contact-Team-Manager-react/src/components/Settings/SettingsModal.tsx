@@ -383,7 +383,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         .insert({
                             team_id: data.id,
                             user_id: user.id,
-                            role: 'Admin'
+                            role: 'Manager'
                         });
                     
                     if (memberError) {
