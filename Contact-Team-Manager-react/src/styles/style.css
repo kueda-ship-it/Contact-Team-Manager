@@ -65,16 +65,20 @@ body.light-mode .sidebar-right {
     border-left: 1px solid #e1e1e1;
 }
 
-body.light-mode .task-card,
-body.light-mode .reply-item {
+body.light-mode .task-card {
     background: #ffffff;
     border: 1px solid #e1e1e1;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+body.light-mode .reply-item {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
 body.light-mode .reply-section {
-    background: #f8f9fa;
-    border-top: 1px solid #e1e1e1;
+    background: transparent;
 }
 
 body.light-mode .logo {
@@ -1979,9 +1983,9 @@ body.light-mode .btn-download-orange:hover {
 
 /* --- Reply Section --- */
 .reply-section {
-    background: rgba(0, 0, 0, 0.15);
+    background: transparent;
     border-radius: 4px;
-    padding: 0.5rem;
+    padding: 0 0.5rem;
     overflow: visible !important;
     display: flex;
     flex-direction: column;
@@ -1990,6 +1994,8 @@ body.light-mode .btn-download-orange:hover {
     /* Lift the whole section to stay above reaction bars below */
     transition: all 0.2s ease;
     position: relative;
+    border: none;
+    box-shadow: none;
 }
 
 .reply-section.is-empty {
@@ -2008,8 +2014,8 @@ body.light-mode .btn-download-orange:hover {
     overflow-y: auto;
     overflow-x: visible !important;
     flex: 1;
-    padding: 20px 5px !important;
-    /* Minimized buffer while still preventing menu clipping */
+    padding: 5px 5px !important;
+    /* Reduced buffer */
     scrollbar-width: thin;
     scrollbar-color: #444 transparent;
 }
@@ -2020,11 +2026,11 @@ body.light-mode .btn-download-orange:hover {
 }
 
 .reply-item {
-    padding: 6px 10px;
-    /* Tightened reply padding */
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03); /* 微細な背景を復活 */
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08); /* 控えめな枠線を復活 */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     margin-bottom: 5px;
     font-size: 0.85rem;
     transition: background 0.2s ease;
@@ -2410,7 +2416,7 @@ textarea.input-field {
     background: rgba(var(--primary-rgb), 0.15);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    border: 1px solid rgba(var(--primary-rgb), 0.3);
+    border: none; /* 二重枠解消のため削除 */
     padding: 0px 6px;
     border-radius: 4px;
     display: inline-block;
@@ -4059,6 +4065,47 @@ body.menu-open .quick-reply-form {
     }
 }
 
+/* --- Icon Specific Coloring (Liquid Glass Icons) --- */
+/* Default State: All icons are translucent white */
+.btn-send-blue svg,
+.btn-clip-yellow svg,
+.btn-status svg,
+.btn-status.btn-revert svg {
+    stroke: rgba(255, 255, 255, 0.9) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Hover States: Specific colors with Skeleton Glow */
+/* Send Icon (Airplane) - Water Blue Glow */
+.btn-send-blue:hover svg {
+    stroke: #00E5FF !important;
+    filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.9));
+}
+
+/* Clip Icon (Paperclip) - Yellow Glow */
+.btn-clip-yellow:hover svg {
+    stroke: #FFEB3B !important;
+    filter: drop-shadow(0 0 6px rgba(255, 235, 59, 0.9));
+}
+
+/* Status Button - Complete (Cyan Green Glow) */
+.btn-status:not(.btn-revert):hover svg {
+    stroke: #00FFBB !important;
+    filter: drop-shadow(0 0 6px rgba(0, 255, 187, 0.9));
+}
+
+/* When in Revert mode (Completed status) - Purple Glow */
+.btn-status.btn-revert:hover svg {
+    stroke: #9C27B0 !important;
+    filter: drop-shadow(0 0 6px rgba(156, 39, 176, 0.9));
+}
+
+/* Light Mode Adjustments - Slightly deeper colors for contrast */
+body.light-mode .btn-send-blue:hover svg { stroke: #00B0FF !important; filter: drop-shadow(0 0 4px rgba(0, 176, 255, 0.5)); }
+body.light-mode .btn-clip-yellow:hover svg { stroke: #FBC02D !important; filter: drop-shadow(0 0 4px rgba(251, 192, 45, 0.5)); }
+body.light-mode .btn-status:hover svg { stroke: #00B28A !important; filter: drop-shadow(0 0 4px rgba(0, 178, 138, 0.5)); }
+body.light-mode .btn-status.btn-revert:hover svg { stroke: #7B1FA2 !important; filter: drop-shadow(0 0 4px rgba(123, 31, 162, 0.5)); }
+
 /* Desktop Defaults - MUST BE OUTSIDE @media query */
 @media (min-width: 769px) {
 
@@ -4291,6 +4338,20 @@ body.menu-open .quick-reply-form {
 }
 
 /* --- Link and Mention Styles (Final Force) --- */
+/* #root .reply-item { 
+    border: none;
+    box-shadow: none;
+    background: transparent;
+} */
+
+#root .reply-section,
+#root .task-footer-teams,
+#root .thread-expandable-wrapper,
+#root .reply-scroll-area {
+    border: none;
+    box-shadow: none;
+}
+
 #root .task-card .task-content a,
 #root .reply-item .reply-content a,
 #root a.post-link {
@@ -4315,12 +4376,23 @@ body.menu-open .quick-reply-form {
     font-weight: 600 !important;
     display: inline !important; 
     white-space: normal !important;
+    border: none !important; /* 基本枠線を削除 */
+}
+
+/* ネストされたメンションの装飾をリセット（二重枠解消） */
+.mention .mention {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
 }
 
 .mention.mention-me {
     color: #FFD700 !important;
     background: rgba(255, 215, 0, 0.15) !important;
-    border: 1px solid rgba(255, 215, 0, 0.3) !important;
+    border: none !important;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
 }
@@ -4328,7 +4400,7 @@ body.menu-open .quick-reply-form {
 .mention.mention-all {
     color: #00B7C3 !important; /* Matching accent */
     background: rgba(0, 183, 195, 0.15) !important;
-    border: 1px solid rgba(0, 183, 195, 0.3) !important;
+    border: none !important;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
 }

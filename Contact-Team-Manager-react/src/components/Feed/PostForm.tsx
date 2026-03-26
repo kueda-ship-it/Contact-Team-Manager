@@ -5,6 +5,7 @@ import { useMentions } from '../../hooks/useMentions';
 import { useProfiles, useTags, useTeams, useTeamMembers } from '../../hooks/useSupabase';
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { MentionList } from '../common/MentionList';
+import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
 
 import { initializeMsal } from '../../lib/microsoftGraph';
 
@@ -156,56 +157,23 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                     <div className="post-form-row-1" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <input
                             type="text"
-                            className="input-field post-subject-input"
+                            className="input-field post-subject-input glass-input-liquid"
                             placeholder="件名を追加してください"
-                            style={{ margin: 0, flex: 1 }}
+                            style={{ 
+                                margin: 0, 
+                                flex: 1,
+                                borderRadius: '8px'
+                            }}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             disabled={loading}
                         />
-                        <div className="post-remind-container" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <input
-                                type="datetime-local"
-                                value={remindAt}
-                                onChange={(e) => setRemindAt(e.target.value)}
-                                className="input-field"
-                                style={{
-                                    margin: 0,
-                                    padding: '0 8px',
-                                    height: '36px',
-                                    fontSize: '0.8rem',
-                                    flex: 1,
-                                    color: remindAt ? 'var(--text-main)' : 'var(--text-muted)'
-                                }}
-                                title="リマインド日時を設定"
-                                disabled={loading}
-                            />
-                            {remindAt && (
-                                <button
-                                    type="button"
-                                    onClick={() => setRemindAt('')}
-                                    title="リマインドをリセット"
-                                    style={{
-                                        background: 'rgba(255,255,255,0.06)',
-                                        border: '1px solid rgba(255,255,255,0.15)',
-                                        color: 'var(--text-muted)',
-                                        borderRadius: '6px',
-                                        width: '36px',
-                                        height: '36px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        cursor: 'pointer',
-                                        flexShrink: 0
-                                    }}
-                                >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="1 4 1 10 7 10"></polyline>
-                                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                                    </svg>
-                                </button>
-                            )}
-                        </div>
+                        <WaterDateTimePicker
+                            value={remindAt}
+                            onChange={setRemindAt}
+                            disabled={loading}
+                            title="リマインド日時を設定"
+                        />
 
                         {/* Clip Button moved here */}
                         <div className="post-clip-container" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -250,17 +218,14 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                             <div
                                 ref={contentRef}
                                 contentEditable
-                                className="input-field rich-editor"
+                                className="input-field rich-editor glass-input-liquid"
                                 data-placeholder="新しい会話を開始します。@ を入力して、誰かにメンションしてください。"
                                 style={{
                                     marginTop: 0,
                                     minHeight: '80px',
                                     width: '100%',
-                                    border: '1px solid rgba(255, 255, 255, 0.5)',
-                                    background: 'rgba(0, 0, 0, 0.2)',
-                                    color: 'white',
-                                    borderRadius: '4px',
-                                    padding: '8px 12px'
+                                    borderRadius: '8px',
+                                    padding: '12px'
                                 }}
                                 onInput={(e) => {
                                     handleInput(e, 'post-form');

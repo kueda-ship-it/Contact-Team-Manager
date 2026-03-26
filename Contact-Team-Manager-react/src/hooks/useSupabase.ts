@@ -100,11 +100,14 @@ export function useThreads(
             const isSearching = searchQuery.trim().length > 0;
             const effectiveLimit = (filter === 'pending' || filter === 'mentions' || isSearching) ? 2000 : limit;
 
-            console.log(`[useThreads] Fetching. Filter: ${filter}, Search: ${searchQuery}, Limit: ${limit}, Effective: ${effectiveLimit}`);
+            console.log(`[useThreads] Fetching. Team: ${teamId}, Filter: ${filter}, Search: ${searchQuery}, Silent: ${silent}`);
 
-            if (!silent) setLoading(true);
+            // Only show loading if we really have no data for the current team
+            const isDifferentTeam = threads.length > 0 && teamId !== null && threads[0].team_id !== Number(teamId);
+            if (!silent && (threads.length === 0 || isDifferentTeam)) setLoading(true);
             setError(null);
-
+            
+            // ... (rest of query construction) ...
             let query = supabase
                 .from('threads')
                 .select(`
@@ -112,18 +115,13 @@ export function useThreads(
                   replies:replies(*)
                 `);
 
-            // Apply search filter if present
             if (isSearching) {
                 const term = `%${searchQuery.trim()}%`;
-                // Search in title and content only (author is UUID, author_name does not exist on table)
                 query = query.or(`title.ilike.${term},content.ilike.${term}`);
             }
 
-            // Apply limit (applied after filters by PostgREST logic, but definition order in JS chain implies intent)
-            // We want to sort by created_at DESC normally
             query = query.order('created_at', { ascending: false }).limit(effectiveLimit);
 
-            // Server-side filtering for status
             if (filter === 'pending') {
                 query = query.eq('status', 'pending');
             } else if (filter === 'completed') {
@@ -161,7 +159,7 @@ export function useThreads(
         } finally {
             setLoading(false);
         }
-    }, [teamId, profile, memberships, limit, ascending, filter, searchQuery]);
+    }, [teamId, profile?.id, memberships.length, limit, ascending, filter, searchQuery]);
 
     useEffect(() => {
         fetchThreads();

@@ -108,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     const { data: existingProfile } = await supabase
                         .from('profiles')
                         .select('*')
-                        .eq('email', currentUser.email)
+                        .ilike('email', currentUser.email)
                         .single();
 
                     if (existingProfile) {
@@ -117,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         const { data: updatedProfile, error: updateError } = await supabase
                             .from('profiles')
                             .update({ id: userId })
-                            .eq('email', currentUser.email)
+                            .ilike('email', currentUser.email)
                             .select()
                             .single();
                         if (!updateError) {
@@ -130,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         const { data: whitelistData, error: whitelistError } = await supabase
                             .from('whitelist')
                             .select('*')
-                            .eq('email', currentUser.email)
+                            .ilike('email', currentUser.email)
                             .single();
 
                         if (!whitelistError && whitelistData) {
@@ -147,7 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 .select()
                                 .single();
                             if (!createError) {
-                                await supabase.from('whitelist').delete().eq('email', currentUser.email);
+                                await supabase.from('whitelist').delete().ilike('email', currentUser.email);
                                 data = newProfile;
                                 error = null as any;
                             }

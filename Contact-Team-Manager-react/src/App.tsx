@@ -11,10 +11,12 @@ import { useThreads, useTeams, useUserMemberships, useUnreadCounts } from './hoo
 import { supabase } from './lib/supabase';
 import { useTheme } from './context/ThemeContext';
 import { useNotifications } from './hooks/useNotifications';
+import { useOutlookFolderWatch } from './hooks/useOutlookFolderWatch';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import './styles/style.css';
+import './styles/liquid-glass.css';
 
-import { initializeMsal, ssoLogin, setExternalAccessToken } from './lib/microsoftGraph';
+import { initializeMsal, ssoLogin, setExternalAccessToken, setExternalUserEmail } from './lib/microsoftGraph';
 
 const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
@@ -49,6 +51,7 @@ const ThemeToggle = () => {
 function App() {
   const { user, profile, session, loading: authLoading, signOut } = useAuth();
   useNotifications(); // Initialize notifications
+  useOutlookFolderWatch(); // Outlook folder polling
 
 
   const [currentTeamId, setCurrentTeamId] = useState<number | string | null>(null);
@@ -118,6 +121,8 @@ function App() {
     if (session?.provider_token) {
       console.log('[App] Reusing Supabase provider token for Microsoft Graph.');
       setExternalAccessToken(session.provider_token);
+      // メールアドレスを loginHint として保持（acquireTokenPopup で管理者同意フローを回避するために使用）
+      if (user?.email) setExternalUserEmail(user.email);
     }
     // ssoSilentはMicrosoftログインユーザーのみ試行（email/passユーザーではタイムアウトする）
     if (isMicrosoftUser && user?.email) {

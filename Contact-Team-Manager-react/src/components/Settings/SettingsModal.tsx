@@ -8,13 +8,14 @@ import type { AccountInfo } from '@azure/msal-browser';
 import { CHANGELOG } from '../../data/changelog';
 import { TagMemberEditor } from './TagMemberEditor';
 import { ImageCropModal } from '../common/ImageCropModal';
+import { OutlookWatchSettings } from './OutlookWatchSettings';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     currentTeamId: string | null;
     currentTeamName: string;
-    initialTab?: 'profile' | 'team' | 'admin' | 'team-mgmt' | 'history';
+    initialTab?: 'profile' | 'team' | 'admin' | 'team-mgmt' | 'history' | 'outlook';
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId, currentTeamName, initialTab = 'profile' }) => {
@@ -29,7 +30,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
     // Permission checks
     const { canEdit: canEditCurrentTeam, isAdmin: isGlobalAdmin } = usePermissions(currentTeamId);
-    const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history'>(initialTab as any);
+    const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history' | 'outlook'>(initialTab as any);
     const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
     const [newTagName, setNewTagName] = useState('');
 
@@ -648,6 +649,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         onClick={() => setActiveTab('history')}
                     >
                         更新履歴
+                    </button>
+                    <button
+                        className={`btn btn-sm ${activeTab === 'outlook' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ borderRadius: '8px', border: 'none' }}
+                        onClick={() => setActiveTab('outlook')}
+                    >
+                        Outlook連携
                     </button>
                 </div>
 
@@ -1583,6 +1591,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                             {renderChangelog(CHANGELOG)}
                         </div>
+                    )}
+
+                    {activeTab === 'outlook' && (
+                        <OutlookWatchSettings />
                     )}
                 </div>
             </div>
