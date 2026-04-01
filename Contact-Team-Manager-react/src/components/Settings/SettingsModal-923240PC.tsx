@@ -410,27 +410,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                 .maybeSingle();
 
             if (existingProfile) {
-                if (existingProfile.is_active) {
-                    alert('このユーザーは既にシステムに登録されています。');
-                } else {
-                    alert('このメールアドレスは既に招待済みです（ログイン待ち）。');
-                }
+                alert('このメールアドレスは既に登録されています。');
                 setIsRegistering(false);
                 return;
             }
 
             // profiles に直接インサート（仮IDを割り当て）
+            // is_active: false = SSO初回ログイン時に true に自動更新される
             const { error } = await supabase.from('profiles').insert({
-                id: crypto.randomUUID(), // 仮ID
+                id: crypto.randomUUID(),
                 email: newUserEmail,
                 display_name: newDisplayName || newUserEmail.split('@')[0],
                 role: newUserRole,
-                is_active: false // ログインするまで false
+                is_active: false
             });
 
             if (error) throw error;
 
-            alert('ユーザーを招待しました。\nログイン時に名前と権限が自動的に紐付けられます。');
+            alert('ユーザーを追加しました。\nMicrosoft SSOで初回ログイン時に自動的に有効化されます。');
             setNewUserEmail('');
             setNewDisplayName('');
             setNewUserRole('Member');
@@ -967,11 +964,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 </div>
                             </div>
 
-                            {/* --- Modern Invite Form --- */}
+                            {/* --- Add User Form --- */}
                             <div style={{ padding: '20px', background: 'linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
                                 <h4 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)' }}></span>
-                                    新規ユーザー招待
+                                    新規ユーザーを追加
                                 </h4>
                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                                     <div style={{ flex: '1 1 200px' }}>
@@ -1016,11 +1013,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                         disabled={isRegistering || !newUserEmail}
                                         style={{ height: '38px', padding: '0 20px', fontWeight: 600 }}
                                     >
-                                        {isRegistering ? '処理中...' : '招待を追加'}
+                                        {isRegistering ? '処理中...' : 'ユーザーを追加'}
                                     </button>
                                 </div>
                                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '10px', opacity: 0.7 }}>
-                                    ※招待されたユーザーは、初回ログイン時に設定した名前と権限が反映されます。
+                                    ※追加したユーザーは Microsoft SSO で初回ログイン時に自動的に有効化されます。
                                 </p>
                             </div>
 
