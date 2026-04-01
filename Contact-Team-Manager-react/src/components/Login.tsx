@@ -76,10 +76,6 @@ export const Login: React.FC = () => {
                     redirectTo: window.location.hostname.includes('github.io')
                         ? 'https://kueda-ship-it.github.io/Contact-Team-Manager/'
                         : window.location.origin,
-                    // ログアウト後は必ず Microsoft の認証画面を表示する
-                    queryParams: {
-                        prompt: 'select_account',
-                    },
                 }
             });
 
