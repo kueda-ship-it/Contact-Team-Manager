@@ -649,6 +649,51 @@ export function useUserMemberships(userId: string | undefined) {
     return { memberships, loading, refetch: fetchMemberships, updateLastRead };
 }
 
+export function usePopularTeamId(userId: string | undefined) {
+    const [popularTeamId, setPopularTeamId] = useState<string | number | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!userId) {
+            setLoading(false);
+            return;
+        }
+
+        const fetchPopularTeam = async () => {
+            setLoading(true);
+            try {
+                // Fetch distribution of posts by this user per team
+                const { data, error } = await supabase
+                    .from('threads')
+                    .select('team_id')
+                    .eq('user_id', userId);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    const counts: { [id: string]: number } = {};
+                    data.forEach(t => {
+                        const tid = String(t.team_id);
+                        counts[tid] = (counts[tid] || 0) + 1;
+                    });
+
+                    // Sort by count descending
+                    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                    setPopularTeamId(sorted[0][0]);
+                }
+            } catch (err) {
+                console.error('Error fetching popular team:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPopularTeam();
+    }, [userId]);
+
+    return { popularTeamId, loading };
+}
+
 export function useUnreadCounts(userId: string | undefined, memberships: any[]) {
     const [unreadTeams, setUnreadTeams] = useState<Set<string>>(new Set());
 

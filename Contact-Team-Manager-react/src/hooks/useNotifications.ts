@@ -89,10 +89,10 @@ export function useNotifications() {
                                 });
                             }
                         }
-                    }
 
-                    // 1度送信を試みたらフラグを立てる（重複通知防止）
-                    await supabase.from('threads').update({ reminder_sent: true }).eq('id', thread.id);
+                        // 通知対象のユーザーにのみ送信済みフラグを立てる（重複通知防止）
+                        await supabase.from('threads').update({ reminder_sent: true }).eq('id', thread.id);
+                    }
                 }
             }
         } catch (e) {
@@ -121,11 +121,18 @@ export function useNotifications() {
 
         const handleNewRecord = (payload: any, table: string) => {
             const { new: newRecord } = payload;
+            console.log(`[useNotifications] New record in ${table}:`, newRecord);
 
             // Skip if own action
-            if (newRecord.user_id === user.id) return;
+            if (newRecord.user_id === user.id) {
+                console.log('[useNotifications] Skipping: Own action');
+                return;
+            }
             // Also skip if author name matches (legacy check)
-            if (newRecord.author === (profile?.display_name || user.email)) return;
+            if (newRecord.author === (profile?.display_name || user.email)) {
+                console.log('[useNotifications] Skipping: Author name matches');
+                return;
+            }
 
             // Check if the user is mentioned via @displayName or @all
             const content = newRecord.content || '';
@@ -148,6 +155,8 @@ export function useNotifications() {
                     }
                 }
             }
+
+            console.log(`[useNotifications] Mention check: Name=${isMentionedByName}, All=${isMentionedByAll}, Tag=${isMentionedByTag}`);
 
             let title = 'Contact Team Manager';
             let body = '';

@@ -7,7 +7,7 @@ import { SettingsModal } from './components/Settings/SettingsModal';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Login';
 import { useAuth } from './hooks/useAuth';
-import { useThreads, useTeams, useUserMemberships, useUnreadCounts } from './hooks/useSupabase';
+import { useThreads, useTeams, useUserMemberships, useUnreadCounts, usePopularTeamId } from './hooks/useSupabase';
 import { supabase } from './lib/supabase';
 import { useTheme } from './context/ThemeContext';
 import { useNotifications } from './hooks/useNotifications';
@@ -18,32 +18,52 @@ import './styles/liquid-glass.css';
 
 import { initializeMsal, ssoLogin, setExternalAccessToken, setExternalUserEmail } from './lib/microsoftGraph';
 
+const THEME_META: Record<string, { title: string; icon: React.ReactNode }> = {
+  'liquid-glass': {
+    title: 'ライトモードに切り替え',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+      </svg>
+    ),
+  },
+  light: {
+    title: 'ダークモードに切り替え',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    ),
+  },
+  dark: {
+    title: 'リキッドグラスモードに切り替え',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    ),
+  },
+};
+
 const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
+  const meta = THEME_META[theme];
   return (
     <button
       onClick={toggleTheme}
       className="btn icon-btn gear-btn-unified theme-toggle-btn"
-      title={theme === 'dark' ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+      title={meta.title}
       style={{ marginRight: '8px' }}
     >
-      {theme === 'dark' ? (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-      ) : (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-      )}
+      {meta.icon}
     </button>
   );
 };
@@ -94,19 +114,22 @@ function App() {
     refetch
   };
 
+  const { popularTeamId, loading: popularLoading } = usePopularTeamId(user?.id);
+
   // Redirect non-admins to their first team if no team is selected
-  // Mobile UI improvement (2026-03-03): If no team is selected initially, force the 'teams' tab to open
+  // Priority: 1. Popular team (most posts) 2. First membership team
   useEffect(() => {
-    if (!authLoading && !membershipsLoading && user && currentTeamId === null) {
+    if (!authLoading && !membershipsLoading && !popularLoading && user && currentTeamId === null) {
       // Switch tab to 'teams' to enforce team selection first on mobile
       setActiveMobileTab('teams');
 
       if (profile?.role !== 'Admin' && memberships.length > 0) {
-        console.log('Redirecting non-admin to first team:', memberships[0].team_id);
-        setCurrentTeamId(memberships[0].team_id);
+        const teamToSet = popularTeamId || memberships[0].team_id;
+        console.log('Redirecting to default team (Popular first):', teamToSet);
+        setCurrentTeamId(teamToSet);
       }
     }
-  }, [user, profile, memberships, membershipsLoading, authLoading, currentTeamId]);
+  }, [user, profile, memberships, membershipsLoading, authLoading, popularLoading, popularTeamId, currentTeamId]);
 
   // Initialize MSAL explicitly on mount
   useEffect(() => {

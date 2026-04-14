@@ -39,13 +39,55 @@ body.light-mode {
     --glass-blur: 8px;
     --border-color: #e1e1e1;
     --bg-elevated: #ffffff;
-    --success: #107c10; /* Darker green for visibility */
+    --success: #107c10;
+    /* body 自体の背景を明示的に上書き */
+    background-color: #f0f2f5 !important;
+    color: #3c4043 !important;
+}
+
+/* ================================================================
+   Light Mode — glass を除去してフラットなライトテーマに
+   ================================================================ */
+
+/* backdrop-filter を一括除去（liquid-glass.css の !important を上書き） */
+body.light-mode header,
+body.light-mode .task-card,
+body.light-mode .task-card:hover,
+body.light-mode .teams-sidebar,
+body.light-mode .teams-sidebar:hover,
+body.light-mode .static-form-container .compact-form,
+body.light-mode .static-form-container .compact-form:focus-within,
+body.light-mode .side-panel,
+body.light-mode .side-panel .side-panel-title,
+body.light-mode .input-field,
+body.light-mode .glass-input-liquid,
+body.light-mode .compact-form .input-field,
+body.light-mode .reply-form .input-field,
+body.light-mode .modal .input-field,
+body.light-mode .static-form-container .input-field,
+body.light-mode .quick-reply-input,
+body.light-mode .quick-reply-input.rich-editor,
+body.light-mode .modal,
+body.light-mode .modal-overlay,
+body.light-mode .water-dtp-panel,
+body.light-mode .water-dtp-trigger {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 水面スペキュラーを非表示 */
+body.light-mode .task-card::before,
+body.light-mode .static-form-container .compact-form::before,
+body.light-mode .modal::before,
+body.light-mode .teams-sidebar::before {
+    display: none !important;
 }
 
 /* Specific overrides for light mode components */
 body.light-mode header {
-    background: #ffffff;
-    border-bottom: 1px solid #e1e1e1;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e1e1e1 !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
     color: #333333;
 }
 
@@ -121,6 +163,20 @@ body.light-mode .static-form-container {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+}
+
+/* コンパクトフォーム — ハードコードされた #1F1E1D を上書き */
+body.light-mode .static-form-container .compact-form {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+    border-top: 1px solid #e1e1e1 !important;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06) !important;
+    color: #3c4043 !important;
+}
+body.light-mode .static-form-container .compact-form:focus-within {
+    border-color: #c0c0e0 !important;
+    border-top-color: #c0c0e0 !important;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.10) !important;
 }
 
 body.light-mode .side-panel .task-card {
@@ -394,10 +450,19 @@ body.light-mode input::placeholder {
     color: #888888 !important;
 }
 
-/* Icons within buttons */
+/* Icons within buttons — 明示的にダーク色で上書き */
 body.light-mode button svg,
-body.light-mode .btn svg {
-    stroke: currentColor;
+body.light-mode .btn svg,
+body.light-mode .icon-btn svg,
+body.light-mode .gear-btn-unified svg,
+body.light-mode header svg,
+body.light-mode .team-settings-icon svg {
+    stroke: #3c4043 !important;
+    color: #3c4043 !important;
+}
+body.light-mode header .icon-btn,
+body.light-mode header button {
+    color: #3c4043 !important;
 }
 
 /* Sidebar submenu items */
@@ -4511,4 +4576,183 @@ body.light-mode #root a.post-link {
 
 .preview-close-btn:hover {
     background: rgba(255, 255, 255, 0.2);
+}
+
+/* ================================================================
+   Flat Dark Mode — glass を除去してフラットなダークテーマに
+   liquid-glass.css の !important を body.dark-mode の高い詳細度で上書き
+   ================================================================ */
+
+/* backdrop-filter を一括除去 */
+body.dark-mode header,
+body.dark-mode .task-card,
+body.dark-mode .task-card:hover,
+body.dark-mode .teams-sidebar,
+body.dark-mode .teams-sidebar:hover,
+body.dark-mode .static-form-container .compact-form,
+body.dark-mode .static-form-container .compact-form:focus-within,
+body.dark-mode .side-panel,
+body.dark-mode .side-panel .side-panel-title,
+body.dark-mode .input-field,
+body.dark-mode .glass-input-liquid,
+body.dark-mode .compact-form .input-field,
+body.dark-mode .reply-form .input-field,
+body.dark-mode .modal .input-field,
+body.dark-mode .static-form-container .input-field,
+body.dark-mode .quick-reply-input,
+body.dark-mode .quick-reply-input.rich-editor,
+body.dark-mode .modal,
+body.dark-mode .modal-overlay,
+body.dark-mode .water-dtp-panel,
+body.dark-mode .water-dtp-trigger {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 水面スペキュラーを非表示 */
+body.dark-mode .task-card::before,
+body.dark-mode .static-form-container .compact-form::before,
+body.dark-mode .modal::before,
+body.dark-mode .teams-sidebar::before {
+    display: none !important;
+}
+
+/* Header */
+body.dark-mode header {
+    background: #1F1E1D !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Task cards */
+body.dark-mode .task-card {
+    background: #1F1E1D !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.09) !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+    transform: none;
+}
+body.dark-mode .task-card:hover {
+    background: #2A2928 !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+    border-top-color: rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+    transform: none !important;
+}
+
+/* Teams sidebar */
+body.dark-mode .teams-sidebar {
+    background: #18171A !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: none !important;
+}
+body.dark-mode .teams-sidebar:hover {
+    background: #18171A !important;
+}
+body.dark-mode .team-list-item.active .team-item-header {
+    background: rgba(255, 255, 255, 0.10) !important;
+    box-shadow: none !important;
+}
+body.dark-mode .team-item-header:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    box-shadow: none !important;
+}
+
+/* Post form */
+body.dark-mode .static-form-container .compact-form {
+    background: #1F1E1D !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+body.dark-mode .static-form-container .compact-form:focus-within {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    border-top-color: rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Side panel */
+body.dark-mode .side-panel {
+    background: #18171A !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+body.dark-mode .side-panel .side-panel-title {
+    background: rgba(24, 23, 26, 0.97) !important;
+}
+
+/* Input fields */
+body.dark-mode .input-field,
+body.dark-mode input.glass-input-liquid,
+body.dark-mode div.glass-input-liquid,
+body.dark-mode .compact-form input.glass-input-liquid,
+body.dark-mode .compact-form div.glass-input-liquid,
+body.dark-mode .static-form-container input.glass-input-liquid,
+body.dark-mode .static-form-container div.glass-input-liquid,
+body.dark-mode .compact-form .input-field,
+body.dark-mode .reply-form .input-field,
+body.dark-mode .modal .input-field,
+body.dark-mode .side-panel .input-field,
+body.dark-mode .static-form-container .input-field {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: none !important;
+    color: #FFFFFF !important;
+}
+body.dark-mode .input-field:focus,
+body.dark-mode input.glass-input-liquid:focus,
+body.dark-mode div.glass-input-liquid:focus {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    box-shadow: none !important;
+}
+body.dark-mode .input-field::placeholder,
+body.dark-mode input.glass-input-liquid::placeholder {
+    color: rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Quick reply */
+body.dark-mode .quick-reply-input,
+body.dark-mode .quick-reply-input.rich-editor {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-top-color: rgba(255, 255, 255, 0.12) !important;
+    color: #FFFFFF !important;
+    box-shadow: none !important;
+}
+body.dark-mode .quick-reply-input:focus,
+body.dark-mode .quick-reply-input.rich-editor:focus {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    box-shadow: none !important;
+}
+
+/* Modal */
+body.dark-mode .modal {
+    background: #2A2928 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+}
+body.dark-mode .modal-overlay {
+    background: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Date time picker */
+body.dark-mode .water-dtp-panel {
+    background: #2A2928 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+body.dark-mode .water-dtp-trigger {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: none !important;
+}
+body.dark-mode .water-dtp-trigger:hover {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(255, 255, 255, 0.20) !important;
+    box-shadow: none !important;
 }
