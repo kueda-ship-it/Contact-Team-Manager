@@ -11,6 +11,7 @@ import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
 import { LinkPreview } from '../common/LinkPreview';
+import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
 
 // Helper component for auto-refreshing images
 const ThreadImage: React.FC<{ 
@@ -146,7 +147,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     // Using a simple object to manage attachments per reply form
     const [replyAttachments, setReplyAttachments] = React.useState<{ [key: string]: Attachment[] }>({});
     const [replyUploading, setReplyUploading] = React.useState<{ [key: string]: boolean }>({});
-    const [remindInput, setRemindInput] = React.useState<{ threadId: string, remindAt: string } | null>(null);
+    // リマインド編集パネル: threadId -> リマインド行リスト
+    const [remindPanel, setRemindPanel] = React.useState<{
+        threadId: string;
+        rows: { id: string | null; value: string }[];
+    } | null>(null);
+    const [remindSaving, setRemindSaving] = React.useState(false);
     const [replyPendingFiles, setReplyPendingFiles] = React.useState<{ [key: string]: { id: string, file: File, previewUrl: string }[] }>({});
     const [expandedThreads, setExpandedThreads] = React.useState<Set<string>>(new Set());
     const [needsExpandMap, setNeedsExpandMap] = React.useState<{ [key: string]: boolean }>({});
@@ -403,14 +409,48 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         }
     };
 
-    const handleSaveRemind = async (threadId: string, remindAt: string) => {
-        const formattedDate = remindAt ? new Date(remindAt).toISOString() : null;
-        const { error } = await supabase.from('threads').update({ remind_at: formattedDate, reminder_sent: false }).eq('id', threadId);
-        if (error) {
-            alert('リマインドの設定に失敗しました: ' + error.message);
-        } else {
-            setRemindInput(null);
-            refetch(true); // スレッド一覧を再取得
+    // thread_reminders テーブルから対象スレッドのリマインドを取得してパネルを開く
+    const openRemindPanel = async (threadId: string) => {
+        const { data } = await supabase
+            .from('thread_reminders')
+            .select('id, remind_at')
+            .eq('thread_id', threadId)
+            .order('remind_at', { ascending: true });
+        const rows = (data || []).map((r: any) => {
+            const d = new Date(r.remind_at);
+            const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+                .toISOString().slice(0, 16);
+            return { id: r.id, value: local };
+        });
+        setRemindPanel({ threadId, rows: rows.length > 0 ? rows : [{ id: null, value: '' }] });
+    };
+
+    const handleSaveRemindPanel = async () => {
+        if (!remindPanel) return;
+        setRemindSaving(true);
+        try {
+            const { threadId, rows } = remindPanel;
+            const validRows = rows.filter(r => r.value.trim() !== '');
+
+            // 既存行を一括削除して再 insert（シンプルな差分なし戦略）
+            const { error: deleteError } = await supabase.from('thread_reminders').delete().eq('thread_id', threadId);
+            if (deleteError) throw deleteError;
+            if (validRows.length > 0) {
+                const { error: insertError } = await supabase.from('thread_reminders').insert(
+                    validRows.map(r => ({
+                        thread_id: threadId,
+                        remind_at: new Date(r.value).toISOString(),
+                        reminder_sent: false,
+                    }))
+                );
+                if (insertError) throw insertError;
+            }
+            setRemindPanel(null);
+            refetch(true);
+        } catch (e: any) {
+            alert('リマインドの保存に失敗しました: ' + e.message);
+        } finally {
+            setRemindSaving(false);
         }
     };
 
@@ -849,17 +889,15 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     </span> 削除
                                                 </div>
                                                 <div className="menu-item" onClick={() => {
-                                                    // Initialize with current remind_at if exists
-                                                    const currentVal = thread.remind_at ? new Date(thread.remind_at - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
                                                     setOpenMenuId(null);
-                                                    setRemindInput({ threadId: thread.id, remindAt: currentVal });
+                                                    openRemindPanel(thread.id);
                                                 }}>
                                                     <span className="menu-icon">
                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                             <circle cx="12" cy="12" r="10"></circle>
                                                             <polyline points="12 6 12 12 16 14"></polyline>
                                                         </svg>
-                                                    </span> リマインド
+                                                    </span> リマインド編集
                                                 </div>
                                                 {['Admin'].includes(currentProfile?.role || '') && (
                                                     <div className="menu-item move-team-item" onClick={(e) => e.stopPropagation()}>
@@ -902,51 +940,93 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                             </div>
                                             <div className="status-dot active"></div>
                                         </div>
-                                        <div className="task-author-info">
-                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                                <span className="author-name">{thread.author}</span>
-                                                <span className="thread-date" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                    {formatDate(thread.created_at)}
-                                                </span>
-                                            </div>
+                                        <div className="task-author-info" style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: '8px' }}>
+                                            <span className="author-name">{thread.author}</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                {formatDate(thread.created_at)}
+                                            </span>
+                                            {(() => {
+                                                const now = new Date().toISOString();
+                                                const upcoming = (thread.reminders || [])
+                                                    .filter((r: any) => r.remind_at > now)
+                                                    .sort((a: any, b: any) => a.remind_at.localeCompare(b.remind_at));
+                                                return upcoming.map((r: any) => (
+                                                    <span key={r.id} style={{ fontSize: '0.72rem', color: 'var(--accent)', background: 'rgba(0,210,255,0.07)', border: '1px solid rgba(0,210,255,0.2)', borderRadius: '4px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                                        </svg>
+                                                        {new Date(r.remind_at).toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                ));
+                                            })()}
                                         </div>
                                     </div>
                                 </div>
 
-                                {thread.remind_at && (
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--accent)', marginTop: '-8px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <span style={{ display: 'flex', alignItems: 'center' }}>
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <circle cx="12" cy="12" r="10"></circle>
-                                                <polyline points="12 6 12 12 16 14"></polyline>
-                                            </svg>
-                                        </span> リマインド: {new Date(thread.remind_at).toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                    </div>
-                                )}
 
-                                {remindInput && remindInput.threadId === thread.id && (
-                                    <div style={{ padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '10px' }}>
-                                        <div style={{ fontSize: '0.8rem', marginBottom: '5px' }}>リマインド日時設定</div>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <input
-                                                type="datetime-local"
-                                                className="input-field"
-                                                value={remindInput.remindAt}
-                                                onChange={(e) => remindInput && setRemindInput({ ...remindInput, remindAt: e.target.value })}
-                                                style={{ flex: 1, margin: 0 }}
-                                            />
+                                {remindPanel && remindPanel.threadId === thread.id && (
+                                    <div style={{ padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                            </svg>
+                                            リマインド設定
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            {remindPanel.rows.map((row, idx) => (
+                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <WaterDateTimePicker
+                                                        value={row.value}
+                                                        onChange={(v) => setRemindPanel(prev => prev ? {
+                                                            ...prev,
+                                                            rows: prev.rows.map((r, i) => i === idx ? { ...r, value: v } : r)
+                                                        } : null)}
+                                                        disabled={remindSaving}
+                                                        title={`リマインド ${idx + 1}`}
+                                                    />
+                                                    {remindPanel.rows.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setRemindPanel(prev => prev ? {
+                                                                ...prev,
+                                                                rows: prev.rows.filter((_, i) => i !== idx)
+                                                            } : null)}
+                                                            style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.7)', cursor: 'pointer', fontSize: '16px', padding: '0 2px' }}
+                                                            title="削除"
+                                                        >×</button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {/* ➕ 枠付きボタン */}
                                             <button
-                                                className="btn btn-primary"
-                                                style={{ padding: '0 12px' }}
-                                                onClick={() => remindInput && handleSaveRemind(thread.id, remindInput.remindAt)}
+                                                type="button"
+                                                onClick={() => setRemindPanel(prev => prev ? { ...prev, rows: [...prev.rows, { id: null, value: '' }] } : null)}
+                                                style={{
+                                                    background: 'rgba(100,180,255,0.1)',
+                                                    border: '1px solid rgba(100,180,255,0.35)',
+                                                    borderRadius: '6px',
+                                                    color: 'rgba(150,210,255,0.9)',
+                                                    cursor: 'pointer',
+                                                    fontSize: '14px',
+                                                    padding: '3px 10px',
+                                                    alignSelf: 'flex-start',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                }}
+                                                title="リマインドを追加"
                                             >
-                                                保存
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                                                </svg>
+                                                追加
                                             </button>
-                                            <button
-                                                className="btn btn-secondary"
-                                                style={{ padding: '0 12px' }}
-                                                onClick={() => setRemindInput(null)}
-                                            >
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                                            <button className="btn btn-primary" style={{ padding: '4px 14px', fontSize: '0.8rem' }} onClick={handleSaveRemindPanel} disabled={remindSaving}>
+                                                {remindSaving ? '保存中...' : '保存'}
+                                            </button>
+                                            <button className="btn btn-secondary" style={{ padding: '4px 14px', fontSize: '0.8rem' }} onClick={() => setRemindPanel(null)} disabled={remindSaving}>
                                                 キャンセル
                                             </button>
                                         </div>

@@ -79,6 +79,7 @@ interface Thread {
     user_id: string;
     remind_at?: string | null;
     reminder_sent?: boolean;
+    reminders?: { id: string; remind_at: string; reminder_sent: boolean }[];
 }
 
 export function useThreads(
@@ -112,7 +113,8 @@ export function useThreads(
                 .from('threads')
                 .select(`
                   *,
-                  replies:replies(*)
+                  replies:replies(*),
+                  reminders:thread_reminders(id, remind_at, reminder_sent)
                 `);
 
             if (isSearching) {
