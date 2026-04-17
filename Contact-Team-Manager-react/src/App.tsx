@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TeamsSidebar } from './components/Sidebar/TeamsSidebar';
 import { RightSidebar } from './components/Sidebar/RightSidebar';
 import { ThreadList } from './components/Feed/ThreadList';
@@ -166,60 +166,86 @@ function App() {
     }
   }, [currentTeamId]);
 
+  // Pending thread navigation (set by both SW message and ?thread=ID URL handlers).
+  // A separate effect drains this once threads/auth are ready, avoiding stale-closure issues.
+  const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
+
   // Handle postMessage from SW notificationclick (existing window case)
   useEffect(() => {
-    if (!user) return;
     const handleSwMessage = (event: MessageEvent) => {
       if (event.data?.type === 'notification-click') {
         try {
           const params = new URLSearchParams(new URL(event.data.url).search);
           const threadId = params.get('thread');
-          if (threadId) handleSidebarThreadClick(threadId);
-        } catch {
-          // ignore malformed URL
+          if (threadId) {
+            console.log('[App] Notification click → navigating to thread:', threadId);
+            setPendingThreadId(threadId);
+          }
+        } catch (e) {
+          console.warn('[App] Failed to parse notification URL:', e);
         }
       }
     };
     navigator.serviceWorker?.addEventListener('message', handleSwMessage);
     return () => navigator.serviceWorker?.removeEventListener('message', handleSwMessage);
-  }, [user]);
+  }, []);
 
-  // Handle ?thread=ID query parameter from notifications
+  // Handle ?thread=ID query parameter from notifications (new-window case)
+  const initialThreadConsumedRef = useRef(false);
   useEffect(() => {
+    if (initialThreadConsumedRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const threadId = params.get('thread');
-    if (threadId && !authLoading && user) {
-      // Find the thread and its team
-      const findAndNavigate = async () => {
-        // If thread is already in rawThreads, we can find its team_id
-        const loadedThread = rawThreads.find(t => t.id === threadId);
-        if (loadedThread) {
-          if (String(loadedThread.team_id) !== String(currentTeamId)) {
-            setCurrentTeamId(loadedThread.team_id);
-          }
-          handleSidebarThreadClick(threadId);
-          // Clear param from URL to avoid repeated navigation
-          const newUrl = window.location.pathname + window.location.hash;
-          window.history.replaceState({}, '', newUrl);
-        } else {
-          // If not loaded, we might need to fetch it to know the team
-          const { data } = await supabase.from('threads').select('team_id').eq('id', threadId).single();
-          if (data) {
-            if (String(data.team_id) !== String(currentTeamId)) {
-              setCurrentTeamId(data.team_id);
-            }
-            // Give it a moment to load threads for the new team
-            setTimeout(() => {
-              handleSidebarThreadClick(threadId);
-              const newUrl = window.location.pathname + window.location.hash;
-              window.history.replaceState({}, '', newUrl);
-            }, 500);
-          }
-        }
-      };
-      findAndNavigate();
+    if (threadId) {
+      initialThreadConsumedRef.current = true;
+      console.log('[App] ?thread= URL param → queuing navigation:', threadId);
+      setPendingThreadId(threadId);
+      const newUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
     }
-  }, [authLoading, user, rawThreads]);
+  }, []);
+
+  // Drain pending navigation once auth is ready. Resolves team via DB if needed,
+  // switches team, then sets scroll target. Uses live state to avoid stale closures.
+  useEffect(() => {
+    if (!pendingThreadId || authLoading || !user) return;
+
+    let cancelled = false;
+    const navigate = async () => {
+      const threadId = pendingThreadId;
+      console.log('[App] Resolving pending thread navigation:', threadId);
+
+      let targetTeamId: string | number | null = null;
+      const loaded = rawThreads.find(t => t.id === threadId);
+      if (loaded) {
+        targetTeamId = loaded.team_id;
+      } else {
+        const { data, error } = await supabase
+          .from('threads')
+          .select('team_id')
+          .eq('id', threadId)
+          .single();
+        if (error || !data) {
+          console.warn('[App] Thread not found:', threadId, error);
+          if (!cancelled) setPendingThreadId(null);
+          return;
+        }
+        targetTeamId = data.team_id;
+      }
+      if (cancelled) return;
+
+      setViewMode('feed');
+      setStatusFilter('all');
+      setActiveMobileTab('feed');
+      if (String(targetTeamId) !== String(currentTeamId)) {
+        setCurrentTeamId(targetTeamId);
+      }
+      setScrollToThreadId(threadId);
+      setPendingThreadId(null);
+    };
+    navigate();
+    return () => { cancelled = true; };
+  }, [pendingThreadId, authLoading, user]);
 
   // Title flashing for unread messages
   useEffect(() => {
@@ -304,7 +330,7 @@ function App() {
 
         <div className="user-profile">
           <ThemeToggle />
-          <NotificationBell onNotificationClick={handleSidebarThreadClick} />
+          <NotificationBell onNotificationClick={(threadId) => setPendingThreadId(threadId)} />
           <button
             className="btn icon-btn gear-btn-unified"
             onClick={() => setIsSettingsOpen(true)}
