@@ -218,17 +218,38 @@ export function useNotifications() {
             let url = '/';
             const isMentioned = isMentionedByName || isMentionedByAll || isMentionedByTag;
 
+            // 通知本文用にテキストを整形（メンション記号や改行を整理して短縮）
+            const formatBody = (text: string): string => {
+                const cleaned = (text || '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                return cleaned.length > 120 ? cleaned.slice(0, 120) + '…' : cleaned;
+            };
+
+            const mentionPrefix = isMentioned ? '📢 ' : '';
+            const authorLabel = newRecord.author ? `${newRecord.author}: ` : '';
+
             if (table === 'threads') {
-                title = isMentioned ? `📢 メンションされました` : `新しい投稿: ${newRecord.title}`;
-                body = isMentioned
-                    ? `${newRecord.author}さんがあなたをメンションしました: ${newRecord.title}`
-                    : `${newRecord.author}さんが新しい投稿を作成しました`;
+                // 新規投稿: スレッドタイトル（件名＋物件名）と本文を通知に表示
+                const threadTitle = newRecord.title || '新しい投稿';
+                title = `${mentionPrefix}${threadTitle}`;
+                body = `${authorLabel}${formatBody(content)}`;
                 url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.id}`;
             } else if (table === 'replies') {
-                title = isMentioned ? `📢 返信でメンションされました` : `新しい返信`;
-                body = isMentioned
-                    ? `${newRecord.author}さんがあなたをメンションしました`
-                    : `${newRecord.author}さんが返信しました`;
+                // 返信: 親スレッドのタイトルを取得して通知に表示
+                let threadTitle = '新しい返信';
+                try {
+                    const { data: parentThread } = await supabase
+                        .from('threads')
+                        .select('title')
+                        .eq('id', newRecord.thread_id)
+                        .single();
+                    if (parentThread?.title) threadTitle = parentThread.title;
+                } catch (e) {
+                    console.warn('[useNotifications] Failed to fetch parent thread title:', e);
+                }
+                title = `${mentionPrefix}${threadTitle}`;
+                body = `${authorLabel}${formatBody(content)}`;
                 url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.thread_id}`;
             }
 
