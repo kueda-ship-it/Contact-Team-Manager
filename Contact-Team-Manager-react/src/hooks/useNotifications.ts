@@ -86,9 +86,25 @@ export function useNotifications() {
 
     const checkReminders = useCallback(async () => {
         if (!user) return;
+        // ユーザーごとに通知済みリマインドIDを localStorage で管理
+        // （thread_reminders は user_id を持たないため、グローバルな reminder_sent
+        //   だけだと他ユーザーの未通知分まで「送信済み」にしてしまう）
+        const seenKey = `seen_reminder_ids_${user.id}`;
+        let seenIds: Set<string>;
+        try {
+            const raw = localStorage.getItem(seenKey);
+            seenIds = new Set(raw ? JSON.parse(raw) : []);
+        } catch {
+            seenIds = new Set();
+        }
+        const persistSeen = () => {
+            try {
+                localStorage.setItem(seenKey, JSON.stringify(Array.from(seenIds)));
+            } catch { /* quota exceeded などは無視 */ }
+        };
+
         try {
             const now = new Date().toISOString();
-            // thread_reminders テーブルから未送信のリマインドを取得
             const { data: reminders, error } = await supabase
                 .from('thread_reminders')
                 .select('*, thread:threads(*)')
@@ -102,17 +118,17 @@ export function useNotifications() {
 
             if (reminders && reminders.length > 0) {
                 for (const reminder of reminders) {
+                    if (seenIds.has(reminder.id)) continue;
+
                     const thread = reminder.thread;
                     if (!thread) continue;
 
-                    // チームの通知設定を確認
                     if (!isTeamNotifEnabled(thread.team_id)) continue;
 
-                    let isTarget = false;
+                    const isCreator = thread.user_id === user.id;
+                    let isTarget = isCreator;
 
-                    if (thread.user_id === user.id) {
-                        isTarget = true;
-                    } else {
+                    if (!isCreator) {
                         const content = thread.content || '';
                         const myDisplayName = profile?.display_name || '';
                         const isMentionedByName = myDisplayName && content.includes(`@${myDisplayName}`);
@@ -138,7 +154,7 @@ export function useNotifications() {
 
                     if (isTarget) {
                         const title = `⏰ リマインド: ${thread.title}`;
-                        const body = thread.user_id === user.id
+                        const body = isCreator
                             ? 'あなたが設定したリマインドです'
                             : 'メンションされたリマインドです';
                         const url = `${window.location.origin}/Contact-Team-Manager/?thread=${thread.id}`;
@@ -146,9 +162,16 @@ export function useNotifications() {
                         await showNotification(title, body, url, `reminder-${reminder.id}`);
                     }
 
-                    // reminder_sent を true に更新（対象外でも送信済みにする）
-                    await supabase.from('thread_reminders').update({ reminder_sent: true }).eq('id', reminder.id);
+                    // 評価済みとして自分の localStorage に記録（対象外でも記録して再評価を防ぐ）
+                    seenIds.add(reminder.id);
+
+                    // グローバルな reminder_sent は創作者のみが更新（クリーンアップ用）
+                    // メンション対象者が更新すると他ユーザーが通知を受け取れなくなるため
+                    if (isCreator) {
+                        await supabase.from('thread_reminders').update({ reminder_sent: true }).eq('id', reminder.id);
+                    }
                 }
+                persistSeen();
             }
         } catch (e) {
             console.error('Reminder check error:', e);
@@ -218,17 +241,38 @@ export function useNotifications() {
             let url = '/';
             const isMentioned = isMentionedByName || isMentionedByAll || isMentionedByTag;
 
+            // 通知本文用にテキストを整形（メンション記号や改行を整理して短縮）
+            const formatBody = (text: string): string => {
+                const cleaned = (text || '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                return cleaned.length > 120 ? cleaned.slice(0, 120) + '…' : cleaned;
+            };
+
+            const mentionPrefix = isMentioned ? '📢 ' : '';
+            const authorLabel = newRecord.author ? `${newRecord.author}: ` : '';
+
             if (table === 'threads') {
-                title = isMentioned ? `📢 メンションされました` : `新しい投稿: ${newRecord.title}`;
-                body = isMentioned
-                    ? `${newRecord.author}さんがあなたをメンションしました: ${newRecord.title}`
-                    : `${newRecord.author}さんが新しい投稿を作成しました`;
+                // 新規投稿: スレッドタイトル（件名＋物件名）と本文を通知に表示
+                const threadTitle = newRecord.title || '新しい投稿';
+                title = `${mentionPrefix}${threadTitle}`;
+                body = `${authorLabel}${formatBody(content)}`;
                 url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.id}`;
             } else if (table === 'replies') {
-                title = isMentioned ? `📢 返信でメンションされました` : `新しい返信`;
-                body = isMentioned
-                    ? `${newRecord.author}さんがあなたをメンションしました`
-                    : `${newRecord.author}さんが返信しました`;
+                // 返信: 親スレッドのタイトルを取得して通知に表示
+                let threadTitle = '新しい返信';
+                try {
+                    const { data: parentThread } = await supabase
+                        .from('threads')
+                        .select('title')
+                        .eq('id', newRecord.thread_id)
+                        .single();
+                    if (parentThread?.title) threadTitle = parentThread.title;
+                } catch (e) {
+                    console.warn('[useNotifications] Failed to fetch parent thread title:', e);
+                }
+                title = `${mentionPrefix}${threadTitle}`;
+                body = `${authorLabel}${formatBody(content)}`;
                 url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.thread_id}`;
             }
 
