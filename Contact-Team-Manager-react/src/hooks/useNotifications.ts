@@ -258,12 +258,30 @@ export function useNotifications() {
             let url = '/';
             const isMentioned = isMentionedByName || isMentionedByAll || isMentionedByTag;
 
-            // 通知本文用にテキストを整形（メンション記号や改行を整理して短縮）
+            // 通知本文用にテキストを整形（HTMLタグ・エンティティ・改行を除去して短縮）
             const formatBody = (text: string): string => {
-                const cleaned = (text || '')
-                    .replace(/\s+/g, ' ')
-                    .trim();
-                return cleaned.length > 120 ? cleaned.slice(0, 120) + '…' : cleaned;
+                if (!text) return '';
+                // ブロック要素を改行に変換してから全タグを除去
+                let s = text
+                    .replace(/<br\s*\/?>/gi, ' ')
+                    .replace(/<\/(div|p|li)>/gi, ' ')
+                    .replace(/<[^>]+>/g, '');
+                // HTMLエンティティをデコード（&nbsp; &amp; &lt; &gt; &quot; &#39; など）
+                if (typeof DOMParser !== 'undefined') {
+                    try {
+                        const doc = new DOMParser().parseFromString(s, 'text/html');
+                        s = doc.documentElement.textContent || s;
+                    } catch { /* ignore */ }
+                } else {
+                    s = s.replace(/&nbsp;/g, ' ')
+                        .replace(/&amp;/g, '&')
+                        .replace(/&lt;/g, '<')
+                        .replace(/&gt;/g, '>')
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#39;/g, "'");
+                }
+                s = s.replace(/\s+/g, ' ').trim();
+                return s.length > 120 ? s.slice(0, 120) + '…' : s;
             };
 
             const mentionPrefix = isMentioned ? '📢 ' : '';
