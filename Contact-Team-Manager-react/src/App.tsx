@@ -165,6 +165,24 @@ function App() {
     }
   }, [currentTeamId]);
 
+  // Handle postMessage from SW notificationclick (existing window case)
+  useEffect(() => {
+    if (!user) return;
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'notification-click') {
+        try {
+          const params = new URLSearchParams(new URL(event.data.url).search);
+          const threadId = params.get('thread');
+          if (threadId) handleSidebarThreadClick(threadId);
+        } catch {
+          // ignore malformed URL
+        }
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handleSwMessage);
+    return () => navigator.serviceWorker?.removeEventListener('message', handleSwMessage);
+  }, [user]);
+
   // Handle ?thread=ID query parameter from notifications
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
