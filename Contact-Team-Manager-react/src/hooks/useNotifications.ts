@@ -27,7 +27,24 @@ async function showNotification(title: string, body: string, url: string, tag: s
     }
 
     try {
-        new Notification(title, { body, icon: '/favicon-v2.png' });
+        const n = new Notification(title, { body, icon: '/favicon-v2.png', data: { url } });
+        n.onclick = (e) => {
+            e.preventDefault();
+            window.focus();
+            try {
+                const params = new URLSearchParams(new URL(url).search);
+                const threadId = params.get('thread');
+                if (threadId) {
+                    // SW notificationclick と同じ経路で App.tsx に渡す
+                    window.postMessage({ type: 'notification-click', url }, window.location.origin);
+                } else {
+                    window.location.href = url;
+                }
+            } catch {
+                window.location.href = url;
+            }
+            n.close();
+        };
     } catch (e) {
         console.error('[useNotifications] Failed to show notification:', e);
     }

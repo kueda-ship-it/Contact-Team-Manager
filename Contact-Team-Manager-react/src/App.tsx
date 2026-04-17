@@ -171,8 +171,9 @@ function App() {
   const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
 
   // Handle postMessage from SW notificationclick (existing window case)
+  // または native Notification フォールバック onclick からの window.postMessage
   useEffect(() => {
-    const handleSwMessage = (event: MessageEvent) => {
+    const handleNotificationClickMessage = (event: MessageEvent) => {
       if (event.data?.type === 'notification-click') {
         try {
           const params = new URLSearchParams(new URL(event.data.url).search);
@@ -186,8 +187,12 @@ function App() {
         }
       }
     };
-    navigator.serviceWorker?.addEventListener('message', handleSwMessage);
-    return () => navigator.serviceWorker?.removeEventListener('message', handleSwMessage);
+    navigator.serviceWorker?.addEventListener('message', handleNotificationClickMessage);
+    window.addEventListener('message', handleNotificationClickMessage);
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleNotificationClickMessage);
+      window.removeEventListener('message', handleNotificationClickMessage);
+    };
   }, []);
 
   // Handle ?thread=ID query parameter from notifications (new-window case)
