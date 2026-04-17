@@ -13,6 +13,7 @@ import { useTheme } from './context/ThemeContext';
 import { useNotifications } from './hooks/useNotifications';
 import { useOutlookFolderWatch } from './hooks/useOutlookFolderWatch';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
+import { NotificationBell } from './components/common/NotificationBell';
 import './styles/style.css';
 import './styles/liquid-glass.css';
 
@@ -303,6 +304,7 @@ function App() {
 
         <div className="user-profile">
           <ThemeToggle />
+          <NotificationBell onNotificationClick={handleSidebarThreadClick} />
           <button
             className="btn icon-btn gear-btn-unified"
             onClick={() => setIsSettingsOpen(true)}
