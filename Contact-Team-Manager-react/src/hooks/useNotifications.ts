@@ -7,14 +7,23 @@ import { useNotificationContext } from '../context/NotificationContext';
 const RECONNECT_DELAY_MS = 5000;
 
 async function showNotification(title: string, body: string, url: string, tag: string) {
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    if (typeof Notification === 'undefined') {
+        console.warn('[useNotifications] Notification API unavailable');
+        return;
+    }
+    if (Notification.permission !== 'granted') {
+        console.warn('[useNotifications] Notification permission not granted:', Notification.permission);
+        return;
+    }
 
     const options: NotificationOptions = {
         body,
         icon: '/favicon-v2.png',
         data: { url },
         tag,
-    };
+        // 同じ tag でも毎回ポップアップさせる（既定 false だとサイレントに置き換わる）
+        renotify: true,
+    } as NotificationOptions & { renotify?: boolean };
 
     if ('serviceWorker' in navigator) {
         try {
@@ -320,7 +329,9 @@ export function useNotifications() {
                 type: isMentioned ? 'mention' : 'new-message'
             });
 
-            await showNotification(title, body, url, isMentioned ? 'mention' : 'new-message');
+            // tag は record id ベースで一意化（同じスレッドへの返信が連続しても個別に通知）
+            const tagId = `${table}-${newRecord.id}`;
+            await showNotification(title, body, url, tagId);
         };
 
         const subscribe = () => {
