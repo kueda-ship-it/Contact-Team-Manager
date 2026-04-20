@@ -1,0 +1,342 @@
+/* ============================================================================
+   Settings modal — calm skeleton, token-driven. Scoped under body.ctm-v2.
+   Replaces the legacy liquid-glass modal chrome with a flat operator surface
+   that matches the shell (header + sidebar).
+   ============================================================================ */
+
+body.ctm-v2 .ctm-settings-overlay {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: var(--space-4) !important;
+  background: color-mix(in oklch, var(--surface-base) 70%, black 30%) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+body.ctm-v2 .ctm-settings-modal {
+  background: var(--surface-raised) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: var(--space-5) !important;
+  /* Fixed frame — dimensions do not change per tab. */
+  width: min(960px, 96vw) !important;
+  height: min(720px, 88vh) !important;
+  max-height: 88vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* ---------- Head ---------------------------------------------------------- */
+body.ctm-v2 .ctm-settings-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: var(--space-4) !important;
+  padding-bottom: var(--space-3) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+/* No gradient text — plain primary token, display font for structure */
+body.ctm-v2 .ctm-settings-title {
+  margin: 0 !important;
+  font-family: var(--font-display) !important;
+  font-size: var(--text-xl) !important;
+  font-weight: var(--weight-semibold) !important;
+  letter-spacing: var(--tracking-tight) !important;
+  color: var(--text-primary) !important;
+  background: none !important;
+  -webkit-text-fill-color: initial !important;
+}
+
+body.ctm-v2 .ctm-settings-close {
+  width: 32px !important;
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-md) !important;
+  cursor: pointer !important;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out) !important;
+}
+
+body.ctm-v2 .ctm-settings-close:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+body.ctm-v2 .ctm-settings-close:focus-visible {
+  outline: none !important;
+  box-shadow: var(--focus-ring) !important;
+  border-color: var(--border-focus) !important;
+}
+
+/* ---------- Tabs ---------------------------------------------------------- */
+/* Segmented look — quiet frame, active tab owns the emphasis. */
+body.ctm-v2 .ctm-settings-tabs {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 2px !important;
+  margin-bottom: var(--space-4) !important;
+  padding: var(--space-1) !important;
+  background: var(--surface-sunken) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  flex-shrink: 0 !important;
+}
+
+body.ctm-v2 .ctm-settings-tab {
+  flex: 1 1 auto !important;
+  min-height: 32px !important;
+  padding: 6px 12px !important;
+  border-radius: var(--radius-sm) !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  font-family: var(--font-body) !important;
+  font-size: var(--text-sm) !important;
+  font-weight: var(--weight-medium) !important;
+  letter-spacing: var(--tracking-normal) !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out) !important;
+}
+
+body.ctm-v2 .ctm-settings-tab:hover:not(:disabled):not(.is-active) {
+  background: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+body.ctm-v2 .ctm-settings-tab.is-active {
+  background: var(--surface-raised) !important;
+  color: var(--text-primary) !important;
+  font-weight: var(--weight-semibold) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+body.ctm-v2 .ctm-settings-tab:disabled {
+  color: var(--text-disabled) !important;
+  cursor: not-allowed !important;
+}
+
+body.ctm-v2 .ctm-settings-tab:focus-visible {
+  outline: none !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* ---------- Inputs inside the modal -------------------------------------- */
+body.ctm-v2 .ctm-settings-modal .input-field,
+body.ctm-v2 .ctm-settings-modal input[type="text"],
+body.ctm-v2 .ctm-settings-modal input[type="email"],
+body.ctm-v2 .ctm-settings-modal input[type="password"],
+body.ctm-v2 .ctm-settings-modal input[type="search"],
+body.ctm-v2 .ctm-settings-modal select,
+body.ctm-v2 .ctm-settings-modal textarea {
+  background: var(--surface-sunken) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 8px 12px !important;
+  font-family: var(--font-body) !important;
+  font-size: var(--text-base) !important;
+  line-height: var(--leading-normal) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out) !important;
+}
+
+body.ctm-v2 .ctm-settings-modal .input-field:hover,
+body.ctm-v2 .ctm-settings-modal input:hover,
+body.ctm-v2 .ctm-settings-modal textarea:hover {
+  border-color: var(--border-default) !important;
+}
+
+body.ctm-v2 .ctm-settings-modal .input-field:focus,
+body.ctm-v2 .ctm-settings-modal input:focus,
+body.ctm-v2 .ctm-settings-modal textarea:focus,
+body.ctm-v2 .ctm-settings-modal select:focus {
+  outline: none !important;
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 28%, transparent) !important;
+}
+
+body.ctm-v2 .ctm-settings-modal label {
+  display: block !important;
+  margin-bottom: 6px !important;
+  font-size: var(--text-sm) !important;
+  color: var(--text-secondary) !important;
+  font-weight: var(--weight-medium) !important;
+}
+
+/* Primary button inside the modal — use accent, solid, no glow. */
+body.ctm-v2 .ctm-settings-modal .btn.btn-primary {
+  background: var(--accent) !important;
+  color: var(--on-accent, #00231f) !important;
+  border: 1px solid var(--accent) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 8px 16px !important;
+  font-weight: var(--weight-semibold) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out) !important;
+}
+body.ctm-v2 .ctm-settings-modal .btn.btn-primary:hover {
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+  box-shadow: none !important;
+}
+
+body.ctm-v2 .ctm-settings-modal .btn.btn-outline {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out) !important;
+}
+body.ctm-v2 .ctm-settings-modal .btn.btn-outline:hover {
+  background: var(--surface-hover) !important;
+  border-color: var(--border-strong) !important;
+}
+
+/* Content area — soften the hard-coded panels used by existing tabs. */
+body.ctm-v2 .ctm-settings-modal hr {
+  border: 0 !important;
+  border-top: 1px solid var(--border-subtle) !important;
+  margin: var(--space-3) 0 !important;
+}
+
+/* The legacy panels use rgba backgrounds — tokenize those too. */
+body.ctm-v2 .ctm-settings-modal [style*="background: rgba(255,255,255,0.03)"],
+body.ctm-v2 .ctm-settings-modal [style*="background: rgba(0,0,0,0.2)"],
+body.ctm-v2 .ctm-settings-modal [style*="background:rgba(255,255,255,0.03)"],
+body.ctm-v2 .ctm-settings-modal [style*="background:rgba(0,0,0,0.2)"] {
+  background: var(--surface-sunken) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+/* Scrollable body of the modal */
+body.ctm-v2 .ctm-settings-modal > div[style*="overflow"] {
+  padding-right: var(--space-2) !important;
+}
+
+/* ---------- Panel + field primitives (used by refreshed admin tab) ------- */
+body.ctm-v2 .ctm-settings-panel {
+  padding: var(--space-4) !important;
+  background: var(--surface-sunken) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.ctm-v2 .ctm-settings-panel-title {
+  margin: 0 0 var(--space-3) 0 !important;
+  font-family: var(--font-body) !important;
+  font-size: var(--text-sm) !important;
+  font-weight: var(--weight-semibold) !important;
+  color: var(--text-primary) !important;
+  letter-spacing: var(--tracking-normal) !important;
+  text-transform: none !important;
+  background: none !important;
+  -webkit-text-fill-color: initial !important;
+}
+
+/* 新規ユーザー追加: 3 フィールドを必ず横一列・等幅で並べる。
+   ボタンは下段に落として、3 フィールド間の整合を最優先。 */
+body.ctm-v2 .ctm-user-add-row {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr !important;
+  column-gap: var(--space-3) !important;
+  row-gap: var(--space-3) !important;
+  align-items: end !important;
+}
+
+/* ボタンは grid の全列に渡って下段に */
+body.ctm-v2 .ctm-user-add-row > .ctm-field-action {
+  grid-column: 1 / -1 !important;
+  justify-self: start !important;
+}
+
+@media (max-width: 640px) {
+  body.ctm-v2 .ctm-user-add-row {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* CustomSelect 内部の inline width:200px を剥がす */
+body.ctm-v2 .ctm-user-add-row .custom-select-container {
+  width: 100% !important;
+}
+
+body.ctm-v2 .ctm-settings-help {
+  margin: var(--space-3) 0 0 0 !important;
+  font-size: var(--text-xs) !important;
+  color: var(--text-muted) !important;
+  line-height: var(--leading-normal) !important;
+}
+
+/* レガシー互換 (既存コード用) */
+body.ctm-v2 .ctm-user-add-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr !important;
+  gap: var(--space-3) !important;
+  align-items: end !important;
+}
+
+body.ctm-v2 .ctm-field {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+}
+
+body.ctm-v2 .ctm-field > label {
+  display: block !important;
+  height: 18px !important;          /* ← ラベル行の高さを固定して横位置を揃える */
+  margin: 0 0 6px 0 !important;
+  font-size: var(--text-xs) !important;
+  color: var(--text-secondary) !important;
+  font-weight: var(--weight-medium) !important;
+  line-height: 18px !important;
+}
+
+body.ctm-v2 .ctm-field .input-field,
+body.ctm-v2 .ctm-field input,
+body.ctm-v2 .ctm-field .custom-select-container,
+body.ctm-v2 .ctm-field .custom-select-trigger,
+body.ctm-v2 .ctm-field select {
+  height: 36px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+}
+
+body.ctm-v2 .ctm-field-action {
+  display: flex !important;
+  align-items: end !important;
+}
+
+body.ctm-v2 .ctm-field-action .btn {
+  height: 36px !important;
+  padding: 0 var(--space-4) !important;
+  white-space: nowrap !important;
+}

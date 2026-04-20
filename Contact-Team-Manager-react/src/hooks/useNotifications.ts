@@ -6,6 +6,12 @@ import { useNotificationContext } from '../context/NotificationContext';
 
 const RECONNECT_DELAY_MS = 5000;
 
+// アプリの base path を Vite から取得（dev: "/"、prod: "/Contact-Team-Manager/"）。
+// 通知 URL のハードコード `/Contact-Team-Manager/` だと dev で 404 になっていた。
+const APP_BASE_URL = `${window.location.origin}${import.meta.env.BASE_URL}`;
+const buildThreadUrl = (threadId: string | number) =>
+    `${APP_BASE_URL}?thread=${threadId}`;
+
 async function showNotification(title: string, body: string, url: string, tag: string) {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
 
@@ -174,7 +180,7 @@ export function useNotifications() {
                         const body = isCreator
                             ? 'あなたが設定したリマインドです'
                             : 'メンションされたリマインドです';
-                        const url = `${window.location.origin}/Contact-Team-Manager/?thread=${thread.id}`;
+                        const url = buildThreadUrl(thread.id);
 
                         await showNotification(title, body, url, `reminder-${reminder.id}`);
                     }
@@ -293,7 +299,7 @@ export function useNotifications() {
                 const threadTitle = newRecord.title || '新しい投稿';
                 title = `${mentionPrefix}${threadTitle}`;
                 body = `${authorLabel}${formatBody(content)}`;
-                url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.id}`;
+                url = buildThreadUrl(newRecord.id);
             } else if (table === 'replies') {
                 // 返信: 親スレッドのタイトルを取得して通知に表示
                 let threadTitle = '新しい返信';
@@ -309,7 +315,7 @@ export function useNotifications() {
                 }
                 title = `${mentionPrefix}${threadTitle}`;
                 body = `${authorLabel}${formatBody(content)}`;
-                url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.thread_id}`;
+                url = buildThreadUrl(newRecord.thread_id);
             }
 
             // アプリ内通知リストに追加

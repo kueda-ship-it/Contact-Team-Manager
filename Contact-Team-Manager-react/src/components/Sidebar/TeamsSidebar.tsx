@@ -6,8 +6,9 @@ import { supabase } from '../../lib/supabase';
 export interface TeamsSidebarProps {
     currentTeamId: number | string | null;
     onSelectTeam: (id: number | string | null) => void;
-    viewMode: 'feed' | 'dashboard';
+    viewMode: 'feed' | 'dashboard' | 'gantt';
     onSelectDashboard: () => void;
+    onSelectGantt?: () => void;
     statusFilter: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts';
     onSelectStatus: (status: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts') => void;
     onEditTeam: (teamId: number) => void;
@@ -20,6 +21,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
     onSelectTeam,
     viewMode,
     onSelectDashboard,
+    onSelectGantt,
     statusFilter,
     onSelectStatus,
     onEditTeam,
@@ -204,7 +206,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                         onClick={onSelectDashboard}
                     >
                         <div className="team-item-header">
-                            <div className="team-icon" style={{ background: '#2B2D31', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <div className="team-icon" style={{ background: 'var(--surface-active)', color: 'var(--text-secondary)' }}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <rect x="3" y="3" width="7" height="9"></rect>
                                     <rect x="14" y="3" width="7" height="5"></rect>
@@ -218,6 +220,26 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                 )}
 
 
+                {/* Gantt / Task Chart */}
+                {profile && onSelectGantt && (
+                    <div
+                        className={`team-list-item ${viewMode === 'gantt' ? 'active' : ''}`}
+                        title="ガントチャート"
+                        onClick={onSelectGantt}
+                    >
+                        <div className="team-item-header">
+                            <div className="team-icon" style={{ background: 'var(--surface-active)', color: 'var(--text-secondary)' }}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="4" y1="6" x2="14" y2="6"></line>
+                                    <line x1="7" y1="12" x2="18" y2="12"></line>
+                                    <line x1="10" y1="18" x2="20" y2="18"></line>
+                                </svg>
+                            </div>
+                            <span className="team-name-label">ガント</span>
+                        </div>
+                    </div>
+                )}
+
                 {profile && <div className="sidebar-divider"></div>}
 
                 {/* Global (All Teams) - Admin Only */}
@@ -228,7 +250,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                         onClick={() => onSelectTeam(null)}
                     >
                         <div className="team-item-header">
-                            <div className="team-icon" style={{ background: 'linear-gradient(135deg, #FF6B6B, #FF8E53)', color: 'white' }}>
+                            <div className="team-icon" style={{ background: 'var(--brand)', color: 'var(--text-on-brand)' }}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <rect x="3" y="3" width="7" height="7"></rect>
                                     <rect x="14" y="3" width="7" height="7"></rect>
@@ -280,6 +302,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                             <div
                                 key={team.id}
                                 className={`team-list-item ${isDirectlyActive ? 'active' : ''} ${isChildActive ? 'child-active' : ''}`}
+                                data-unread={unreadTeams.has(String(team.id)) ? 'true' : undefined}
                                 title={`${team.name}${team.email_address ? ` (${team.email_address})` : ''}`}
                                 draggable={true}
                                 onDragStart={(e) => {
@@ -399,23 +422,10 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                                                     className={`sidebar-submenu-item ${statusFilter === 'pending' ? 'active' : ''}`}
                                                     onClick={() => onSelectStatus('pending')}
                                                 >
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                                                         # 未完了
                                                         {pendingCount > 0 && (
-                                                            <span style={{
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                minWidth: '18px',
-                                                                height: '18px',
-                                                                padding: '0 5px',
-                                                                borderRadius: '9px',
-                                                                background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
-                                                                color: '#fff',
-                                                                fontSize: '0.65rem',
-                                                                fontWeight: 700,
-                                                                lineHeight: 1,
-                                                            }}>
+                                                            <span className="ctm-badge-count">
                                                                 {pendingCount}
                                                             </span>
                                                         )}
@@ -463,17 +473,17 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                         >
                             <div className="team-item-header">
                                 <div className="team-icon" style={{
-                                    border: canCreate ? '2px dashed rgba(0,183,189,0.6)' : '2px dashed #444',
-                                    background: canCreate ? 'rgba(0,183,189,0.06)' : 'transparent',
-                                    color: canCreate ? 'var(--accent)' : '#555',
-                                    transition: 'all 0.2s',
+                                    border: `1px dashed ${canCreate ? 'var(--accent)' : 'var(--border-default)'}`,
+                                    background: canCreate ? 'var(--accent-subtle-bg)' : 'transparent',
+                                    color: canCreate ? 'var(--accent)' : 'var(--text-disabled)',
+                                    transition: 'all var(--duration-fast) var(--ease-out)',
                                 }}>
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>
                                         <line x1="5" y1="12" x2="19" y2="12"></line>
                                     </svg>
                                 </div>
-                                <span className="team-name-label" style={{ color: canCreate ? 'var(--text-main)' : '#555', transition: 'color 0.2s' }}>
+                                <span className="team-name-label" style={{ color: canCreate ? 'var(--text-secondary)' : 'var(--text-disabled)' }}>
                                     チームを追加
                                 </span>
                             </div>
@@ -486,7 +496,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                 {/* Knowledge Link - All Users */}
                 {profile && (
                     <a
-                        href="https://kueda-ship-it.github.io/Knowledge/"
+                        href="https://knowledge-theta-seven.vercel.app/"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="team-list-item"
@@ -494,7 +504,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                         style={{ textDecoration: 'none' }}
                     >
                         <div className="team-item-header">
-                            <div className="team-icon" style={{ background: '#2B2D31', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <div className="team-icon" style={{ background: 'var(--surface-active)', color: 'var(--text-secondary)' }}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>

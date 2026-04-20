@@ -12,6 +12,8 @@ import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
 import { LinkPreview } from '../common/LinkPreview';
 import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
+import { PresenceDot } from '../common/PresenceDot';
+import { usePresence } from '../../context/PresenceContext';
 
 // Helper component for auto-refreshing images
 const ThreadImage: React.FC<{ 
@@ -131,6 +133,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const { tags } = useTags();
     const { reactions, refetch: refetchReactions } = useReactions();
     const { user, profile: currentProfile } = useAuth();
+    const { getPresence } = usePresence();
     const [editingThreadId, setEditingThreadId] = React.useState<string | null>(null);
     const [editingReplyId, setEditingReplyId] = React.useState<string | null>(null);
     const {
@@ -930,7 +933,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
                                 <div className="task-header-meta">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                                        <div className="avatar-container">
+                                        <div className="avatar-container" style={{ position: 'relative' }}>
                                             <div className="avatar">
                                                 {authorAvatar ? (
                                                     <img src={authorAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
@@ -938,7 +941,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     (thread.author && thread.author[0].toUpperCase())
                                                 )}
                                             </div>
-                                            <div className="status-dot active"></div>
+                                            <PresenceDot status={getPresence(authorProfile?.id).status} size="md" />
                                         </div>
                                         <div className="task-author-info" style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: '8px' }}>
                                             <span className="author-name">{thread.author}</span>
@@ -1150,12 +1153,15 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                         </div>
                                                                     </div>
                                                                     <div className="reply-header">
-                                                                        <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.6rem' }}>
-                                                                            {replyAvatar ? (
-                                                                                <img src={replyAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                                                                            ) : (
-                                                                                (reply.author && reply.author[0].toUpperCase())
-                                                                            )}
+                                                                        <div style={{ position: 'relative', width: 20, height: 20, flexShrink: 0 }}>
+                                                                            <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.6rem' }}>
+                                                                                {replyAvatar ? (
+                                                                                    <img src={replyAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                                                                ) : (
+                                                                                    (reply.author && reply.author[0].toUpperCase())
+                                                                                )}
+                                                                            </div>
+                                                                            <PresenceDot status={getPresence(replyAuthorProfile?.id).status} size="sm" />
                                                                         </div>
                                                                         <span>{reply.author}</span>
                                                                         <span>{formatDate(reply.created_at)}</span>

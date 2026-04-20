@@ -19,13 +19,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     useEffect(() => {
-        const root = document.body;
-        root.classList.remove('light-mode', 'dark-mode');
+        const body = document.body;
+        const html = document.documentElement;
+
+        // Legacy body classes — existing style.css / liquid-glass.css rely on these.
+        body.classList.remove('light-mode', 'dark-mode');
         if (theme === 'light') {
-            root.classList.add('light-mode');
+            body.classList.add('light-mode');
         } else if (theme === 'dark') {
-            root.classList.add('dark-mode');
+            body.classList.add('dark-mode');
         }
+
+        // Opt-in to refreshed shell styles (shell.css scopes itself under
+        // body.ctm-v2 to avoid colliding with legacy liquid-glass rules).
+        body.classList.add('ctm-v2');
+
+        // New design-token channel. liquid-glass is a dark-family skin; map it
+        // to data-theme="dark" so OKLCH tokens resolve to dark values.
+        const dataTheme = theme === 'light' ? 'light' : 'dark';
+        html.setAttribute('data-theme', dataTheme);
+
         localStorage.setItem('theme', theme);
     }, [theme]);
 

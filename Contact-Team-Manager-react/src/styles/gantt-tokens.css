@@ -1,0 +1,183 @@
+/* ============================================================================
+   Gantt Compatibility Tokens
+   ----------------------------------------------------------------------------
+   Taskchart 由来の Gantt コンポーネント群が参照するトークンを、Contact の
+   既存 semantic トークン (tokens.css) にブリッジするためのレイヤー。
+   新規コードでは Contact 側 (--surface-raised, --text-primary, ...) を直接
+   使うこと。ここでは移植コンポーネントを走らせるための最小セットのみ定義。
+
+   Theme selectors:
+   - [data-theme="dark"]       : Contact の標準ダーク
+   - [data-theme="light"]      : Contact のライト
+   - [data-theme="liquid-glass"] / [data-theme="liquid"] : リキッドガラス
+   ============================================================================ */
+
+:root,
+:root[data-theme="dark"],
+:root[data-theme="light"],
+:root[data-theme="liquid-glass"],
+:root[data-theme="liquid"],
+body.dark-mode,
+body.light-mode {
+  /* Font — Contact uses --font-body; provide --font-sans alias for ported code */
+  --font-sans: var(--font-body);
+
+  /* Surface bridge */
+  --surface:        var(--surface-raised);
+  --surface-2:      var(--surface-sunken);
+  --surface-3:      var(--surface-overlay);
+
+  --background:     var(--surface-base);
+  --bg:             var(--surface-base);
+  --foreground:     var(--text-primary);
+  --text:           var(--text-primary);
+  --muted:          var(--text-muted);
+  --text-subtle:    var(--text-disabled);
+
+  /* Border bridge */
+  --border:         var(--border-default);
+
+  /* Primary / state bridge */
+  --primary-fg:     var(--text-on-brand);
+  --primary-glow:   color-mix(in oklab, var(--primary) 28%, transparent);
+  --warning:        var(--warning-500);
+  --warning-glow:   color-mix(in oklab, var(--warning) 28%, transparent);
+  --success-glow:   color-mix(in oklab, var(--success) 28%, transparent);
+  --danger-glow:    color-mix(in oklab, var(--danger) 28%, transparent);
+
+  /* Spacing bridge (Taskchart uses xs/sm/md/lg, Contact uses 1..9) */
+  --space-2xs:      var(--space-1);
+  --space-xs:       var(--space-2);
+  --space-sm:       var(--space-3);
+  --space-md:       var(--space-4);
+  --space-lg:       var(--space-5);
+  --space-xl:       var(--space-6);
+
+  /* Radius bridge */
+  --radius:         var(--radius-md);
+
+  /* Card bridge */
+  --card-bg:        var(--surface-raised);
+  --card-border:    var(--border-default);
+  --card-shadow:    var(--shadow-sm);
+  --card-shadow-lg: var(--shadow-lg);
+
+  /* Input bridge */
+  --input-bg:       var(--surface-raised);
+  --input-border:   var(--border-default);
+  --input-text:     var(--text-primary);
+
+  /* Icon button bridge */
+  --btn-icon-bg:          color-mix(in oklab, var(--text-primary) 6%, transparent);
+  --btn-icon-border:      color-mix(in oklab, var(--text-primary) 10%, transparent);
+  --btn-icon-color:       var(--text-secondary);
+  --btn-icon-hover-bg:    color-mix(in oklab, var(--text-primary) 12%, transparent);
+  --btn-icon-hover-color: var(--text-primary);
+
+  /* Header / overlay / sidebar */
+  --header-bg:      color-mix(in oklab, var(--surface-base) 85%, transparent);
+  --overlay-bg:     color-mix(in oklab, var(--surface-base) 85%, transparent);
+  --sidebar-hover:  color-mix(in oklab, var(--primary) 10%, transparent);
+
+  /* Tag */
+  --tag-active-bg:   var(--primary);
+  --tag-active-text: var(--text-on-brand);
+
+  /* Gantt-specific */
+  --gantt-bg:         var(--surface);
+  --gantt-header-bg:  var(--surface-2);
+  --gantt-cell-bg:    var(--surface);
+  --gantt-cell-hover: color-mix(in oklab, var(--primary) 10%, transparent);
+  --gantt-border:     var(--border);
+  --saturday:         oklch(0.55 0.15 250);
+}
+
+/* Light theme — subtle grid lines on dark ink */
+:root[data-theme="light"],
+body.light-mode {
+  --gantt-border-day:  rgba(15,23,42,0.06);
+  --gantt-border-week: rgba(15,23,42,0.12);
+  --gantt-month-end:   rgba(15,23,42,0.22);
+}
+
+/* Dark / default — grid on white ink */
+:root,
+:root[data-theme="dark"],
+body.dark-mode {
+  --gantt-border-day:  rgba(255,255,255,0.045);
+  --gantt-border-week: rgba(255,255,255,0.11);
+  --gantt-month-end:   rgba(255,255,255,0.24);
+}
+
+/* Liquid glass — stronger grid for translucent canvas */
+:root[data-theme="liquid-glass"],
+:root[data-theme="liquid"] {
+  --gantt-border-day:  rgba(255,255,255,0.05);
+  --gantt-border-week: rgba(255,255,255,0.13);
+  --gantt-month-end:   rgba(255,255,255,0.28);
+}
+
+/* ============================================================================
+   Glass elevated card (Knowledge signature, used by Gantt cards & LoginPage)
+   ============================================================================ */
+.glass-elevated {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow-lg);
+  transition: border-color var(--duration-base) var(--ease-out),
+              box-shadow   var(--duration-base) var(--ease-out);
+}
+
+.glass-elevated:hover {
+  border-color: color-mix(in oklab, var(--primary) 40%, var(--card-border));
+  box-shadow:
+    var(--card-shadow-lg),
+    0 0 0 1px color-mix(in oklab, var(--primary) 28%, transparent),
+    0 0 28px color-mix(in oklab, var(--primary) 24%, transparent);
+}
+
+/* ============================================================================
+   Gantt primary action button (Add Project etc.)
+   ============================================================================ */
+.gantt-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 0.875rem;
+  background: var(--primary);
+  color: var(--text-on-brand);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--primary) 32%, transparent);
+  transition: transform var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-base) var(--ease-out),
+              background var(--duration-base) var(--ease-out);
+}
+
+.gantt-btn-primary:hover {
+  background: color-mix(in oklab, var(--primary) 88%, white);
+  box-shadow:
+    0 8px 24px color-mix(in oklab, var(--primary) 38%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--primary) 55%, transparent);
+}
+
+.gantt-btn-primary:active {
+  transform: translateY(1px);
+}
+
+/* ============================================================================
+   Gantt main layout override (Contact's .main-feed-area is capped at 1000px
+   with overflow:hidden — Gantt/Calendar needs full width + vertical scroll)
+   ============================================================================ */
+.main-feed-area--gantt {
+  max-width: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  padding: 0 !important;
+}

@@ -4,6 +4,7 @@ import App from './App.tsx'
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { PresenceProvider } from './context/PresenceContext';
 import { initializeMsal } from './lib/microsoftGraph';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
@@ -38,7 +39,9 @@ initializeMsal()
           <NotificationProvider>
             <ThemeProvider>
               <AuthProvider>
-                <App />
+                <PresenceProvider>
+                  <App />
+                </PresenceProvider>
               </AuthProvider>
             </ThemeProvider>
           </NotificationProvider>

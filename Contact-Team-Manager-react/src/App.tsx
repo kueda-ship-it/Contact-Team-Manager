@@ -5,6 +5,7 @@ import { ThreadList } from './components/Feed/ThreadList';
 import { PostForm } from './components/Feed/PostForm';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { Dashboard } from './components/Dashboard/Dashboard';
+import { GanttApp } from './gantt/GanttApp';
 import { Login } from './components/Login';
 import { useAuth } from './hooks/useAuth';
 import { useThreads, useTeams, useUserMemberships, useUnreadCounts, usePopularTeamId } from './hooks/useSupabase';
@@ -14,8 +15,17 @@ import { useNotifications } from './hooks/useNotifications';
 import { useOutlookFolderWatch } from './hooks/useOutlookFolderWatch';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import { NotificationBell } from './components/common/NotificationBell';
+import { PresenceDot } from './components/common/PresenceDot';
+import { PresencePopover } from './components/common/PresencePopover';
+import { GlobalSearchResults } from './components/common/GlobalSearchResults';
+import { useGlobalSearch, type SearchHit } from './hooks/useGlobalSearch';
+import { usePresence } from './context/PresenceContext';
+import './styles/tokens.css';
 import './styles/style.css';
 import './styles/liquid-glass.css';
+import './styles/shell.css';
+import './styles/settings.css';
+import './styles/gantt-tokens.css';
 
 import { initializeMsal, ssoLogin, setExternalAccessToken, setExternalUserEmail } from './lib/microsoftGraph';
 
@@ -23,7 +33,7 @@ const THEME_META: Record<string, { title: string; icon: React.ReactNode }> = {
   'liquid-glass': {
     title: 'ライトモードに切り替え',
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
       </svg>
     ),
@@ -31,7 +41,7 @@ const THEME_META: Record<string, { title: string; icon: React.ReactNode }> = {
   light: {
     title: 'ダークモードに切り替え',
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="5"/>
         <line x1="12" y1="1" x2="12" y2="3"/>
         <line x1="12" y1="21" x2="12" y2="23"/>
@@ -47,7 +57,7 @@ const THEME_META: Record<string, { title: string; icon: React.ReactNode }> = {
   dark: {
     title: 'リキッドグラスモードに切り替え',
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
       </svg>
     ),
@@ -76,17 +86,23 @@ function App() {
 
 
   const [currentTeamId, setCurrentTeamId] = useState<number | string | null>(null);
-  const [viewMode, setViewMode] = useState<'feed' | 'dashboard'>('feed');
+  const [viewMode, setViewMode] = useState<'feed' | 'dashboard' | 'gantt'>('feed');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'mentions' | 'myposts'>('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history'>('profile');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchActiveIndex, setSearchActiveIndex] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const { hits: searchHits, loading: searchLoadingGlobal } = useGlobalSearch(isSearchOpen ? searchQuery : '');
   const [threadsLimit, setThreadsLimit] = useState(50);
   const [sortAscending, setSortAscending] = useState(true);
   const [scrollToThreadId, setScrollToThreadId] = useState<string | null>(null);
   const [activeMobileTab, setActiveMobileTab] = useState<'teams' | 'feed' | 'pending'>('feed');
   const [isMobilePostFormOpen, setIsMobilePostFormOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [presenceAnchor, setPresenceAnchor] = useState<HTMLElement | null>(null);
+  const { myPresence } = usePresence();
 
   useEffect(() => {
     const handleResize = () => {
@@ -252,6 +268,52 @@ function App() {
     return () => { cancelled = true; };
   }, [pendingThreadId, authLoading, user]);
 
+  // Ctrl+E / Ctrl+K / Cmd+K でグローバル検索にフォーカス、Esc で閉じる。
+  // Teams 準拠(Ctrl+E)に加え、Slack/VSCode 系で慣れた Ctrl/Cmd+K も受ける。
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      const focusKey = isMod && !e.shiftKey && !e.altKey && (e.key === 'e' || e.key === 'E' || e.key === 'k' || e.key === 'K');
+      if (focusKey) {
+        // IME 変換中は無視
+        if (e.isComposing) return;
+        e.preventDefault();
+        const el = searchInputRef.current;
+        if (el) {
+          setIsSearchOpen(true);
+          el.focus();
+          el.select();
+        }
+        return;
+      }
+      if (e.key === 'Escape' && isSearchOpen) {
+        setIsSearchOpen(false);
+        setSearchActiveIndex(0);
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isSearchOpen]);
+
+  // 検索結果選択時: pendingThreadId に入れて既存の遷移ドレインを再利用
+  const handleSearchHitSelect = (hit: SearchHit) => {
+    setIsSearchOpen(false);
+    setSearchQuery('');
+    setSearchActiveIndex(0);
+    searchInputRef.current?.blur();
+    // 既定の threadsLimit(50) では対象スレッドが DOM に描画されずスクロール対象が見つからないため、
+    // 検索経由遷移時はフェッチ上限を大きく取り直す。フィード自身の検索モードを抜けた直後の
+    // fetchLimit 縮小(2000 → 50)を避けるためのフォールバック。
+    setThreadsLimit(2000);
+    setPendingThreadId(hit.threadId);
+  };
+
+  // ヒット数が変わったら activeIndex をリセット
+  useEffect(() => {
+    setSearchActiveIndex(0);
+  }, [searchHits.length]);
+
   // Title flashing for unread messages
   useEffect(() => {
     let interval: any;
@@ -325,12 +387,58 @@ function App() {
 
         <div className="header-search-container">
           <input
+            ref={searchInputRef}
             type="text"
             className="search-input"
-            placeholder="検索 (CTRL+E)"
+            placeholder="検索 (Ctrl+E)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsSearchOpen(true)}
+            onBlur={() => {
+              // クリックで結果選択できるよう少し遅延させる(ドロップダウン側の onMouseDown preventDefault もあり
+              // 本来不要だが、キーボードフォーカス遷移の暴発防止に残す)
+              setTimeout(() => setIsSearchOpen(false), 120);
+            }}
+            onKeyDown={(e) => {
+              if (e.isComposing) return;
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setIsSearchOpen(true);
+                setSearchActiveIndex(i => Math.min(i + 1, Math.max(0, searchHits.length - 1)));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSearchActiveIndex(i => Math.max(0, i - 1));
+              } else if (e.key === 'Enter') {
+                const hit = searchHits[searchActiveIndex];
+                if (hit) {
+                  e.preventDefault();
+                  handleSearchHitSelect(hit);
+                }
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setIsSearchOpen(false);
+                setSearchQuery('');
+                setSearchActiveIndex(0);
+                (e.currentTarget as HTMLInputElement).blur();
+              }
+            }}
           />
+          {isSearchOpen && searchQuery.trim().length > 0 && (
+            <GlobalSearchResults
+              query={searchQuery}
+              hits={searchHits}
+              loading={searchLoadingGlobal}
+              activeIndex={searchActiveIndex}
+              onHover={setSearchActiveIndex}
+              onSelect={handleSearchHitSelect}
+              onClose={() => {
+                setIsSearchOpen(false);
+                setSearchQuery('');
+                setSearchActiveIndex(0);
+                searchInputRef.current?.blur();
+              }}
+            />
+          )}
         </div>
 
         <div className="user-profile">
@@ -341,48 +449,67 @@ function App() {
             onClick={() => setIsSettingsOpen(true)}
             title="設定"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {profile?.avatar_url && (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name}
-                style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
-              />
-            )}
+            <button
+              type="button"
+              aria-label="ステータスを変更"
+              title="ステータスを変更"
+              onClick={(e) => setPresenceAnchor(prev => prev ? null : e.currentTarget)}
+              style={{
+                position: 'relative',
+                width: 32,
+                height: 32,
+                padding: 0,
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                borderRadius: '50%',
+                flexShrink: 0,
+              }}
+            >
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.display_name}
+                  style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                <span
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: 'var(--surface-active)',
+                    color: 'var(--text-primary)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 600, fontSize: 13,
+                  }}
+                >
+                  {(profile?.display_name || user.email || '?').slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <PresenceDot status={myPresence.status} size="md" />
+            </button>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{profile?.display_name || user.email}</span>
               <span style={{ fontSize: '0.75rem', color: 'var(--accent)' }}>{profile?.role || 'User'}</span>
             </div>
           </div>
+          {presenceAnchor && (
+            <PresencePopover anchor={presenceAnchor} onClose={() => setPresenceAnchor(null)} />
+          )}
 
           <button
             id="logout-btn"
-            className="btn"
+            className="ctm-logout-chip"
             onClick={() => signOut()}
             title="ログアウト"
-            style={{
-              padding: '6px',
-              fontSize: '0.8rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: '1px solid rgba(232, 17, 35, 0.4)',
-              color: '#FF6666',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              width: '34px',
-              height: '34px',
-              transition: 'all 0.2s'
-            }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
               <polyline points="16 17 21 12 16 7"></polyline>
               <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -404,6 +531,10 @@ function App() {
             setViewMode('dashboard');
             setActiveMobileTab('feed');
           }}
+          onSelectGantt={() => {
+            setViewMode('gantt');
+            setActiveMobileTab('feed');
+          }}
           statusFilter={statusFilter}
           onSelectStatus={(status) => {
             setStatusFilter(status);
@@ -422,7 +553,7 @@ function App() {
         />
 
         <div className="dashboard-layout">
-          <main className="main-feed-area">
+          <main className={`main-feed-area${viewMode === 'gantt' ? ' main-feed-area--gantt' : ''}`}>
             {viewMode === 'feed' && (
               <div
                 className="feed-list-flex-container"
@@ -462,6 +593,9 @@ function App() {
                 onThreadClick={handleSidebarThreadClick}
               />
             )}
+            {viewMode === 'gantt' && (
+              <GanttApp view="gantt" />
+            )}
           </main>
 
           <RightSidebar
@@ -473,7 +607,7 @@ function App() {
       </div>
 
       {/* Mobile Post FAB (Only show when active tab is feed or teams, and form is not open) */}
-      {!isMobilePostFormOpen && (activeMobileTab === 'feed' || activeMobileTab === 'teams') && viewMode !== 'dashboard' && (
+      {!isMobilePostFormOpen && (activeMobileTab === 'feed' || activeMobileTab === 'teams') && viewMode === 'feed' && (
         <button
           className="mobile-fab"
           onClick={() => setIsMobilePostFormOpen(true)}

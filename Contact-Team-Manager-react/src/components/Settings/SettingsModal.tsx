@@ -604,37 +604,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
     return (
         <>
-        <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onMouseDown={(e) => { if (filePickerActiveRef.current) return; if (e.target === e.currentTarget) onClose(); }}>
-            <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <h2 style={{
-                        margin: 0,
-                        background: 'linear-gradient(135deg, var(--text-main) 0%, var(--accent) 100%)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                        fontSize: '1.3rem',
-                        fontWeight: 800,
-                        letterSpacing: '-0.02em'
-                    }}>設定</h2>
+        <div className="modal-overlay ctm-settings-overlay" onMouseDown={(e) => { if (filePickerActiveRef.current) return; if (e.target === e.currentTarget) onClose(); }}>
+            <div className="modal ctm-settings-modal" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="ctm-settings-head">
+                    <h2 className="ctm-settings-title">設定</h2>
                     <button
-                        className="btn btn-sm btn-outline"
+                        className="ctm-settings-close"
                         onClick={onClose}
-                        style={{ width: '32px', height: '32px', padding: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}
-                    >✕</button>
+                        aria-label="閉じる"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
                 </div>
 
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(8px)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="ctm-settings-tabs" role="tablist">
                     <button
-                        className={`btn btn-sm ${activeTab === 'profile' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderRadius: '8px', border: 'none' }}
+                        role="tab"
+                        aria-selected={activeTab === 'profile'}
+                        className={`ctm-settings-tab${activeTab === 'profile' ? ' is-active' : ''}`}
                         onClick={() => setActiveTab('profile')}
                     >
                         個人設定
                     </button>
                     <button
-                        className={`btn btn-sm ${activeTab === 'team' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderRadius: '8px', border: 'none' }}
+                        role="tab"
+                        aria-selected={activeTab === 'team'}
+                        className={`ctm-settings-tab${activeTab === 'team' ? ' is-active' : ''}`}
                         onClick={() => setActiveTab('team')}
                         disabled={!currentTeamId}
                     >
@@ -642,8 +640,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                     </button>
                     {isAdmin && (
                         <button
-                            className={`btn btn-sm ${activeTab === 'admin' ? 'btn-primary' : 'btn-outline'}`}
-                            style={{ borderRadius: '8px', border: 'none' }}
+                            role="tab"
+                            aria-selected={activeTab === 'admin'}
+                            className={`ctm-settings-tab${activeTab === 'admin' ? ' is-active' : ''}`}
                             onClick={() => setActiveTab('admin')}
                         >
                             ユーザー管理
@@ -651,23 +650,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                     )}
                     {(isAdmin || canManageTeam || (profile?.role !== 'Viewer')) && (
                         <button
-                            className={`btn btn-sm ${activeTab === 'team-mgmt' ? 'btn-primary' : 'btn-outline'}`}
-                            style={{ borderRadius: '8px', border: 'none' }}
+                            role="tab"
+                            aria-selected={activeTab === 'team-mgmt'}
+                            className={`ctm-settings-tab${activeTab === 'team-mgmt' ? ' is-active' : ''}`}
                             onClick={() => setActiveTab('team-mgmt')}
                         >
                             チーム管理
                         </button>
                     )}
                     <button
-                        className={`btn btn-sm ${activeTab === 'history' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderRadius: '8px', border: 'none' }}
+                        role="tab"
+                        aria-selected={activeTab === 'history'}
+                        className={`ctm-settings-tab${activeTab === 'history' ? ' is-active' : ''}`}
                         onClick={() => setActiveTab('history')}
                     >
                         更新履歴
                     </button>
                     <button
-                        className={`btn btn-sm ${activeTab === 'outlook' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderRadius: '8px', border: 'none' }}
+                        role="tab"
+                        aria-selected={activeTab === 'outlook'}
+                        className={`ctm-settings-tab${activeTab === 'outlook' ? ' is-active' : ''}`}
                         onClick={() => setActiveTab('outlook')}
                     >
                         Outlook連携
@@ -1081,36 +1083,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                             </div>
 
                             {/* --- Add User Form --- */}
-                            <div style={{ padding: '20px', background: 'linear-gradient(145deg, rgba(0,183,189,0.08) 0%, rgba(255,255,255,0.03) 100%)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: '16px', border: '1px solid rgba(0,183,189,0.2)', boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07), 0 0 40px rgba(0,183,189,0.06)' }}>
-                                <h4 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)' }}></span>
-                                    新規ユーザーを追加
-                                </h4>
-                                <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                                    <div style={{ flex: '1 1 200px' }}>
-                                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>メールアドレス</label>
+                            <div className="ctm-settings-panel">
+                                <h4 className="ctm-settings-panel-title">新規ユーザーを追加</h4>
+                                <div className="ctm-user-add-row">
+                                    <div className="ctm-field">
+                                        <label>メールアドレス</label>
                                         <input
                                             type="email"
                                             className="input-field"
                                             placeholder="example@fts.co.jp"
                                             value={newUserEmail}
                                             onChange={(e) => setNewUserEmail(e.target.value)}
-                                            style={{ height: '38px', fontSize: '0.9rem', width: '100%' }}
                                         />
                                     </div>
-                                    <div style={{ flex: '1 1 150px' }}>
-                                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>表示名 (任意)</label>
+                                    <div className="ctm-field">
+                                        <label>表示名 (任意)</label>
                                         <input
                                             type="text"
                                             className="input-field"
                                             placeholder="山田 太郎"
                                             value={newDisplayName}
                                             onChange={(e) => setNewDisplayName(e.target.value)}
-                                            style={{ height: '38px', fontSize: '0.9rem', width: '100%' }}
                                         />
                                     </div>
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>ロール</label>
+                                    <div className="ctm-field">
+                                        <label>ロール</label>
                                         <CustomSelect
                                             options={[
                                                 { value: 'Admin', label: '管理者' },
@@ -1120,19 +1117,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                             ]}
                                             value={newUserRole}
                                             onChange={(val) => setNewUserRole(val as any)}
-                                            style={{ height: '38px', fontSize: '0.85rem' }}
                                         />
                                     </div>
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={handleRegisterUser}
-                                        disabled={isRegistering || !newUserEmail}
-                                        style={{ height: '38px', padding: '0 20px', fontWeight: 600 }}
-                                    >
-                                        {isRegistering ? '処理中...' : 'ユーザーを追加'}
-                                    </button>
+                                    <div className="ctm-field ctm-field-action">
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={handleRegisterUser}
+                                            disabled={isRegistering || !newUserEmail}
+                                        >
+                                            {isRegistering ? '処理中...' : 'ユーザーを追加'}
+                                        </button>
+                                    </div>
                                 </div>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '10px', opacity: 0.7 }}>
+                                <p className="ctm-settings-help">
                                     ※追加したユーザーは Microsoft SSO で初回ログイン時に自動的に有効化されます。
                                 </p>
                             </div>
@@ -1247,14 +1244,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                             </div>
 
                             {/* --- User Card Grid --- */}
-                            <div style={{ 
-                                display: 'grid', 
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
-                                gap: '15px', 
-                                maxHeight: '500px', 
-                                overflowY: 'auto', 
-                                padding: '4px',
-                                scrollbarWidth: 'thin'
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                gap: '15px',
+                                padding: '4px'
                             }}>
                                 {profiles.filter(p => {
                                     if (userSearchQuery && !p.display_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) && !p.email?.toLowerCase().includes(userSearchQuery.toLowerCase())) return false;
@@ -1490,14 +1484,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                 { value: '', label: '選択してください...' },
                                                 ...((isAdmin || canManageTeam) ? [{ value: 'new', label: '+ 新規チーム作成' }] : []),
                                                 ...teams.filter(t => {
+                                                    // チャネル(parent_id を持つもの)はここでは表示しない
+                                                    if (t.parent_id) return false;
                                                     if (isAdmin) return true;
-                                                    const isDirectManager = memberships.some(m => String(m.team_id) === String(t.id) && m.role === 'Manager');
-                                                    if (isDirectManager) return true;
-                                                    // Also show if manager of parent
-                                                    if (t.parent_id) {
-                                                        return memberships.some(m => String(m.team_id) === String(t.parent_id) && m.role === 'Manager');
-                                                    }
-                                                    return false;
+                                                    return memberships.some(m => String(m.team_id) === String(t.id) && m.role === 'Manager');
                                                 }).map(t => ({ value: t.id, label: t.name }))
                                             ]}
                                             value={selectedTeamId}

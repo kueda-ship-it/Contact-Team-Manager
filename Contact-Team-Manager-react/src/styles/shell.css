@@ -1,0 +1,817 @@
+/* ============================================================================
+   Contact Team Manager — Shell (Header + Left Sidebar)
+   ----------------------------------------------------------------------------
+   Scoped under body.ctm-v2 so we can override liquid-glass.css / style.css
+   without touching them. All visuals resolve to tokens.css.
+
+   Principles enforced here:
+   - Calm skeleton, loud state
+   - No decorative glass, no colored side-stripes on list items
+   - Info density over ornamental padding
+   - State colors reserved for state (unread, pending), not chrome
+   ============================================================================ */
+
+/* ---------- Shell frame ---------------------------------------------------- */
+body.ctm-v2 .app-container {
+  background: var(--surface-base) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Unify typography across the shell. Legacy style.css asserts
+   `* { font-family: 'Segoe UI', sans-serif }` at specificity (0,0,1,0),
+   which forces every <span>/<div>/<button> onto Segoe UI and — for
+   Japanese glyphs — whatever system fallback each surface happens to pick.
+   This produced two visible fonts side by side (sidebar vs. thread cards).
+   We assert body font here at higher specificity so every element inherits
+   the same BIZ UDPGothic stack, and let headings still opt into the display
+   face via their own rule. */
+body.ctm-v2,
+body.ctm-v2 *,
+body.ctm-v2 *::before,
+body.ctm-v2 *::after {
+  font-family: var(--font-body) !important;
+}
+body.ctm-v2 h1,
+body.ctm-v2 h2,
+body.ctm-v2 h3,
+body.ctm-v2 h4,
+body.ctm-v2 h5,
+body.ctm-v2 h6,
+body.ctm-v2 .display-font {
+  font-family: var(--font-display) !important;
+}
+
+/* ---------- HEADER --------------------------------------------------------- */
+/* Height kept at 50px to match the legacy .main-wrapper { margin-top: 50px }
+   layout contract. Changing it would desync fixed-positioned panels. */
+body.ctm-v2 header {
+  background: var(--surface-raised) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  box-shadow: none !important;
+  height: 50px !important;
+  padding: 0 var(--space-3) 0 var(--space-4) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-3) !important;
+  color: var(--text-primary) !important;
+}
+
+body.ctm-v2 header::before,
+body.ctm-v2 header::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Logo */
+body.ctm-v2 .logo {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-display) !important;
+  font-weight: var(--weight-semibold) !important;
+  font-size: var(--text-md) !important;
+  letter-spacing: var(--tracking-tight) !important;
+  flex-shrink: 0 !important;
+  min-width: 0 !important;
+}
+
+body.ctm-v2 .logo svg {
+  background: var(--accent-subtle-bg) !important;
+  color: var(--accent) !important;
+  stroke: var(--accent) !important;
+  padding: 5px !important;
+  border-radius: var(--radius-sm) !important;
+  box-sizing: content-box !important;
+}
+
+body.ctm-v2 .logo-text {
+  color: var(--text-primary) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Search bar — the central operational primitive */
+body.ctm-v2 .header-search-container {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  max-width: 720px !important;
+  margin: 0 var(--space-4) !important;
+}
+
+body.ctm-v2 .search-input {
+  width: 100% !important;
+  height: 36px !important;
+  padding: 0 var(--space-4) !important;
+  background: var(--surface-sunken) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  font-family: var(--font-body) !important;
+  font-size: var(--text-base) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out) !important;
+}
+
+body.ctm-v2 .search-input::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 1 !important;
+}
+
+body.ctm-v2 .search-input:hover {
+  background: var(--surface-hover) !important;
+  border-color: var(--border-default) !important;
+}
+
+body.ctm-v2 .search-input:focus,
+body.ctm-v2 .search-input:focus-visible {
+  outline: none !important;
+  background: var(--surface-raised) !important;
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 28%, transparent) !important;
+}
+
+/* Right-side user cluster */
+body.ctm-v2 .user-profile {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  flex-shrink: 0 !important;
+  margin-left: auto !important;
+  padding-right: var(--space-1) !important;
+}
+
+/* Avatar + name-stack wrapper (the <div style="flex row"> in App.tsx).
+   Do NOT force column here — that would stack avatar above name and blow
+   past the 50px header. Just cap width so long names don't push the cluster. */
+body.ctm-v2 .user-profile > div:last-of-type {
+  min-width: 0 !important;
+  max-width: 200px !important;
+  align-items: center !important;
+}
+
+/* The inner column (name + role) — inline style already sets column,
+   we only need to constrain width + line-height for the 50px header. */
+body.ctm-v2 .user-profile > div:last-of-type > div {
+  min-width: 0 !important;
+  max-width: 140px !important;
+  line-height: var(--leading-tight) !important;
+}
+
+body.ctm-v2 .user-profile > div:last-of-type > div > span:first-child {
+  font-size: var(--text-sm) !important;
+  font-weight: var(--weight-semibold) !important;
+  color: var(--text-primary) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+}
+
+body.ctm-v2 .user-profile > div:last-of-type > div > span:last-child {
+  font-size: var(--text-2xs) !important;
+  font-weight: var(--weight-medium) !important;
+  color: var(--text-muted) !important;
+  letter-spacing: var(--tracking-label) !important;
+  text-transform: uppercase !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+}
+
+body.ctm-v2 .user-profile > div:last-of-type > img {
+  width: 30px !important;
+  height: 30px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Icon buttons in header (theme toggle, notification bell, settings) */
+body.ctm-v2 header .btn.icon-btn,
+body.ctm-v2 header .gear-btn-unified,
+body.ctm-v2 header .theme-toggle-btn,
+body.ctm-v2 header #logout-btn {
+  width: 34px !important;
+  height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-md) !important;
+  cursor: pointer !important;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.ctm-v2 header .btn.icon-btn:hover,
+body.ctm-v2 header .gear-btn-unified:hover,
+body.ctm-v2 header .theme-toggle-btn:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-subtle) !important;
+  transform: none !important;
+}
+
+body.ctm-v2 header .btn.icon-btn:focus-visible,
+body.ctm-v2 header .gear-btn-unified:focus-visible,
+body.ctm-v2 header .theme-toggle-btn:focus-visible,
+body.ctm-v2 header #logout-btn:focus-visible {
+  outline: none !important;
+  box-shadow: var(--focus-ring) !important;
+  border-color: var(--border-focus) !important;
+}
+
+/* Logout — icon-only chip framed in danger red. Always red so it reads
+   unambiguously as the destructive action in the header. */
+body.ctm-v2 header #logout-btn.ctm-logout-chip,
+body.ctm-v2 header .ctm-logout-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  color: var(--state-danger) !important;
+  background: transparent !important;
+  border: 1px solid var(--state-danger) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+  margin-left: var(--space-2) !important;
+  cursor: pointer !important;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out) !important;
+}
+
+body.ctm-v2 header .ctm-logout-chip > svg {
+  width: 18px !important;
+  height: 18px !important;
+  stroke-width: 2.2 !important;
+  display: block !important;
+  color: var(--state-danger) !important;
+}
+
+body.ctm-v2 header .ctm-logout-chip:hover {
+  color: var(--state-danger) !important;
+  background: var(--state-danger-bg) !important;
+  border-color: var(--state-danger) !important;
+}
+
+/* All header icons render at the same visual size (22px / stroke 2).
+   Logout specifically gets slightly thicker stroke since the door+arrow
+   glyph has fewer strokes than the gear/bell and reads lighter at the
+   same nominal size. */
+body.ctm-v2 header .btn.icon-btn > svg,
+body.ctm-v2 header .gear-btn-unified > svg,
+body.ctm-v2 header .theme-toggle-btn > svg,
+body.ctm-v2 header button#logout-btn > svg {
+  width: 22px !important;
+  height: 22px !important;
+  stroke-width: 2 !important;
+  display: block !important;
+}
+body.ctm-v2 header button#logout-btn > svg {
+  width: 22px !important;
+  height: 22px !important;
+  stroke-width: 2.2 !important;
+}
+
+/* Defeat any residual legacy sizing that applies to ALL SVGs in header. */
+body.ctm-v2 header svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+/* Logo mark uses its own size — don't shrink it. */
+body.ctm-v2 header .logo svg {
+  width: 26px !important;
+  height: 26px !important;
+}
+
+/* User avatar keeps its shape but loses any shadow */
+body.ctm-v2 .user-profile img {
+  box-shadow: none !important;
+  border: 1px solid var(--border-subtle) !important;
+}
+
+/* ---------- TEAMS SIDEBAR -------------------------------------------------- */
+/* Collapsed 72px icon rail by default, hover-expands to 260px with labels.
+   Main content is padded for the collapsed width — the expanded state
+   overlays via width transition (no content reflow on hover). */
+body.ctm-v2 .teams-sidebar {
+  background: var(--surface-raised) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-right: 1px solid var(--border-subtle) !important;
+  box-shadow: none !important;
+  width: 72px !important;
+  padding: var(--space-2) 0 !important;
+  align-items: stretch !important;
+  padding-left: 0 !important;
+  /* Horizontal clip so labels stay hidden when collapsed; vertical scroll
+     so long team lists are reachable. */
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  transition: width var(--duration-base) var(--ease-out) !important;
+  z-index: 50 !important;
+}
+
+body.ctm-v2 .teams-sidebar:hover {
+  background: var(--surface-raised) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  width: 260px !important;
+  align-items: stretch !important;
+  padding-left: 0 !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* Main content offset matches the collapsed rail (72 + 16 gap = 88). */
+body.ctm-v2 .main-wrapper {
+  padding-left: 88px !important;
+}
+
+/* Collapsed state: hide all text labels, center the icons.
+   The `:not(:hover)` scope means "only hide when sidebar is collapsed". */
+body.ctm-v2 .teams-sidebar:not(:hover) .team-name-label,
+body.ctm-v2 .teams-sidebar:not(:hover) .team-expand-chevron,
+body.ctm-v2 .teams-sidebar:not(:hover) .team-settings-icon,
+body.ctm-v2 .teams-sidebar:not(:hover) .sidebar-submenu-container,
+body.ctm-v2 .teams-sidebar:not(:hover) .ctm-badge-count {
+  display: none !important;
+}
+
+body.ctm-v2 .teams-sidebar:not(:hover) .team-item-header {
+  justify-content: center !important;
+  padding: var(--space-1) 0 !important;
+}
+
+/* When collapsed, shift the unread dot from after-label to a top-right
+   corner pip on the icon itself. */
+body.ctm-v2 .teams-sidebar:not(:hover) .team-list-item[data-unread="true"] > .team-item-header {
+  position: relative !important;
+}
+body.ctm-v2 .teams-sidebar:not(:hover) .team-list-item[data-unread="true"] > .team-item-header::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 6px !important;
+  right: 18px !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: var(--radius-round) !important;
+  background: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--surface-raised) !important;
+  margin: 0 !important;
+}
+
+/* Kill the decorative sheen gradient */
+body.ctm-v2 .teams-sidebar::before {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+
+body.ctm-v2 .teams-list {
+  padding: 0 var(--space-2) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+body.ctm-v2 .sidebar-divider {
+  height: 1px !important;
+  background: var(--border-subtle) !important;
+  margin: var(--space-2) var(--space-1) !important;
+  border: 0 !important;
+}
+
+/* Team row */
+body.ctm-v2 .team-list-item {
+  background: transparent !important;
+  border-radius: var(--radius-md) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: var(--text-secondary) !important;
+  transition: background-color var(--duration-fast) var(--ease-out) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.ctm-v2 .team-item-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  min-height: 40px !important;
+  padding: var(--space-1) var(--space-3) !important;
+  border-radius: var(--radius-md) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  width: 100% !important;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out) !important;
+}
+
+body.ctm-v2 .team-item-header:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+}
+
+/* Active team — use surface tint + bold label. NO colored side-stripe. */
+body.ctm-v2 .team-list-item.active {
+  border-left: 0 !important;
+  background: transparent !important;
+}
+
+body.ctm-v2 .team-list-item.active > .team-item-header {
+  background: var(--surface-selected) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+  border-radius: var(--radius-md) !important;
+  border-left: 0 !important;
+}
+
+body.ctm-v2 .team-list-item.active > .team-item-header .team-name-label {
+  color: var(--text-primary) !important;
+  font-weight: var(--weight-semibold) !important;
+}
+
+/* Unread — the skeleton is quiet so this one signal can own attention.
+   Bold label + accent-tinted label color. The "loud state" moment. */
+body.ctm-v2 .team-list-item[data-unread="true"] > .team-item-header .team-name-label {
+  color: var(--text-primary) !important;
+  font-weight: var(--weight-semibold) !important;
+}
+
+body.ctm-v2 .team-list-item[data-unread="true"] > .team-item-header::after {
+  content: "" !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: var(--radius-round) !important;
+  background: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 25%, transparent) !important;
+  flex-shrink: 0 !important;
+  margin-right: var(--space-1) !important;
+}
+
+/* Team icon — quiet container, the identity lives in the letter/image.
+   36px reads clearly in the 72px collapsed rail and still fits the expanded one. */
+body.ctm-v2 .team-icon {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  border-radius: var(--radius-round) !important;
+  font-size: var(--text-sm) !important;
+  font-weight: var(--weight-semibold) !important;
+  font-family: var(--font-display) !important;
+  color: var(--neutral-0) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: none !important;
+  border: none !important;
+  overflow: hidden !important;
+}
+
+/* Label structure — always visible, never hidden by legacy rail rules.
+   Color and weight are NOT forced here; TeamsSidebar.tsx sets them inline
+   per-row (channel/parent → muted, direct-active/unread → semibold) and
+   those inline values are intentionally allowed to win. */
+body.ctm-v2 .team-name-label {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  flex: 1 1 auto !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-family: var(--font-body) !important;
+  letter-spacing: var(--tracking-normal) !important;
+  font-size: var(--text-base) !important;
+  font-weight: var(--weight-regular) !important;
+  color: var(--text-secondary) !important;
+  text-shadow: none !important;
+}
+
+body.ctm-v2 .team-list-item:not(.active) > .team-item-header:hover .team-name-label {
+  color: var(--text-primary) !important;
+}
+
+/* Expand chevron */
+body.ctm-v2 .team-expand-chevron {
+  color: var(--text-muted) !important;
+  padding: 2px !important;
+  border-radius: var(--radius-xs) !important;
+}
+
+body.ctm-v2 .team-expand-chevron:hover {
+  color: var(--text-primary) !important;
+  background: var(--surface-active) !important;
+}
+
+/* Settings gear — hidden until hover for low noise */
+body.ctm-v2 .team-settings-icon {
+  opacity: 0 !important;
+  color: var(--text-muted) !important;
+  padding: 4px !important;
+  border-radius: var(--radius-sm) !important;
+  transition: opacity var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out) !important;
+}
+
+body.ctm-v2 .team-item-header:hover .team-settings-icon,
+body.ctm-v2 .team-list-item.active .team-settings-icon {
+  opacity: 1 !important;
+}
+
+body.ctm-v2 .team-settings-icon:hover {
+  color: var(--text-primary) !important;
+  background: var(--surface-active) !important;
+}
+
+/* Submenu (channels / status filter) */
+body.ctm-v2 .sidebar-submenu-container {
+  margin: var(--space-1) 0 var(--space-1) var(--space-4) !important;
+  border-left: 1px solid var(--border-subtle) !important;
+  padding-left: var(--space-2) !important;
+}
+
+body.ctm-v2 .sidebar-submenu {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  background: transparent !important;
+}
+
+body.ctm-v2 .sidebar-submenu-item {
+  min-height: 30px !important;
+  padding: var(--space-1) var(--space-2) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-muted) !important;
+  font-size: var(--text-sm) !important;
+  font-weight: var(--weight-medium) !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+body.ctm-v2 .sidebar-submenu-item:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+body.ctm-v2 .sidebar-submenu-item.active {
+  background: var(--surface-selected) !important;
+  color: var(--text-primary) !important;
+  font-weight: var(--weight-semibold) !important;
+}
+
+/* Pending count badge — warning tone, not "scream red" */
+body.ctm-v2 .sidebar-submenu-item .ctm-badge-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 20px !important;
+  height: 18px !important;
+  padding: 0 var(--space-1) !important;
+  margin-left: var(--space-2) !important;
+  border-radius: var(--radius-round) !important;
+  background: var(--state-warning-bg) !important;
+  color: var(--state-warning) !important;
+  font-size: var(--text-2xs) !important;
+  font-weight: var(--weight-bold) !important;
+  font-variant-numeric: tabular-nums !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+}
+
+/* Channel rows (nested under a team) — compressed footprint, same tempo
+   as team rows but leaner since the identity is carried by the parent team. */
+body.ctm-v2 .sidebar-submenu.children-list {
+  gap: 1px !important;
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
+}
+
+body.ctm-v2 .sidebar-submenu.children-list .team-list-item {
+  background: transparent !important;
+}
+
+body.ctm-v2 .sidebar-submenu.children-list .team-item-header {
+  min-height: 28px !important;
+  padding: 2px var(--space-2) !important;
+  gap: var(--space-2) !important;
+}
+
+body.ctm-v2 .sidebar-submenu.children-list .team-icon {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  font-size: var(--text-xs) !important;
+}
+
+body.ctm-v2 .sidebar-submenu.children-list .team-name-label {
+  font-size: var(--text-sm) !important;
+  color: var(--text-muted) !important;
+}
+
+body.ctm-v2 .sidebar-submenu.children-list .team-list-item.active .team-name-label {
+  color: var(--text-primary) !important;
+}
+
+/* External link tiles (Knowledge, Log Dashboard, Add Team) — same footprint */
+body.ctm-v2 .teams-sidebar a.team-list-item {
+  text-decoration: none !important;
+  color: inherit !important;
+}
+
+/* ---------- Post form — calm it down ------------------------------------
+   Legacy style.css sets z-index: 5002 and a heavy -4px 20px black halo,
+   which makes the form "jump" above the expanded sidebar (z-index 50) and
+   draws the eye away from the feed. Lower it into the document flow and
+   replace the dark halo with a quiet token border. */
+body.ctm-v2 .static-form-container {
+  z-index: 10 !important;
+  padding: var(--space-2) 0 var(--space-3) 0 !important;
+}
+body.ctm-v2 .static-form-container .compact-form {
+  background: var(--surface-raised) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+body.ctm-v2 .static-form-container .compact-form:focus-within {
+  border-color: var(--border-focus) !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* Mobile (< 768px) — ensure touch targets */
+@media (max-width: 768px) {
+  body.ctm-v2 header {
+    height: 52px !important;
+    padding: 0 var(--space-3) !important;
+    gap: var(--space-2) !important;
+  }
+  body.ctm-v2 .header-search-container {
+    margin: 0 !important;
+  }
+  body.ctm-v2 .logo-text {
+    display: none !important;
+  }
+  body.ctm-v2 .user-profile > div:last-of-type {
+    display: none !important;
+  }
+  body.ctm-v2 .team-item-header {
+    min-height: 44px !important;
+  }
+  body.ctm-v2 .sidebar-submenu-item {
+    min-height: 40px !important;
+  }
+  body.ctm-v2 header .btn.icon-btn,
+  body.ctm-v2 header .gear-btn-unified,
+  body.ctm-v2 header .theme-toggle-btn,
+  body.ctm-v2 header #logout-btn {
+    width: 40px !important;
+    height: 40px !important;
+  }
+}
+
+/* ---------- GLOBAL SEARCH DROPDOWN ---------------------------------------- */
+/* ヘッダー検索入力の直下に出る、スレッド/返信横断ヒットの一覧。 */
+body.ctm-v2 .header-search-container {
+  position: relative !important;
+}
+
+body.ctm-v2 .ctm-search-dropdown {
+  position: absolute !important;
+  top: calc(100% + 6px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  /* legacy style.css uses 1000〜10000+ 系の z-index を多用しているため、
+     トークン値では足りない。ヘッダー直下ポップオーバーとして確実に最前面に出す。 */
+  z-index: 10050 !important;
+  max-height: min(70vh, 560px) !important;
+  overflow-y: auto !important;
+  background: var(--surface-raised) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: 4px !important;
+  overscroll-behavior: contain !important;
+}
+
+body.ctm-v2 .ctm-search-dropdown-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 6px 10px !important;
+  font-size: var(--text-xs) !important;
+  color: var(--text-muted) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  margin-bottom: 4px !important;
+}
+
+body.ctm-v2 .ctm-search-dropdown-close {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-sm) !important;
+  cursor: pointer !important;
+}
+body.ctm-v2 .ctm-search-dropdown-close:hover {
+  color: var(--text-primary) !important;
+  background: var(--surface-hover) !important;
+}
+
+body.ctm-v2 .ctm-search-hit-list {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.ctm-v2 .ctm-search-hit {
+  padding: 8px 10px !important;
+  border-radius: var(--radius-md) !important;
+  cursor: pointer !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  border: 1px solid transparent !important;
+}
+body.ctm-v2 .ctm-search-hit + .ctm-search-hit {
+  margin-top: 2px !important;
+}
+body.ctm-v2 .ctm-search-hit.is-active,
+body.ctm-v2 .ctm-search-hit:hover {
+  background: var(--surface-hover) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+body.ctm-v2 .ctm-search-hit-row1 {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: var(--text-2xs) !important;
+  color: var(--text-muted) !important;
+}
+body.ctm-v2 .ctm-search-hit-team {
+  text-transform: none !important;
+  letter-spacing: var(--tracking-normal) !important;
+}
+body.ctm-v2 .ctm-search-hit-type {
+  padding: 0 6px !important;
+  border-radius: var(--radius-round) !important;
+  background: var(--surface-active) !important;
+  color: var(--text-secondary) !important;
+}
+body.ctm-v2 .ctm-search-hit-title {
+  font-size: var(--text-base) !important;
+  color: var(--text-primary) !important;
+  font-weight: var(--weight-medium) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+body.ctm-v2 .ctm-search-hit-snippet {
+  font-size: var(--text-xs) !important;
+  color: var(--text-secondary) !important;
+  line-height: var(--leading-snug) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+}
+body.ctm-v2 .ctm-search-hit-mark {
+  background: color-mix(in oklch, var(--accent) 30%, transparent) !important;
+  color: inherit !important;
+  padding: 0 1px !important;
+  border-radius: 2px !important;
+}

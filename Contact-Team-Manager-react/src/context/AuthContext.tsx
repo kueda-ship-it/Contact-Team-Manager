@@ -84,6 +84,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
     }, []);
 
+    // employee-master などの他アプリから role / display_name などが更新された際に、
+    // 自分の profile state をリアルタイムで追従させる。
+    useEffect(() => {
+        if (!user?.id) return;
+        const channel = supabase
+            .channel(`contact-team:profile:${user.id}`)
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+                (payload) => {
+                    const row = payload.new as Partial<Profile>;
+                    setProfile((prev) => (prev ? { ...prev, ...row } : prev));
+                },
+            )
+            .subscribe();
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [user?.id]);
+
     async function loadProfile(userId: string) {
         // Prevent concurrent loads for the same user (SSO race condition fix)
         if (profileLoadingRef.current === userId) {

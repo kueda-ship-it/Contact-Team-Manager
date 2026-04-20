@@ -1,0 +1,346 @@
+/* ============================================================================
+   Contact Team Manager — Design Tokens
+   ----------------------------------------------------------------------------
+   Single source of truth for color, typography, spacing, radius, motion,
+   and shadow. Themed via [data-theme="light" | "dark"] on <html>, and also
+   via body.light-mode / body.dark-mode for backward compatibility with
+   legacy stylesheets (style.css, liquid-glass.css).
+
+   Guiding principles: Business-grade density. Calm skeleton, loud state.
+   OKLCH for perceptually uniform scales. Neutrals tinted toward brand hue.
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   1. Primitives — raw palette. Never reference these from components; go
+   through the semantic tokens below.
+   --------------------------------------------------------------------------- */
+:root {
+  /* Brand Purple (hue 285, from #6264A7) */
+  --brand-50:  oklch(0.97 0.020 285);
+  --brand-100: oklch(0.94 0.035 285);
+  --brand-200: oklch(0.87 0.060 285);
+  --brand-300: oklch(0.78 0.090 285);
+  --brand-400: oklch(0.66 0.120 285);
+  --brand-500: oklch(0.54 0.140 285);
+  --brand-600: oklch(0.46 0.140 285);
+  --brand-700: oklch(0.38 0.120 285);
+  --brand-800: oklch(0.30 0.095 285);
+  --brand-900: oklch(0.22 0.065 285);
+
+  /* Accent Cyan-Green (hue 200, from #00B7C3) */
+  --accent-50:  oklch(0.97 0.020 200);
+  --accent-100: oklch(0.93 0.045 200);
+  --accent-200: oklch(0.88 0.075 200);
+  --accent-300: oklch(0.82 0.105 200);
+  --accent-400: oklch(0.76 0.125 200);
+  --accent-500: oklch(0.71 0.130 200);
+  --accent-600: oklch(0.62 0.125 200);
+  --accent-700: oklch(0.52 0.115 200);
+  --accent-800: oklch(0.42 0.095 200);
+  --accent-900: oklch(0.30 0.065 200);
+
+  /* Neutrals — tinted toward brand purple (hue 285, ultra-low chroma) */
+  --neutral-0:    oklch(0.995 0.003 285);
+  --neutral-50:   oklch(0.975 0.004 285);
+  --neutral-100:  oklch(0.945 0.005 285);
+  --neutral-200:  oklch(0.890 0.006 285);
+  --neutral-300:  oklch(0.800 0.007 285);
+  --neutral-400:  oklch(0.660 0.008 285);
+  --neutral-500:  oklch(0.520 0.009 285);
+  --neutral-600:  oklch(0.420 0.009 285);
+  --neutral-700:  oklch(0.320 0.008 285);
+  --neutral-800:  oklch(0.240 0.007 285);
+  --neutral-850:  oklch(0.195 0.006 285);
+  --neutral-900:  oklch(0.155 0.005 285);
+  --neutral-950:  oklch(0.115 0.004 285);
+  --neutral-1000: oklch(0.075 0.003 285);
+
+  /* State — warning (amber, hue 80) */
+  --warning-300: oklch(0.86 0.110 80);
+  --warning-500: oklch(0.78 0.135 80);
+  --warning-700: oklch(0.58 0.130 70);
+  --warning-900: oklch(0.32 0.085 70);
+
+  /* State — danger (muted red, hue 25) */
+  --danger-300: oklch(0.76 0.130 25);
+  --danger-500: oklch(0.62 0.170 25);
+  --danger-700: oklch(0.48 0.165 25);
+  --danger-900: oklch(0.30 0.105 25);
+}
+
+/* ---------------------------------------------------------------------------
+   2. Semantic tokens — DARK (default)
+   App boots into dark by default (the liquid-glass mode is dark-family).
+   The selectors below ALL map to dark values so legacy liquid-glass mode
+   (which has no body class) and explicit dark mode both resolve correctly.
+   --------------------------------------------------------------------------- */
+:root,
+:root[data-theme="dark"],
+body.dark-mode {
+  color-scheme: dark;
+
+  /* Surfaces — the quiet skeleton.
+     Elevation in dark mode goes LIGHTER with each layer (Material/Teams
+     convention). Base = charcoal, raised = slightly lighter charcoal,
+     overlay/modal = one more step up. Avoids the "void black" look. */
+  --surface-base:    var(--neutral-850);  /* app background (charcoal) */
+  --surface-sunken:  var(--neutral-900);  /* recessed (darker than base) */
+  --surface-raised:  var(--neutral-800);  /* cards, sidebar */
+  --surface-overlay: var(--neutral-700);  /* modals, popovers */
+  --surface-hover:   var(--neutral-700);
+  --surface-active:  var(--neutral-600);
+  --surface-selected: color-mix(in oklch, var(--brand-500) 22%, var(--neutral-900));
+
+  /* Borders — raised to keep definition visible now that surfaces are lighter */
+  --border-subtle:  var(--neutral-700);
+  --border-default: var(--neutral-600);
+  --border-strong:  var(--neutral-500);
+  --border-focus:   var(--accent-400);
+
+  /* Text */
+  /* Text */
+  --text-primary:   var(--neutral-50);
+  --text-secondary: var(--neutral-300);
+  --text-muted:     var(--neutral-400);
+  --text-disabled:  var(--neutral-500);
+  --text-inverse:   var(--neutral-950);
+  --text-on-brand:  var(--neutral-0);
+  --text-on-accent: var(--neutral-1000);
+
+  /* Brand / Accent — tuned for dark backgrounds (higher L for contrast) */
+  --brand:           var(--brand-400);
+  --brand-hover:     var(--brand-300);
+  --brand-active:    var(--brand-500);
+  --brand-subtle-bg: color-mix(in oklch, var(--brand-500) 18%, transparent);
+
+  --accent:           var(--accent-400);
+  --accent-hover:     var(--accent-300);
+  --accent-active:    var(--accent-500);
+  --accent-subtle-bg: color-mix(in oklch, var(--accent-500) 18%, transparent);
+
+  /* Task / Thread state colors — three-way legible: color + shape + label */
+  --state-pending:    var(--brand-300);       /* 未対応 */
+  --state-in-progress: var(--accent-300);     /* 対応中 */
+  --state-completed:  var(--accent-500);      /* 完了 */
+  --state-warning:    var(--warning-500);     /* 保留 / 注意 */
+  --state-danger:     var(--danger-500);      /* 期限超過 / エラー */
+  --state-info:       var(--brand-400);
+
+  --state-pending-bg:     color-mix(in oklch, var(--brand-500) 16%, transparent);
+  --state-in-progress-bg: color-mix(in oklch, var(--accent-500) 16%, transparent);
+  --state-completed-bg:   color-mix(in oklch, var(--accent-700) 22%, transparent);
+  --state-warning-bg:     color-mix(in oklch, var(--warning-500) 18%, transparent);
+  --state-danger-bg:      color-mix(in oklch, var(--danger-500) 20%, transparent);
+
+  /* Shadows — dark uses deeper tints, not blacker */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+  --shadow-md: 0 2px 6px oklch(0 0 0 / 0.32), 0 1px 2px oklch(0 0 0 / 0.40);
+  --shadow-lg: 0 8px 24px oklch(0 0 0 / 0.38);
+  --shadow-xl: 0 16px 48px oklch(0 0 0 / 0.45);
+
+  /* Focus ring — two-tone so it shows on any surface */
+  --focus-ring: 0 0 0 2px var(--surface-base),
+                0 0 0 4px color-mix(in oklch, var(--accent-400) 70%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   3. Semantic tokens — LIGHT
+   Not "safe default" light — intentionally cool neutral with purple hint.
+   --------------------------------------------------------------------------- */
+:root[data-theme="light"],
+body.light-mode {
+  color-scheme: light;
+
+  --surface-base:    var(--neutral-50);
+  --surface-sunken:  var(--neutral-100);
+  --surface-raised:  var(--neutral-0);
+  --surface-overlay: var(--neutral-0);
+  --surface-hover:   var(--neutral-100);
+  --surface-active:  var(--neutral-200);
+  --surface-selected: color-mix(in oklch, var(--brand-500) 10%, var(--neutral-0));
+
+  --border-subtle:  var(--neutral-100);
+  --border-default: var(--neutral-200);
+  --border-strong:  var(--neutral-300);
+  --border-focus:   var(--accent-700);
+
+  --text-primary:   var(--neutral-900);
+  --text-secondary: var(--neutral-700);
+  --text-muted:     var(--neutral-500);
+  --text-disabled:  var(--neutral-400);
+  --text-inverse:   var(--neutral-0);
+  --text-on-brand:  var(--neutral-0);
+  --text-on-accent: var(--neutral-1000);
+
+  --brand:           var(--brand-600);
+  --brand-hover:     var(--brand-700);
+  --brand-active:    var(--brand-800);
+  --brand-subtle-bg: color-mix(in oklch, var(--brand-500) 10%, var(--neutral-0));
+
+  --accent:           var(--accent-700);
+  --accent-hover:     var(--accent-800);
+  --accent-active:    var(--accent-900);
+  --accent-subtle-bg: color-mix(in oklch, var(--accent-500) 12%, var(--neutral-0));
+
+  --state-pending:    var(--brand-600);
+  --state-in-progress: var(--accent-700);
+  --state-completed:  var(--accent-800);
+  --state-warning:    var(--warning-700);
+  --state-danger:     var(--danger-700);
+  --state-info:       var(--brand-600);
+
+  --state-pending-bg:     color-mix(in oklch, var(--brand-500) 10%, var(--neutral-0));
+  --state-in-progress-bg: color-mix(in oklch, var(--accent-500) 12%, var(--neutral-0));
+  --state-completed-bg:   color-mix(in oklch, var(--accent-700) 10%, var(--neutral-0));
+  --state-warning-bg:     color-mix(in oklch, var(--warning-500) 18%, var(--neutral-0));
+  --state-danger-bg:      color-mix(in oklch, var(--danger-500) 12%, var(--neutral-0));
+
+  --shadow-sm: 0 1px 2px oklch(0.30 0.02 285 / 0.08);
+  --shadow-md: 0 2px 8px oklch(0.30 0.02 285 / 0.08),
+               0 1px 2px oklch(0.30 0.02 285 / 0.06);
+  --shadow-lg: 0 10px 30px oklch(0.30 0.02 285 / 0.12);
+  --shadow-xl: 0 20px 48px oklch(0.30 0.02 285 / 0.16);
+
+  --focus-ring: 0 0 0 2px var(--surface-base),
+                0 0 0 4px color-mix(in oklch, var(--accent-700) 60%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   4. Typography, spacing, radius, motion — theme-independent.
+   --------------------------------------------------------------------------- */
+:root {
+  /* Font families. Reflex fonts (Inter/IBM Plex/DM Sans/Fraunces/Space Grotesk
+     etc.) deliberately avoided. BIZ UDPGothic = Morisawa UD gothic, built for
+     business legibility and Japanese-first reading. Zen Kaku Gothic New =
+     industrial geometric display that stays calm at large sizes. */
+  --font-body: "BIZ UDPGothic", "Zen Kaku Gothic New",
+               "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+               system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Zen Kaku Gothic New", "BIZ UDPGothic",
+                  "Hiragino Sans", system-ui, sans-serif;
+
+  /* App-UI type scale (fixed rem — do not fluid-scale inside product UI) */
+  --text-2xs:  0.6875rem; /* 11px — dense badges, timestamps */
+  --text-xs:   0.75rem;   /* 12px — meta, labels */
+  --text-sm:   0.8125rem; /* 13px — compact secondary */
+  --text-base: 0.875rem;  /* 14px — body default */
+  --text-md:   0.9375rem; /* 15px — primary reading */
+  --text-lg:   1.0625rem; /* 17px — section labels */
+  --text-xl:   1.25rem;   /* 20px — H3 */
+  --text-2xl:  1.5rem;    /* 24px — H2 */
+  --text-3xl:  1.875rem;  /* 30px — H1 */
+  --text-4xl:  2.375rem;  /* 38px — display */
+
+  --leading-tight:   1.2;
+  --leading-snug:    1.35;
+  --leading-normal:  1.55;
+  --leading-relaxed: 1.7;
+
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.02em;
+  --tracking-label:  0.04em;
+
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* Spacing — 4pt scale, semantic names (not pixel-named) */
+  --space-0:   0;
+  --space-px:  1px;
+  --space-1:   0.25rem;  /*  4px */
+  --space-2:   0.5rem;   /*  8px */
+  --space-3:   0.75rem;  /* 12px */
+  --space-4:   1rem;     /* 16px */
+  --space-5:   1.5rem;   /* 24px */
+  --space-6:   2rem;     /* 32px */
+  --space-7:   3rem;     /* 48px */
+  --space-8:   4rem;     /* 64px */
+  --space-9:   6rem;     /* 96px */
+
+  /* Radius */
+  --radius-xs:    2px;
+  --radius-sm:    4px;
+  --radius-md:    6px;
+  --radius-lg:    10px;
+  --radius-xl:    14px;
+  --radius-2xl:   20px;
+  --radius-round: 999px;
+
+  /* Motion — exponential deceleration, no bounce */
+  --ease-out:        cubic-bezier(0.22, 1, 0.36, 1);    /* quart-out */
+  --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);     /* expo-out */
+  --ease-in-out:     cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast:   120ms;
+  --duration-base:   180ms;
+  --duration-slow:   260ms;
+
+  /* Layout constants */
+  --reading-max: 72ch;
+  --touch-min:   44px;
+  --z-sidebar:   10;
+  --z-header:    20;
+  --z-overlay:   40;
+  --z-modal:     50;
+  --z-toast:     60;
+  --z-tooltip:   70;
+}
+
+/* ---------------------------------------------------------------------------
+   5. Legacy variable aliases — keep existing style.css / liquid-glass.css
+   working. New code should NOT reference these; use the semantic tokens.
+   --------------------------------------------------------------------------- */
+:root,
+:root[data-theme="dark"],
+:root[data-theme="light"],
+body.dark-mode,
+body.light-mode {
+  /* Existing palette vars */
+  --primary:        var(--brand);
+  --primary-light:  var(--brand-hover);
+  --primary-dark:   var(--brand-active);
+  --bg-dark:        var(--surface-base);
+  --card-bg:        var(--surface-raised);
+  --text-main:      var(--text-primary);
+  --text-normal:    var(--text-primary);
+  --danger:         var(--state-danger);
+  --success:        var(--state-completed);
+
+  /* Glass effect — retained for legacy liquid-glass mode but routed through
+     theme so light mode can neutralize it */
+  --glass:           color-mix(in oklch, var(--surface-raised) 75%, transparent);
+  --glass-border:    color-mix(in oklch, var(--border-default) 60%, transparent);
+  --glass-highlight: color-mix(in oklch, var(--neutral-0) 15%, transparent);
+  --glass-blur:      20px;
+
+  --transition:      all var(--duration-base) var(--ease-in-out);
+  --img-rendering:   -webkit-optimize-contrast;
+}
+
+/* In light mode, flatten the glass surfaces (matches existing expectations). */
+:root[data-theme="light"],
+body.light-mode {
+  --glass:           var(--surface-raised);
+  --glass-border:    var(--border-default);
+  --glass-highlight: transparent;
+  --glass-blur:      0px;
+}
+
+/* ---------------------------------------------------------------------------
+   6. Motion preferences
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
