@@ -173,11 +173,11 @@ export function WaterDateTimePicker({
         }
 
         if (spaceAbove > panelH || spaceAbove > spaceBelow) {
-            // 上に開く
-            setPanelPos({ bottom: `${window.innerHeight - rect.top + 6}px`, left: `${left}px` });
+            // 上に開く（top は明示的に auto にして CSS の残存を無効化）
+            setPanelPos({ top: 'auto', bottom: `${window.innerHeight - rect.top + 6}px`, left: `${left}px`, right: 'auto' });
         } else {
-            // 下に開く
-            setPanelPos({ top: `${rect.bottom + 6}px`, left: `${left}px` });
+            // 下に開く（bottom は明示的に auto にして CSS の残存を無効化）
+            setPanelPos({ top: `${rect.bottom + 6}px`, bottom: 'auto', left: `${left}px`, right: 'auto' });
         }
     }, []);
 
