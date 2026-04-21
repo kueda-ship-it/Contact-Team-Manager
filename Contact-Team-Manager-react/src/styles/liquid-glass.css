@@ -637,7 +637,8 @@ select.input-field option,
     justify-content: space-between;
 }
 .water-dtp-btn-clear,
-.water-dtp-btn-today {
+.water-dtp-btn-today,
+.water-dtp-btn-confirm {
     font-size: 0.75rem;
     font-weight: 600;
     padding: 5px 14px;
@@ -655,13 +656,25 @@ select.input-field option,
     border-color: rgba(255, 130, 130, 0.45);
     color: white;
 }
+/* 今日: ニュートラル（確定と区別するため目立たない見た目に） */
 .water-dtp-btn-today {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(180, 210, 255, 0.25);
+    color: rgba(210, 230, 255, 0.85);
+}
+.water-dtp-btn-today:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(180, 210, 255, 0.45);
+    color: white;
+}
+/* 確定: プライマリ（強い青グラデーションで主要アクション化） */
+.water-dtp-btn-confirm {
     background: linear-gradient(135deg, rgba(90, 160, 255, 0.50), rgba(60, 130, 240, 0.65));
     border: 1px solid rgba(140, 205, 255, 0.45);
     color: white;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
 }
-.water-dtp-btn-today:hover {
+.water-dtp-btn-confirm:hover {
     background: linear-gradient(135deg, rgba(100, 175, 255, 0.65), rgba(70, 145, 255, 0.80));
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(60,130,255,0.30);
 }
@@ -698,7 +711,9 @@ body.light-mode .water-dtp-time-input {
     color: #1a3060;
 }
 body.light-mode .water-dtp-btn-clear { color: #c02020; background: rgba(255,80,80,0.08); border-color: rgba(220,80,80,0.25); }
-body.light-mode .water-dtp-btn-today { background: linear-gradient(135deg, rgba(70,145,255,0.60), rgba(50,120,230,0.75)); color: white; }
+body.light-mode .water-dtp-btn-today { background: rgba(220, 235, 255, 0.55); color: #1a3a6a; border-color: rgba(150, 195, 245, 0.45); }
+body.light-mode .water-dtp-btn-today:hover { background: rgba(200, 222, 250, 0.75); color: #0f2a55; }
+body.light-mode .water-dtp-btn-confirm { background: linear-gradient(135deg, rgba(70,145,255,0.60), rgba(50,120,230,0.75)); color: white; }
 
 /* ────────────────────────────────────────────────────────────────
    REMIND (datetime-local) — リマインド入力
