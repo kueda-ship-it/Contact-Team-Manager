@@ -942,18 +942,15 @@ body {
     background: rgba(255, 255, 255, 0.05);
 }
 
-/* 選択中の項目は常に左端に cyan バーを表示（チャネル有無を問わず） */
-.team-list-item.active>.team-item-header,
-.team-list-item.child-active>.team-item-header {
-    border-left: 2px solid var(--accent);
-}
-
+/* 選択中の項目: アイコン周辺に対称な cyan リングを表示（左右非対称な border-left 方式から変更） */
 .team-list-item.active>.team-item-header {
     background: rgba(255, 255, 255, 0.1);
+    border-left: none;
 }
 
 .team-list-item.child-active>.team-item-header {
     background: transparent;
+    border-left: none;
 }
 
 .team-icon {
@@ -1253,11 +1250,13 @@ body:not(.light-mode) .rich-editor * {
     flex: 1;
 }
 
-/* Active indicator for list item */
-.team-list-item.active .team-icon {
+/* Active indicator for list item — アイコンに対称な cyan リング */
+.team-list-item.active .team-icon,
+.team-list-item.child-active .team-icon {
     border-radius: 12px;
     background: var(--primary);
     color: white;
+    box-shadow: 0 0 0 2px var(--accent);
 }
 
 .team-item-header:hover .team-icon {
