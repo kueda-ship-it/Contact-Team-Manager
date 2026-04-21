@@ -79,6 +79,7 @@ interface Thread {
     user_id: string;
     remind_at?: string | null;
     reminder_sent?: boolean;
+    reminders?: { id: string; remind_at: string; reminder_sent: boolean }[];
 }
 
 export function useThreads(
@@ -100,30 +101,29 @@ export function useThreads(
             const isSearching = searchQuery.trim().length > 0;
             const effectiveLimit = (filter === 'pending' || filter === 'mentions' || isSearching) ? 2000 : limit;
 
-            console.log(`[useThreads] Fetching. Filter: ${filter}, Search: ${searchQuery}, Limit: ${limit}, Effective: ${effectiveLimit}`);
+            console.log(`[useThreads] Fetching. Team: ${teamId}, Filter: ${filter}, Search: ${searchQuery}, Silent: ${silent}`);
 
-            if (!silent) setLoading(true);
+            // Only show loading if we really have no data for the current team
+            const isDifferentTeam = threads.length > 0 && teamId !== null && threads[0].team_id !== Number(teamId);
+            if (!silent && (threads.length === 0 || isDifferentTeam)) setLoading(true);
             setError(null);
-
+            
+            // ... (rest of query construction) ...
             let query = supabase
                 .from('threads')
                 .select(`
                   *,
-                  replies:replies(*)
+                  replies:replies(*),
+                  reminders:thread_reminders(id, remind_at, reminder_sent)
                 `);
 
-            // Apply search filter if present
             if (isSearching) {
                 const term = `%${searchQuery.trim()}%`;
-                // Search in title and content only (author is UUID, author_name does not exist on table)
                 query = query.or(`title.ilike.${term},content.ilike.${term}`);
             }
 
-            // Apply limit (applied after filters by PostgREST logic, but definition order in JS chain implies intent)
-            // We want to sort by created_at DESC normally
             query = query.order('created_at', { ascending: false }).limit(effectiveLimit);
 
-            // Server-side filtering for status
             if (filter === 'pending') {
                 query = query.eq('status', 'pending');
             } else if (filter === 'completed') {
@@ -161,7 +161,7 @@ export function useThreads(
         } finally {
             setLoading(false);
         }
-    }, [teamId, profile, memberships, limit, ascending, filter, searchQuery]);
+    }, [teamId, profile?.id, memberships.length, limit, ascending, filter, searchQuery]);
 
     useEffect(() => {
         fetchThreads();
@@ -649,6 +649,51 @@ export function useUserMemberships(userId: string | undefined) {
     };
 
     return { memberships, loading, refetch: fetchMemberships, updateLastRead };
+}
+
+export function usePopularTeamId(userId: string | undefined) {
+    const [popularTeamId, setPopularTeamId] = useState<string | number | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!userId) {
+            setLoading(false);
+            return;
+        }
+
+        const fetchPopularTeam = async () => {
+            setLoading(true);
+            try {
+                // Fetch distribution of posts by this user per team
+                const { data, error } = await supabase
+                    .from('threads')
+                    .select('team_id')
+                    .eq('user_id', userId);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    const counts: { [id: string]: number } = {};
+                    data.forEach(t => {
+                        const tid = String(t.team_id);
+                        counts[tid] = (counts[tid] || 0) + 1;
+                    });
+
+                    // Sort by count descending
+                    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                    setPopularTeamId(sorted[0][0]);
+                }
+            } catch (err) {
+                console.error('Error fetching popular team:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPopularTeam();
+    }, [userId]);
+
+    return { popularTeamId, loading };
 }
 
 export function useUnreadCounts(userId: string | undefined, memberships: any[]) {

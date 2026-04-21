@@ -39,12 +39,55 @@ body.light-mode {
     --glass-blur: 8px;
     --border-color: #e1e1e1;
     --bg-elevated: #ffffff;
+    --success: #107c10;
+    /* body 自体の背景を明示的に上書き */
+    background-color: #f0f2f5 !important;
+    color: #3c4043 !important;
+}
+
+/* ================================================================
+   Light Mode — glass を除去してフラットなライトテーマに
+   ================================================================ */
+
+/* backdrop-filter を一括除去（liquid-glass.css の !important を上書き） */
+body.light-mode header,
+body.light-mode .task-card,
+body.light-mode .task-card:hover,
+body.light-mode .teams-sidebar,
+body.light-mode .teams-sidebar:hover,
+body.light-mode .static-form-container .compact-form,
+body.light-mode .static-form-container .compact-form:focus-within,
+body.light-mode .side-panel,
+body.light-mode .side-panel .side-panel-title,
+body.light-mode .input-field,
+body.light-mode .glass-input-liquid,
+body.light-mode .compact-form .input-field,
+body.light-mode .reply-form .input-field,
+body.light-mode .modal .input-field,
+body.light-mode .static-form-container .input-field,
+body.light-mode .quick-reply-input,
+body.light-mode .quick-reply-input.rich-editor,
+body.light-mode .modal,
+body.light-mode .modal-overlay,
+body.light-mode .water-dtp-panel,
+body.light-mode .water-dtp-trigger {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 水面スペキュラーを非表示 */
+body.light-mode .task-card::before,
+body.light-mode .static-form-container .compact-form::before,
+body.light-mode .modal::before,
+body.light-mode .teams-sidebar::before {
+    display: none !important;
 }
 
 /* Specific overrides for light mode components */
 body.light-mode header {
-    background: #ffffff;
-    border-bottom: 1px solid #e1e1e1;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e1e1e1 !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
     color: #333333;
 }
 
@@ -65,16 +108,20 @@ body.light-mode .sidebar-right {
     border-left: 1px solid #e1e1e1;
 }
 
-body.light-mode .task-card,
-body.light-mode .reply-item {
+body.light-mode .task-card {
     background: #ffffff;
     border: 1px solid #e1e1e1;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+body.light-mode .reply-item {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
 body.light-mode .reply-section {
-    background: #f8f9fa;
-    border-top: 1px solid #e1e1e1;
+    background: transparent;
 }
 
 body.light-mode .logo {
@@ -116,6 +163,20 @@ body.light-mode .static-form-container {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+}
+
+/* コンパクトフォーム — ハードコードされた #1F1E1D を上書き */
+body.light-mode .static-form-container .compact-form {
+    background: #ffffff !important;
+    border: 1px solid #e1e1e1 !important;
+    border-top: 1px solid #e1e1e1 !important;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06) !important;
+    color: #3c4043 !important;
+}
+body.light-mode .static-form-container .compact-form:focus-within {
+    border-color: #c0c0e0 !important;
+    border-top-color: #c0c0e0 !important;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.10) !important;
 }
 
 body.light-mode .side-panel .task-card {
@@ -203,13 +264,30 @@ body.light-mode .icon-btn,
 body.light-mode .quick-reply-btn,
 body.light-mode .reaction-bubble,
 body.light-mode .gear-btn-unified,
-body.light-mode .team-settings-icon,
-body.light-mode .btn-send-blue,
-body.light-mode .btn-clip-yellow {
+body.light-mode .team-settings-icon {
     color: #666666 !important;
-    /* Default gray */
     border-color: #cccccc !important;
     background: transparent !important;
+}
+
+/* Specific Action Buttons in Light Mode - High Visibility */
+body.light-mode .btn-send-blue {
+    color: #0078d4 !important; /* Azure Blue */
+    border-color: #0078d4 !important;
+}
+body.light-mode .btn-clip-yellow {
+    color: #b8860b !important; /* Dark Goldenrod for visibility */
+    border-color: #b8860b !important;
+}
+body.light-mode .btn-complete,
+body.light-mode .check-btn,
+body.light-mode .action-btn-complete {
+    color: #00b28a !important; /* Cyan Green as requested */
+    border-color: #00b28a !important;
+}
+body.light-mode .btn-revert {
+    color: #5c2d91 !important; /* Teams Purple */
+    border-color: #5c2d91 !important;
 }
 
 /* Hover states - Color on hover */
@@ -372,10 +450,19 @@ body.light-mode input::placeholder {
     color: #888888 !important;
 }
 
-/* Icons within buttons */
+/* Icons within buttons — 明示的にダーク色で上書き */
 body.light-mode button svg,
-body.light-mode .btn svg {
-    stroke: currentColor;
+body.light-mode .btn svg,
+body.light-mode .icon-btn svg,
+body.light-mode .gear-btn-unified svg,
+body.light-mode header svg,
+body.light-mode .team-settings-icon svg {
+    stroke: #3c4043 !important;
+    color: #3c4043 !important;
+}
+body.light-mode header .icon-btn,
+body.light-mode header button {
+    color: #3c4043 !important;
 }
 
 /* Sidebar submenu items */
@@ -523,12 +610,10 @@ body.light-mode .btn-complete:hover,
 body.light-mode .check-btn:hover,
 body.light-mode .action-btn-complete:hover,
 body.light-mode .btn-status:hover {
-    color: #1bffa4 !important;
-    /* Neon Mint / Dark Mode Glow */
-    background: rgba(27, 255, 164, 0.1) !important;
-    border-color: #1bffa4 !important;
-    box-shadow: 0 0 10px rgba(27, 255, 164, 0.4) !important;
-    /* Mint Glow */
+    color: #00b28a !important;
+    background: rgba(0, 178, 138, 0.1) !important;
+    border-color: #00b28a !important;
+    box-shadow: 0 0 10px rgba(0, 178, 138, 0.2) !important;
 }
 
 /* Ensure the icon inside also changes color */
@@ -536,18 +621,19 @@ body.light-mode .btn-complete:hover svg,
 body.light-mode .check-btn:hover svg,
 body.light-mode .action-btn-complete:hover svg,
 body.light-mode .btn-status:hover svg {
-    stroke: #1bffa4 !important;
+    stroke: #00b28a !important;
 }
 
 /* Return (Undo) Button Hover in Light Mode */
 body.light-mode .btn-revert:hover {
-    color: #0078d4 !important;
-    background: rgba(0, 120, 212, 0.1) !important;
-    border-color: #0078d4 !important;
+    color: #5c2d91 !important;
+    background: rgba(92, 45, 145, 0.1) !important;
+    border-color: #5c2d91 !important;
+    box-shadow: 0 0 10px rgba(92, 45, 145, 0.2) !important;
 }
 
 body.light-mode .btn-revert:hover svg {
-    stroke: #0078d4 !important;
+    stroke: #5c2d91 !important;
 }
 
 .logo {
@@ -856,13 +942,11 @@ body {
     background: rgba(255, 255, 255, 0.05);
 }
 
-.team-list-item.active .team-item-header {
-    background: rgba(255, 255, 255, 0.1);
-}
-
+/* 選択中の項目: アイコンの cyan リングのみで表現。行の白背景は不要 */
+.team-list-item.active>.team-item-header,
 .team-list-item.child-active>.team-item-header {
-    border-left: 2px solid var(--accent);
     background: transparent;
+    border-left: none;
 }
 
 .team-icon {
@@ -1162,11 +1246,13 @@ body:not(.light-mode) .rich-editor * {
     flex: 1;
 }
 
-/* Active indicator for list item */
-.team-list-item.active .team-icon {
+/* Active indicator for list item — アイコンに対称な cyan リング */
+.team-list-item.active .team-icon,
+.team-list-item.child-active .team-icon {
     border-radius: 12px;
     background: var(--primary);
     color: white;
+    box-shadow: 0 0 0 2px var(--accent);
 }
 
 .team-item-header:hover .team-icon {
@@ -1979,9 +2065,9 @@ body.light-mode .btn-download-orange:hover {
 
 /* --- Reply Section --- */
 .reply-section {
-    background: rgba(0, 0, 0, 0.15);
+    background: transparent;
     border-radius: 4px;
-    padding: 0.5rem;
+    padding: 0 0.5rem;
     overflow: visible !important;
     display: flex;
     flex-direction: column;
@@ -1990,6 +2076,8 @@ body.light-mode .btn-download-orange:hover {
     /* Lift the whole section to stay above reaction bars below */
     transition: all 0.2s ease;
     position: relative;
+    border: none;
+    box-shadow: none;
 }
 
 .reply-section.is-empty {
@@ -2008,8 +2096,8 @@ body.light-mode .btn-download-orange:hover {
     overflow-y: auto;
     overflow-x: visible !important;
     flex: 1;
-    padding: 20px 5px !important;
-    /* Minimized buffer while still preventing menu clipping */
+    padding: 5px 5px !important;
+    /* Reduced buffer */
     scrollbar-width: thin;
     scrollbar-color: #444 transparent;
 }
@@ -2020,11 +2108,11 @@ body.light-mode .btn-download-orange:hover {
 }
 
 .reply-item {
-    padding: 6px 10px;
-    /* Tightened reply padding */
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03); /* 微細な背景を復活 */
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08); /* 控えめな枠線を復活 */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     margin-bottom: 5px;
     font-size: 0.85rem;
     transition: background 0.2s ease;
@@ -2410,7 +2498,7 @@ textarea.input-field {
     background: rgba(var(--primary-rgb), 0.15);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    border: 1px solid rgba(var(--primary-rgb), 0.3);
+    border: none; /* 二重枠解消のため削除 */
     padding: 0px 6px;
     border-radius: 4px;
     display: inline-block;
@@ -4059,6 +4147,47 @@ body.menu-open .quick-reply-form {
     }
 }
 
+/* --- Icon Specific Coloring (Liquid Glass Icons) --- */
+/* Default State: All icons are translucent white */
+.btn-send-blue svg,
+.btn-clip-yellow svg,
+.btn-status svg,
+.btn-status.btn-revert svg {
+    stroke: rgba(255, 255, 255, 0.9) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Hover States: Specific colors with Skeleton Glow */
+/* Send Icon (Airplane) - Water Blue Glow */
+.btn-send-blue:hover svg {
+    stroke: #00E5FF !important;
+    filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.9));
+}
+
+/* Clip Icon (Paperclip) - Yellow Glow */
+.btn-clip-yellow:hover svg {
+    stroke: #FFEB3B !important;
+    filter: drop-shadow(0 0 6px rgba(255, 235, 59, 0.9));
+}
+
+/* Status Button - Complete (Cyan Green Glow) */
+.btn-status:not(.btn-revert):hover svg {
+    stroke: #00FFBB !important;
+    filter: drop-shadow(0 0 6px rgba(0, 255, 187, 0.9));
+}
+
+/* When in Revert mode (Completed status) - Purple Glow */
+.btn-status.btn-revert:hover svg {
+    stroke: #9C27B0 !important;
+    filter: drop-shadow(0 0 6px rgba(156, 39, 176, 0.9));
+}
+
+/* Light Mode Adjustments - Slightly deeper colors for contrast */
+body.light-mode .btn-send-blue:hover svg { stroke: #00B0FF !important; filter: drop-shadow(0 0 4px rgba(0, 176, 255, 0.5)); }
+body.light-mode .btn-clip-yellow:hover svg { stroke: #FBC02D !important; filter: drop-shadow(0 0 4px rgba(251, 192, 45, 0.5)); }
+body.light-mode .btn-status:hover svg { stroke: #00B28A !important; filter: drop-shadow(0 0 4px rgba(0, 178, 138, 0.5)); }
+body.light-mode .btn-status.btn-revert:hover svg { stroke: #7B1FA2 !important; filter: drop-shadow(0 0 4px rgba(123, 31, 162, 0.5)); }
+
 /* Desktop Defaults - MUST BE OUTSIDE @media query */
 @media (min-width: 769px) {
 
@@ -4291,6 +4420,20 @@ body.menu-open .quick-reply-form {
 }
 
 /* --- Link and Mention Styles (Final Force) --- */
+/* #root .reply-item { 
+    border: none;
+    box-shadow: none;
+    background: transparent;
+} */
+
+#root .reply-section,
+#root .task-footer-teams,
+#root .thread-expandable-wrapper,
+#root .reply-scroll-area {
+    border: none;
+    box-shadow: none;
+}
+
 #root .task-card .task-content a,
 #root .reply-item .reply-content a,
 #root a.post-link {
@@ -4315,12 +4458,23 @@ body.menu-open .quick-reply-form {
     font-weight: 600 !important;
     display: inline !important; 
     white-space: normal !important;
+    border: none !important; /* 基本枠線を削除 */
+}
+
+/* ネストされたメンションの装飾をリセット（二重枠解消） */
+.mention .mention {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
 }
 
 .mention.mention-me {
     color: #FFD700 !important;
     background: rgba(255, 215, 0, 0.15) !important;
-    border: 1px solid rgba(255, 215, 0, 0.3) !important;
+    border: none !important;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
 }
@@ -4328,7 +4482,7 @@ body.menu-open .quick-reply-form {
 .mention.mention-all {
     color: #00B7C3 !important; /* Matching accent */
     background: rgba(0, 183, 195, 0.15) !important;
-    border: 1px solid rgba(0, 183, 195, 0.3) !important;
+    border: none !important;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
 }
@@ -4422,4 +4576,183 @@ body.light-mode #root a.post-link {
 
 .preview-close-btn:hover {
     background: rgba(255, 255, 255, 0.2);
+}
+
+/* ================================================================
+   Flat Dark Mode — glass を除去してフラットなダークテーマに
+   liquid-glass.css の !important を body.dark-mode の高い詳細度で上書き
+   ================================================================ */
+
+/* backdrop-filter を一括除去 */
+body.dark-mode header,
+body.dark-mode .task-card,
+body.dark-mode .task-card:hover,
+body.dark-mode .teams-sidebar,
+body.dark-mode .teams-sidebar:hover,
+body.dark-mode .static-form-container .compact-form,
+body.dark-mode .static-form-container .compact-form:focus-within,
+body.dark-mode .side-panel,
+body.dark-mode .side-panel .side-panel-title,
+body.dark-mode .input-field,
+body.dark-mode .glass-input-liquid,
+body.dark-mode .compact-form .input-field,
+body.dark-mode .reply-form .input-field,
+body.dark-mode .modal .input-field,
+body.dark-mode .static-form-container .input-field,
+body.dark-mode .quick-reply-input,
+body.dark-mode .quick-reply-input.rich-editor,
+body.dark-mode .modal,
+body.dark-mode .modal-overlay,
+body.dark-mode .water-dtp-panel,
+body.dark-mode .water-dtp-trigger {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 水面スペキュラーを非表示 */
+body.dark-mode .task-card::before,
+body.dark-mode .static-form-container .compact-form::before,
+body.dark-mode .modal::before,
+body.dark-mode .teams-sidebar::before {
+    display: none !important;
+}
+
+/* Header */
+body.dark-mode header {
+    background: #1F1E1D !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Task cards */
+body.dark-mode .task-card {
+    background: #1F1E1D !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.09) !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+    transform: none;
+}
+body.dark-mode .task-card:hover {
+    background: #2A2928 !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+    border-top-color: rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+    transform: none !important;
+}
+
+/* Teams sidebar */
+body.dark-mode .teams-sidebar {
+    background: #18171A !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: none !important;
+}
+body.dark-mode .teams-sidebar:hover {
+    background: #18171A !important;
+}
+body.dark-mode .team-list-item.active .team-item-header {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+body.dark-mode .team-item-header:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    box-shadow: none !important;
+}
+
+/* Post form */
+body.dark-mode .static-form-container .compact-form {
+    background: #1F1E1D !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+body.dark-mode .static-form-container .compact-form:focus-within {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    border-top-color: rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Side panel */
+body.dark-mode .side-panel {
+    background: #18171A !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+body.dark-mode .side-panel .side-panel-title {
+    background: rgba(24, 23, 26, 0.97) !important;
+}
+
+/* Input fields */
+body.dark-mode .input-field,
+body.dark-mode input.glass-input-liquid,
+body.dark-mode div.glass-input-liquid,
+body.dark-mode .compact-form input.glass-input-liquid,
+body.dark-mode .compact-form div.glass-input-liquid,
+body.dark-mode .static-form-container input.glass-input-liquid,
+body.dark-mode .static-form-container div.glass-input-liquid,
+body.dark-mode .compact-form .input-field,
+body.dark-mode .reply-form .input-field,
+body.dark-mode .modal .input-field,
+body.dark-mode .side-panel .input-field,
+body.dark-mode .static-form-container .input-field {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: none !important;
+    color: #FFFFFF !important;
+}
+body.dark-mode .input-field:focus,
+body.dark-mode input.glass-input-liquid:focus,
+body.dark-mode div.glass-input-liquid:focus {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    box-shadow: none !important;
+}
+body.dark-mode .input-field::placeholder,
+body.dark-mode input.glass-input-liquid::placeholder {
+    color: rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Quick reply */
+body.dark-mode .quick-reply-input,
+body.dark-mode .quick-reply-input.rich-editor {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-top-color: rgba(255, 255, 255, 0.12) !important;
+    color: #FFFFFF !important;
+    box-shadow: none !important;
+}
+body.dark-mode .quick-reply-input:focus,
+body.dark-mode .quick-reply-input.rich-editor:focus {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    box-shadow: none !important;
+}
+
+/* Modal */
+body.dark-mode .modal {
+    background: #2A2928 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+}
+body.dark-mode .modal-overlay {
+    background: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Date time picker */
+body.dark-mode .water-dtp-panel {
+    background: #2A2928 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+body.dark-mode .water-dtp-trigger {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: none !important;
+}
+body.dark-mode .water-dtp-trigger:hover {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(255, 255, 255, 0.20) !important;
+    box-shadow: none !important;
 }

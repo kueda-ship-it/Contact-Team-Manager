@@ -1,0 +1,1014 @@
+/* ================================================================
+   Liquid Glass — Water Effect (全面適用版)
+   Reference: Apple WWDC25 Liquid Glass Icon Composer
+   ================================================================ */
+
+:root {
+    --w-blue-faint:  rgba(130, 190, 255, 0.10);
+    --w-blue-light:  rgba(140, 200, 255, 0.16);
+    --w-blue-mid:    rgba(100, 165, 255, 0.08);
+    --w-border:      rgba(160, 215, 255, 0.20);
+    --w-border-top:  rgba(210, 240, 255, 0.52);
+    --w-inset-top:   rgba(255, 255, 255, 0.48);
+    --w-inset-btm:   rgba(60,  140, 230, 0.14);
+    --w-shadow1:     rgba(0,   15,  50,  0.35);
+    --w-shadow2:     rgba(0,   8,   35,  0.22);
+    --w-blur:        24px;
+    --w-sat:         200%;
+    --w-bright:      1.06;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   水面スペキュラー共通 (::before) — card / form
+   ──────────────────────────────────────────────────────────────── */
+.task-card::before,
+.static-form-container .compact-form::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        radial-gradient(ellipse 65% 38% at 12% 0%,
+            rgba(200, 235, 255, 0.32) 0%, transparent 58%),
+        radial-gradient(ellipse 32% 22% at 88% 4%,
+            rgba(180, 225, 255, 0.16) 0%, transparent 50%),
+        linear-gradient(180deg,
+            rgba(210, 240, 255, 0.16) 0%,
+            rgba(180, 220, 255, 0.04) 25%,
+            transparent 50%);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   1. HEADER
+   ──────────────────────────────────────────────────────────────── */
+header {
+    background: linear-gradient(
+        180deg,
+        rgba(120, 185, 255, 0.10) 0%,
+        rgba(90,  155, 255, 0.05) 100%
+    ) !important;
+    backdrop-filter: blur(28px) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    border-bottom: 1px solid var(--w-border) !important;
+    box-shadow:
+        0 2px 16px var(--w-shadow2),
+        inset 0 -1px 0 rgba(160, 215, 255, 0.12) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   2. TASK CARDS
+   ──────────────────────────────────────────────────────────────── */
+.task-card {
+    background: linear-gradient(
+        160deg,
+        rgba(140, 200, 255, 0.16) 0%,
+        rgba(100, 165, 255, 0.08) 45%,
+        rgba(120, 185, 255, 0.13) 100%
+    ) !important;
+    backdrop-filter: blur(var(--w-blur)) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    -webkit-backdrop-filter: blur(var(--w-blur)) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    border: 1px solid var(--w-border) !important;
+    border-top: 1px solid var(--w-border-top) !important;
+    box-shadow:
+        0  2px 18px var(--w-shadow1),
+        0  8px 36px var(--w-shadow2),
+        inset 0  1px 0 var(--w-inset-top),
+        inset 0 -1px 0 var(--w-inset-btm) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.task-card:hover {
+    background: linear-gradient(
+        160deg,
+        rgba(150, 210, 255, 0.22) 0%,
+        rgba(110, 175, 255, 0.12) 45%,
+        rgba(130, 195, 255, 0.18) 100%
+    ) !important;
+    border-top-color: rgba(225, 248, 255, 0.68) !important;
+    border-color: rgba(170, 220, 255, 0.28) !important;
+    box-shadow:
+        0  4px 24px var(--w-shadow1),
+        0 12px 48px var(--w-shadow2),
+        inset 0  1px 0 rgba(255, 255, 255, 0.62),
+        inset 0 -1px 0 rgba(60, 140, 230, 0.20) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   3. TEAMS SIDEBAR (position: fixed を維持)
+   ──────────────────────────────────────────────────────────────── */
+.teams-sidebar {
+    background: linear-gradient(
+        180deg,
+        rgba(130, 190, 255, 0.12) 0%,
+        rgba(100, 165, 255, 0.07) 50%,
+        rgba(115, 180, 255, 0.10) 100%
+    ) !important;
+    backdrop-filter: blur(28px) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    border-right: 1px solid var(--w-border) !important;
+    box-shadow:
+        inset -1px 0 0 rgba(200, 235, 255, 0.14),
+        4px 0 28px var(--w-shadow1) !important;
+}
+
+.teams-sidebar::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        radial-gradient(ellipse 100% 28% at 50% 0%,
+            rgba(200, 235, 255, 0.20) 0%, transparent 60%),
+        linear-gradient(180deg,
+            rgba(210, 240, 255, 0.12) 0%, transparent 40%);
+}
+
+.teams-sidebar:hover {
+    background: linear-gradient(
+        180deg,
+        rgba(140, 200, 255, 0.16) 0%,
+        rgba(110, 172, 255, 0.10) 50%,
+        rgba(125, 188, 255, 0.14) 100%
+    ) !important;
+    backdrop-filter: blur(28px) saturate(220%) brightness(1.08) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(220%) brightness(1.08) !important;
+}
+
+.team-list-item.active .team-item-header {
+    background: rgba(140, 205, 255, 0.18) !important;
+    box-shadow:
+        inset 0  1px 0 rgba(210, 240, 255, 0.50),
+        inset 0 -1px 0 rgba(60, 130, 220, 0.15),
+        0 2px 10px rgba(0, 20, 60, 0.25) !important;
+    border-radius: 10px;
+}
+
+.team-item-header:hover {
+    background: rgba(160, 215, 255, 0.12) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(210, 240, 255, 0.32),
+        0 1px 6px rgba(0, 20, 60, 0.18) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   4. POST FORM
+   ──────────────────────────────────────────────────────────────── */
+.static-form-container .compact-form {
+    background: linear-gradient(
+        155deg,
+        rgba(130, 195, 255, 0.15) 0%,
+        rgba(95,  160, 255, 0.08) 45%,
+        rgba(115, 180, 255, 0.12) 100%
+    ) !important;
+    backdrop-filter: blur(28px) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    border: 1px solid var(--w-border) !important;
+    border-top: 1px solid var(--w-border-top) !important;
+    border-radius: 18px !important;
+    box-shadow:
+        0 -4px 20px var(--w-shadow2),
+        0  6px 32px var(--w-shadow1),
+        inset 0  1px 0 var(--w-inset-top),
+        inset 0 -1px 0 var(--w-inset-btm) !important;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease !important;
+}
+
+.static-form-container .compact-form:focus-within {
+    border-color: rgba(140, 200, 255, 0.38) !important;
+    border-top-color: rgba(220, 245, 255, 0.72) !important;
+    box-shadow:
+        0 -4px 24px var(--w-shadow2),
+        0  8px 40px var(--w-shadow1),
+        0 0 0 1.5px rgba(100, 175, 255, 0.28),
+        inset 0  1px 0 rgba(255, 255, 255, 0.65),
+        inset 0 -1px 0 rgba(60, 140, 230, 0.22) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   5. RIGHT SIDE PANEL
+   ──────────────────────────────────────────────────────────────── */
+.side-panel {
+    background: linear-gradient(
+        160deg,
+        rgba(130, 190, 255, 0.10) 0%,
+        rgba(100, 160, 255, 0.05) 50%,
+        rgba(115, 178, 255, 0.08) 100%
+    ) !important;
+    backdrop-filter: blur(var(--w-blur)) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    -webkit-backdrop-filter: blur(var(--w-blur)) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    border: 1px solid var(--w-border) !important;
+    border-top: 1px solid var(--w-border-top) !important;
+}
+
+.side-panel .side-panel-title {
+    background: rgba(0, 10, 35, 0.62) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   6. INPUT FIELDS — 水感 (specificity を合わせて確実に上書き)
+   ──────────────────────────────────────────────────────────────── */
+
+/* --- 基本 (specificity 1,0) --- */
+/* --- 基本 (specificity 1,0) --- */
+.input-field {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(20px) saturate(180%) brightness(1.15) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: white !important;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1) !important;
+}
+
+.input-field::placeholder {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* 本格リキッドグラス入力欄 (最優先) */
+input.glass-input-liquid,
+div.glass-input-liquid,
+.compact-form input.glass-input-liquid,
+.compact-form div.glass-input-liquid,
+.static-form-container input.glass-input-liquid,
+.static-form-container div.glass-input-liquid {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(20px) saturate(180%) brightness(1.15) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: white !important;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1) !important;
+}
+
+input.glass-input-liquid::placeholder,
+div.glass-input-liquid[data-placeholder]:empty::before {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+input.glass-input-liquid:focus, 
+div.glass-input-liquid:focus,
+.compact-form input.glass-input-liquid:focus,
+.compact-form div.glass-input-liquid:focus,
+.static-form-container input.glass-input-liquid:focus,
+.static-form-container div.glass-input-liquid:focus {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(160, 215, 255, 0.55) !important;
+  box-shadow: 
+    0 0 20px rgba(100, 180, 255, 0.3),
+    inset 0 1px 2px rgba(255, 255, 255, 0.25) !important;
+  outline: none !important;
+}
+.input-field:focus {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(160, 215, 255, 0.55) !important;
+  box-shadow: 
+    0 0 20px rgba(100, 180, 255, 0.3),
+    inset 0 1px 2px rgba(255, 255, 255, 0.25) !important;
+  outline: none !important;
+}
+
+/* --- specificity (2,0) — compact-form / reply-form / modal / side-panel 等の内側を確実に上書き --- */
+.compact-form .input-field,
+.reply-form .input-field,
+.modal .input-field,
+.side-panel .input-field,
+.static-form-container .input-field {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(20px) saturate(180%) brightness(1.15) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+
+.compact-form .input-field:focus,
+.reply-form .input-field:focus,
+.modal .input-field:focus,
+.static-form-container .input-field:focus {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(160, 215, 255, 0.55) !important;
+  box-shadow: 
+    0 0 20px rgba(100, 180, 255, 0.3),
+    inset 0 1px 2px rgba(255, 255, 255, 0.25) !important;
+}
+
+
+/* --- select --- */
+select.input-field,
+.compact-form select.input-field,
+.modal select.input-field {
+    background-color: rgba(100, 165, 255, 0.10) !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2390caff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+}
+select.input-field option,
+.compact-form select.input-field option,
+.modal select.input-field option {
+    background-color: #0d1a35;
+    color: #FFFFFF;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   7. QUICK REPLY FORM (Not Finished 返信欄)
+   ──────────────────────────────────────────────────────────────── */
+/* 外枠を削除 */
+.quick-reply-form,
+.task-card .quick-reply-form.hover-reveal,
+.side-panel .task-card:hover .quick-reply-form {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 4px 0 !important;
+}
+
+/* 入力欄に水感 */
+.quick-reply-input,
+.quick-reply-input.rich-editor {
+    background: rgba(100, 165, 255, 0.08) !important;
+    border: 1px solid rgba(150, 210, 255, 0.20) !important;
+    border-top-color: rgba(200, 235, 255, 0.32) !important;
+    border-radius: 8px !important;
+    color: white !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    box-shadow: inset 0 1px 0 rgba(210, 238, 255, 0.12) !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 12px !important;
+}
+.quick-reply-input:focus,
+.quick-reply-input.rich-editor:focus {
+    background: rgba(120, 185, 255, 0.14) !important;
+    border-color: rgba(140, 205, 255, 0.40) !important;
+    box-shadow: inset 0 1px 0 rgba(210, 238, 255, 0.20),
+        0 0 0 2px rgba(100, 175, 255, 0.14) !important;
+}
+
+/* reply-form (フィード内返信欄) */
+.reply-form {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   8. MODAL (Settings / Admin)
+   ──────────────────────────────────────────────────────────────── */
+.modal {
+    background: linear-gradient(
+        150deg,
+        rgba(20, 40, 80,  0.75) 0%,
+        rgba(10, 20, 55,  0.88) 100%
+    ) !important;
+    backdrop-filter: blur(32px) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    -webkit-backdrop-filter: blur(32px) saturate(var(--w-sat)) brightness(var(--w-bright)) !important;
+    border: 1px solid var(--w-border) !important;
+    border-top: 1px solid var(--w-border-top) !important;
+    border-radius: 22px !important;
+    box-shadow:
+        0  4px 20px var(--w-shadow1),
+        0 20px 60px var(--w-shadow2),
+        0 40px 80px rgba(0, 5, 25, 0.30),
+        inset 0  1px 0 var(--w-inset-top),
+        inset 0 -1px 0 var(--w-inset-btm) !important;
+    position: relative;
+    overflow: hidden !important;
+}
+
+/* モーダル水面スペキュラー */
+.modal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        radial-gradient(ellipse 70% 36% at 12% 0%,
+            rgba(190, 230, 255, 0.24) 0%, transparent 58%),
+        radial-gradient(ellipse 35% 22% at 88% 4%,
+            rgba(170, 220, 255, 0.14) 0%, transparent 50%),
+        linear-gradient(180deg,
+            rgba(200, 235, 255, 0.14) 0%, transparent 30%);
+}
+
+/* モーダル overlay */
+.modal-overlay {
+    background: rgba(0, 5, 25, 0.62) !important;
+    backdrop-filter: blur(14px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(140%) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   9. WATER DATE TIME PICKER — カスタムカレンダー
+   ──────────────────────────────────────────────────────────────── */
+
+/* トリガーボタン */
+.water-dtp-trigger {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(120, 185, 255, 0.12), rgba(90, 155, 255, 0.06));
+    border: 1px solid rgba(150, 210, 255, 0.22);
+    border-top: 1px solid rgba(200, 235, 255, 0.40);
+    border-radius: 10px;
+    color: var(--text-main);
+    padding: 0 10px;
+    height: 36px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 2px 8px rgba(0,15,50,0.20);
+    transition: all 0.2s ease;
+    min-width: 160px;
+}
+.water-dtp-trigger:hover {
+    background: linear-gradient(135deg, rgba(130, 195, 255, 0.18), rgba(100, 165, 255, 0.10));
+    border-color: rgba(160, 220, 255, 0.35);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.38), 0 4px 14px rgba(0,15,50,0.28);
+}
+.water-dtp-trigger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.water-dtp-placeholder {
+    color: var(--text-muted);
+}
+
+/* パネル本体（位置は React 側で portal + fixed で制御するため、ここでは見た目だけ） */
+.water-dtp-panel {
+    z-index: 9999999 !important;
+    width: 260px;
+    background: linear-gradient(150deg, rgba(18, 38, 75, 0.75), rgba(10, 20, 55, 0.85)) !important;
+    backdrop-filter: blur(32px) saturate(200%) brightness(1.08) !important;
+    -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.08) !important;
+    border: 1px solid rgba(160, 215, 255, 0.25) !important;
+    border-top: 1px solid rgba(210, 240, 255, 0.55) !important;
+    border-radius: 20px !important;
+    padding: 16px !important;
+    box-shadow:
+        0 -8px 32px rgba(0, 15, 50, 0.45),
+        0  4px 16px rgba(0,  8, 35, 0.30),
+        inset 0  1px 0 rgba(255, 255, 255, 0.45),
+        inset 0 -1px 0 rgba(60, 140, 230, 0.20) !important;
+    animation: water-dtp-in 0.25s cubic-bezier(0.23, 1, 0.32, 1) !important;
+    overflow: hidden !important;
+}
+
+/* 水面スペキュラー（パネル内） */
+.water-dtp-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        radial-gradient(circle at 20% 10%, rgba(200, 235, 255, 0.25) 0%, transparent 40%),
+        radial-gradient(circle at 80% 90%, rgba(100, 180, 255, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(150, 210, 255, 0.05) 0%, transparent 60%);
+    opacity: 0.8;
+}
+
+@keyframes water-dtp-in {
+    from { opacity: 0; transform: translateY(6px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+/* ヘッダー */
+.water-dtp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.water-dtp-month-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: rgba(200, 235, 255, 0.95);
+}
+.water-dtp-nav {
+    background: rgba(120, 185, 255, 0.12);
+    border: 1px solid rgba(150, 210, 255, 0.22);
+    border-radius: 6px;
+    color: rgba(180, 225, 255, 0.90);
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.water-dtp-nav:hover {
+    background: rgba(140, 200, 255, 0.22);
+    border-color: rgba(170, 220, 255, 0.40);
+    color: white;
+}
+
+/* グリッド */
+.water-dtp-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 10px;
+}
+.water-dtp-weekday {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 3px 0;
+    color: rgba(160, 205, 255, 0.70);
+}
+.water-dtp-weekday.sun { color: rgba(255, 140, 140, 0.80); }
+.water-dtp-weekday.sat { color: rgba(120, 180, 255, 0.85); }
+
+.water-dtp-day {
+    aspect-ratio: 1;
+    font-size: 0.75rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(210, 235, 255, 0.85);
+    cursor: pointer;
+    transition: all 0.12s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+.water-dtp-day:hover:not(.empty):not(.selected) {
+    background: rgba(140, 205, 255, 0.25) !important;
+    color: white !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 0 12px rgba(100, 180, 255, 0.4) !important;
+    z-index: 10;
+}
+.water-dtp-day:active:not(.empty) {
+    transform: scale(0.9) !important;
+    transition: transform 0.1s !important;
+}
+.water-dtp-day.sun { color: rgba(255, 150, 150, 0.80); }
+.water-dtp-day.sat { color: rgba(130, 190, 255, 0.90); }
+.water-dtp-day.today {
+    background: rgba(100, 170, 255, 0.18);
+    border: 1px solid rgba(140, 205, 255, 0.45);
+    color: rgba(180, 225, 255, 1);
+    font-weight: 700;
+}
+.water-dtp-day.selected {
+    background: linear-gradient(135deg, rgba(90, 160, 255, 0.70), rgba(60, 130, 240, 0.85));
+    border: 1px solid rgba(140, 205, 255, 0.60);
+    color: white;
+    font-weight: 700;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(60,130,255,0.35);
+}
+.water-dtp-day.empty { cursor: default; }
+
+/* 時刻 */
+.water-dtp-time {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 0;
+    border-top: 1px solid rgba(160, 215, 255, 0.16);
+    border-bottom: 1px solid rgba(160, 215, 255, 0.16);
+    margin-bottom: 10px;
+}
+.water-dtp-time-label {
+    font-size: 0.72rem;
+    color: rgba(160, 210, 255, 0.70);
+    margin-right: 2px;
+}
+.water-dtp-time-input {
+    width: 100px;
+    background: rgba(100, 165, 255, 0.10);
+    border: 1px solid rgba(150, 210, 255, 0.22);
+    border-top: 1px solid rgba(200, 235, 255, 0.35);
+    border-radius: 6px;
+    color: rgba(210, 238, 255, 0.95);
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 6px 10px;
+    outline: none;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.water-dtp-time-input::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8) sepia(1) hue-rotate(180deg) saturate(300%);
+    cursor: pointer;
+    opacity: 0.7;
+}
+.water-dtp-time-input::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
+.water-dtp-time-input:focus {
+    border-color: rgba(140, 205, 255, 0.45);
+    background: rgba(120, 185, 255, 0.16);
+    box-shadow: 0 0 0 2px rgba(100, 175, 255, 0.14);
+}
+
+
+/* フッター */
+.water-dtp-footer {
+    display: flex;
+    justify-content: space-between;
+}
+.water-dtp-btn-clear,
+.water-dtp-btn-today,
+.water-dtp-btn-confirm {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.water-dtp-btn-clear {
+    background: rgba(255, 100, 100, 0.10);
+    border: 1px solid rgba(255, 120, 120, 0.25);
+    color: rgba(255, 160, 160, 0.90);
+}
+.water-dtp-btn-clear:hover {
+    background: rgba(255, 100, 100, 0.20);
+    border-color: rgba(255, 130, 130, 0.45);
+    color: white;
+}
+/* 今日: ニュートラル（確定と区別するため目立たない見た目に） */
+.water-dtp-btn-today {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(180, 210, 255, 0.25);
+    color: rgba(210, 230, 255, 0.85);
+}
+.water-dtp-btn-today:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(180, 210, 255, 0.45);
+    color: white;
+}
+/* 確定: プライマリ（強い青グラデーションで主要アクション化） */
+.water-dtp-btn-confirm {
+    background: linear-gradient(135deg, rgba(90, 160, 255, 0.50), rgba(60, 130, 240, 0.65));
+    border: 1px solid rgba(140, 205, 255, 0.45);
+    color: white;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.water-dtp-btn-confirm:hover {
+    background: linear-gradient(135deg, rgba(100, 175, 255, 0.65), rgba(70, 145, 255, 0.80));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(60,130,255,0.30);
+}
+
+/* ライトモード */
+body.light-mode .water-dtp-trigger {
+    background: linear-gradient(135deg, rgba(210, 235, 255, 0.70), rgba(185, 220, 255, 0.55));
+    border: 1px solid rgba(150, 205, 255, 0.55);
+    border-top: 1px solid rgba(255, 255, 255, 0.95);
+    color: #1a2a4a;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 2px 8px rgba(0,20,60,0.07);
+}
+body.light-mode .water-dtp-panel {
+    background: linear-gradient(150deg, rgba(240, 250, 255, 0.92), rgba(215, 238, 255, 0.96));
+    border: 1px solid rgba(155, 208, 255, 0.55);
+    border-top: 1px solid rgba(255, 255, 255, 0.98);
+    box-shadow:
+        0 -8px 28px rgba(0, 25, 70, 0.10),
+        0  4px 14px rgba(0, 15, 55, 0.08),
+        inset 0  1px 0 rgba(255,255,255,1.0);
+}
+body.light-mode .water-dtp-month-label { color: #1a3a6a; }
+body.light-mode .water-dtp-day { color: #2a4070; }
+body.light-mode .water-dtp-day.sun { color: #c0302a; }
+body.light-mode .water-dtp-day.sat { color: #2060b0; }
+body.light-mode .water-dtp-day.today {
+    background: rgba(80, 155, 255, 0.14);
+    border-color: rgba(100, 170, 255, 0.40);
+    color: #1040a0;
+}
+body.light-mode .water-dtp-time-input {
+    background: rgba(200, 228, 255, 0.60);
+    border-color: rgba(140, 195, 255, 0.50);
+    color: #1a3060;
+}
+body.light-mode .water-dtp-btn-clear { color: #c02020; background: rgba(255,80,80,0.08); border-color: rgba(220,80,80,0.25); }
+body.light-mode .water-dtp-btn-today { background: rgba(220, 235, 255, 0.55); color: #1a3a6a; border-color: rgba(150, 195, 245, 0.45); }
+body.light-mode .water-dtp-btn-today:hover { background: rgba(200, 222, 250, 0.75); color: #0f2a55; }
+body.light-mode .water-dtp-btn-confirm { background: linear-gradient(135deg, rgba(70,145,255,0.60), rgba(50,120,230,0.75)); color: white; }
+
+/* ────────────────────────────────────────────────────────────────
+   REMIND (datetime-local) — リマインド入力
+   ──────────────────────────────────────────────────────────────── */
+.post-remind-container {
+    background: linear-gradient(
+        135deg,
+        rgba(120, 185, 255, 0.12) 0%,
+        rgba(90,  155, 255, 0.06) 100%
+    );
+    border: 1px solid rgba(150, 210, 255, 0.22);
+    border-top: 1px solid rgba(200, 235, 255, 0.40);
+    border-radius: 10px;
+    padding: 2px 4px !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.32),
+        inset 0 -1px 0 rgba(60, 130, 220, 0.10),
+        0 2px 10px rgba(0, 15, 50, 0.22);
+}
+
+/* datetime-local のカレンダーハイライトを水色に */
+input[type="datetime-local"] {
+    accent-color: #5ab4ff;
+    color-scheme: dark;
+}
+
+input[type="datetime-local"].input-field {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7) sepia(0.5) hue-rotate(180deg) saturate(2) brightness(1.4);
+    cursor: pointer;
+    opacity: 0.85;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+    filter: invert(0.85) sepia(0.6) hue-rotate(180deg) saturate(2.8) brightness(1.7);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   10. MENTION — 紫を濃く
+   ──────────────────────────────────────────────────────────────── */
+.mention,
+body:not(.light-mode) .task-content .mention,
+body:not(.light-mode) .reply-content .mention,
+body:not(.light-mode) .rich-editor .mention,
+#pending-sidebar-list .mention,
+#assigned-sidebar-list .mention {
+    color: #b8b9ff !important;
+    background: rgba(140, 100, 255, 0.22) !important;
+    border: none !important; /* 二重枠解消のため削除 */
+    text-shadow: 0 0 12px rgba(160, 120, 255, 0.5);
+}
+
+.mention:hover {
+    color: #ceceff !important;
+    background: rgba(150, 110, 255, 0.32) !important;
+    border-color: rgba(170, 130, 255, 0.65) !important;
+    text-shadow: 0 0 16px rgba(170, 130, 255, 0.70);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   11. LIGHT MODE
+   ──────────────────────────────────────────────────────────────── */
+body.light-mode header {
+    background: linear-gradient(
+        180deg,
+        rgba(240, 250, 255, 0.88) 0%,
+        rgba(215, 238, 255, 0.75) 100%
+    ) !important;
+    border-bottom: 1px solid rgba(160, 210, 255, 0.50) !important;
+}
+
+body.light-mode .task-card {
+    background: linear-gradient(
+        160deg,
+        rgba(255, 255, 255, 0.78) 0%,
+        rgba(215, 238, 255, 0.65) 50%,
+        rgba(228, 245, 255, 0.72) 100%
+    ) !important;
+    backdrop-filter: blur(var(--w-blur)) saturate(170%) brightness(1.05) !important;
+    -webkit-backdrop-filter: blur(var(--w-blur)) saturate(170%) brightness(1.05) !important;
+    border: 1px solid rgba(160, 210, 255, 0.45) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.98) !important;
+    box-shadow:
+        0 2px 14px rgba(0, 25, 70, 0.09),
+        0 6px 30px rgba(0, 15, 55, 0.07),
+        inset 0  1px 0 rgba(255, 255, 255, 1.0),
+        inset 0 -1px 0 rgba(100, 170, 240, 0.16) !important;
+}
+
+body.light-mode .task-card:hover {
+    background: linear-gradient(
+        160deg,
+        rgba(255, 255, 255, 0.90) 0%,
+        rgba(218, 242, 255, 0.78) 50%,
+        rgba(232, 248, 255, 0.85) 100%
+    ) !important;
+    border-top-color: rgba(255, 255, 255, 1.0) !important;
+}
+
+body.light-mode .teams-sidebar {
+    background: linear-gradient(
+        180deg,
+        rgba(235, 248, 255, 0.82) 0%,
+        rgba(215, 238, 255, 0.72) 50%,
+        rgba(225, 244, 255, 0.78) 100%
+    ) !important;
+    backdrop-filter: blur(28px) saturate(160%) brightness(1.04) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(160%) brightness(1.04) !important;
+    border-right: 1px solid rgba(160, 210, 255, 0.45) !important;
+}
+
+body.light-mode .teams-sidebar:hover {
+    background: linear-gradient(
+        180deg,
+        rgba(240, 250, 255, 0.90) 0%,
+        rgba(220, 242, 255, 0.80) 100%
+    ) !important;
+}
+
+body.light-mode .static-form-container .compact-form {
+    background: linear-gradient(
+        155deg,
+        rgba(255, 255, 255, 0.80) 0%,
+        rgba(215, 238, 255, 0.68) 50%,
+        rgba(228, 246, 255, 0.75) 100%
+    ) !important;
+    border: 1px solid rgba(155, 208, 255, 0.48) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.98) !important;
+    box-shadow:
+        0 -4px 18px rgba(0, 25, 70, 0.06),
+        0  6px 28px rgba(0, 15, 55, 0.08),
+        inset 0  1px 0 rgba(255, 255, 255, 1.0),
+        inset 0 -1px 0 rgba(100, 170, 240, 0.14) !important;
+}
+
+body.light-mode .side-panel {
+    background: linear-gradient(
+        160deg,
+        rgba(240, 250, 255, 0.80) 0%,
+        rgba(215, 238, 255, 0.68) 50%,
+        rgba(228, 245, 255, 0.75) 100%
+    ) !important;
+    backdrop-filter: blur(var(--w-blur)) saturate(160%) brightness(1.04) !important;
+    -webkit-backdrop-filter: blur(var(--w-blur)) saturate(160%) brightness(1.04) !important;
+    border: 1px solid rgba(155, 208, 255, 0.45) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.95) !important;
+}
+
+body.light-mode .side-panel .side-panel-title {
+    background: rgba(225, 243, 255, 0.90) !important;
+}
+
+body.light-mode .input-field,
+body.light-mode .compact-form .input-field,
+body.light-mode .reply-form .input-field,
+body.light-mode .modal .input-field,
+body.light-mode .static-form-container .input-field {
+    background: rgba(200, 230, 255, 0.45) !important;
+    border: 1px solid rgba(150, 205, 255, 0.50) !important;
+    border-top-color: rgba(255, 255, 255, 0.90) !important;
+    color: #1a2a4a !important;
+}
+
+body.light-mode .input-field:focus,
+body.light-mode .compact-form .input-field:focus,
+body.light-mode .modal .input-field:focus {
+    background: rgba(220, 240, 255, 0.60) !important;
+    border-color: rgba(120, 185, 255, 0.60) !important;
+}
+
+body.light-mode select.input-field,
+body.light-mode .compact-form select.input-field,
+body.light-mode .modal select.input-field {
+    background-color: rgba(200, 230, 255, 0.48) !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2020/svg' viewBox='0 0 24 24' fill='none' stroke='%232060c0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+}
+
+body.light-mode select.input-field option {
+    background-color: #ddeeff;
+    color: #1a2a4a;
+}
+
+body.light-mode .quick-reply-input,
+body.light-mode .quick-reply-input.rich-editor {
+    background: rgba(210, 235, 255, 0.58) !important;
+    border: 1px solid rgba(150, 205, 255, 0.50) !important;
+    color: #1a2a4a !important;
+}
+
+body.light-mode .modal {
+    background: linear-gradient(
+        150deg,
+        rgba(240, 250, 255, 0.80) 0%,
+        rgba(215, 238, 255, 0.88) 100%
+    ) !important;
+    border: 1px solid rgba(160, 210, 255, 0.55) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.98) !important;
+    box-shadow:
+        0  4px 20px rgba(0, 25, 70, 0.08),
+        0 20px 60px rgba(0, 15, 55, 0.06),
+        inset 0  1px 0 rgba(255, 255, 255, 1.0),
+        inset 0 -1px 0 rgba(100, 170, 240, 0.15) !important;
+}
+
+body.light-mode .post-remind-container {
+    background: linear-gradient(
+        135deg,
+        rgba(210, 235, 255, 0.70) 0%,
+        rgba(185, 220, 255, 0.55) 100%
+    );
+    border: 1px solid rgba(150, 205, 255, 0.55);
+    border-top: 1px solid rgba(255, 255, 255, 0.95);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 2px 8px rgba(0, 20, 60, 0.06);
+}
+
+body.light-mode input[type="datetime-local"] {
+    accent-color: #2080d0;
+    color-scheme: light;
+}
+
+body.light-mode .mention,
+body.light-mode .task-content .mention,
+body.light-mode .reply-content .mention,
+body.light-mode .rich-editor .mention {
+    color: #5b3fbf !important;
+    background: rgba(120, 80, 220, 0.12) !important;
+    border: none !important; /* 二重枠解消のため border を削除 */
+    text-shadow: none;
+}
+
+body.light-mode .team-list-item.active .team-item-header {
+    background: rgba(180, 220, 255, 0.38) !important;
+    box-shadow:
+        inset 0  1px 0 rgba(255, 255, 255, 0.95),
+        inset 0 -1px 0 rgba(100, 170, 240, 0.20),
+        0 2px 10px rgba(0, 25, 70, 0.10) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   10. BUTTONS (Liquid Glass UI)
+   ──────────────────────────────────────────────────────────────── */
+.btn-clip-yellow,
+.btn-send-blue,
+.btn-complete,
+.btn-status:not(.btn-revert) {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(16px) saturate(180%) brightness(1.15) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) brightness(1.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: white !important;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1) !important;
+}
+
+.btn-clip-yellow:hover,
+.btn-send-blue:hover,
+.btn-complete:hover,
+.btn-status:not(.btn-revert):hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(160, 215, 255, 0.6) !important;
+  box-shadow: 
+    0 0 15px rgba(100, 180, 255, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-1px) !important;
+}
+
+
+/* Status Button - Circle Shape */
+.btn-complete,
+.btn-status:not(.btn-revert) {
+  border-radius: 50% !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+
+/* ────────────────────────────────────────────────────────────────
+   11. REPLIES (Liquid Glass UI)
+   ──────────────────────────────────────────────────────────────── */
+/* .reply-item, .reply-section 指定を削除 (style.cssで制御するため) */
+
+
+/* .reply-item:hover 削除 */
+
+
+.quick-reply-form {
+  background: transparent !important;
+}
+
