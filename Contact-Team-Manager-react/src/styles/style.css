@@ -942,12 +942,8 @@ body {
     background: rgba(255, 255, 255, 0.05);
 }
 
-/* 選択中の項目: アイコン周辺に対称な cyan リングを表示（左右非対称な border-left 方式から変更） */
-.team-list-item.active>.team-item-header {
-    background: rgba(255, 255, 255, 0.1);
-    border-left: none;
-}
-
+/* 選択中の項目: アイコンの cyan リングのみで表現。行の白背景は不要 */
+.team-list-item.active>.team-item-header,
 .team-list-item.child-active>.team-item-header {
     background: transparent;
     border-left: none;
@@ -4654,7 +4650,7 @@ body.dark-mode .teams-sidebar:hover {
     background: #18171A !important;
 }
 body.dark-mode .team-list-item.active .team-item-header {
-    background: rgba(255, 255, 255, 0.10) !important;
+    background: transparent !important;
     box-shadow: none !important;
 }
 body.dark-mode .team-item-header:hover {
