@@ -942,12 +942,17 @@ body {
     background: rgba(255, 255, 255, 0.05);
 }
 
-.team-list-item.active .team-item-header {
+/* 選択中の項目は常に左端に cyan バーを表示（チャネル有無を問わず） */
+.team-list-item.active>.team-item-header,
+.team-list-item.child-active>.team-item-header {
+    border-left: 2px solid var(--accent);
+}
+
+.team-list-item.active>.team-item-header {
     background: rgba(255, 255, 255, 0.1);
 }
 
 .team-list-item.child-active>.team-item-header {
-    border-left: 2px solid var(--accent);
     background: transparent;
 }
 
