@@ -3327,11 +3327,12 @@ html {
     top: 100%;
     right: 0;
     width: 180px;
-    background: var(--glass);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--glass-border);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    /* 透過しすぎを解消: 不透明寄りの濃いダーク背景 + 強めの blur */
+    background: rgba(28, 32, 42, 0.96);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
     border-radius: 12px;
     padding: 4px;
     opacity: 0;
@@ -3339,6 +3340,11 @@ html {
     pointer-events: none;
     z-index: 1010;
     transition: opacity 0.15s ease, visibility 0s 1s;
+}
+body.light-mode .dot-menu {
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
 }
 
 /* Hover Shield: Extends hover area significantly in all directions */
@@ -3359,12 +3365,14 @@ html {
     visibility: visible;
     pointer-events: auto;
     transition: opacity 0.15s ease, visibility 0s 0s;
-    z-index: 9999;
+    /* 投稿フォーム (z-index 5002) より確実に上、画面のあらゆる要素より上に */
+    z-index: 100000;
 }
 
-/* Raise card above siblings when its menu is open */
+/* Raise card above siblings when its menu is open
+   (post-form-container は z-index: 5002 なので、それより必ず上に来る必要あり) */
 .task-card.has-open-menu {
-    z-index: 10001;
+    z-index: 100001;
     position: relative;
 }
 
