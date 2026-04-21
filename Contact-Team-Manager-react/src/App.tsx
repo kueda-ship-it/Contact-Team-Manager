@@ -170,13 +170,13 @@ function App() {
   // A separate effect drains this once threads/auth are ready, avoiding stale-closure issues.
   const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
 
-  // Handle postMessage from SW notificationclick (existing window case)
-  // または native Notification フォールバック onclick からの window.postMessage
+  // Handle notification click from SW (3経路: BroadcastChannel / SW postMessage / window postMessage)
   useEffect(() => {
-    const handleNotificationClickMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'notification-click') {
+    const handleNotificationClickMessage = (eventOrData: MessageEvent | { data: any }) => {
+      const data = (eventOrData as MessageEvent).data;
+      if (data?.type === 'notification-click') {
         try {
-          const params = new URLSearchParams(new URL(event.data.url).search);
+          const params = new URLSearchParams(new URL(data.url).search);
           const threadId = params.get('thread');
           if (threadId) {
             console.log('[App] Notification click → navigating to thread:', threadId);
@@ -187,9 +187,25 @@ function App() {
         }
       }
     };
+
+    // 1) BroadcastChannel（最も確実、SW から複数クライアントに配信される）
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('notification-clicks');
+        bc.onmessage = (e) => handleNotificationClickMessage(e);
+      } catch (e) {
+        console.warn('[App] BroadcastChannel unavailable', e);
+      }
+    }
+
+    // 2) SW message channel (traditional postMessage from SW)
     navigator.serviceWorker?.addEventListener('message', handleNotificationClickMessage);
+    // 3) window message (native Notification フォールバック onclick から)
     window.addEventListener('message', handleNotificationClickMessage);
+
     return () => {
+      bc?.close();
       navigator.serviceWorker?.removeEventListener('message', handleNotificationClickMessage);
       window.removeEventListener('message', handleNotificationClickMessage);
     };
