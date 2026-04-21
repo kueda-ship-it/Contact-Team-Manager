@@ -361,7 +361,10 @@ export function WaterDateTimePicker({
                     {/* フッター */}
                     <div className="water-dtp-footer">
                         <button type="button" className="water-dtp-btn-clear" onClick={clear}>削除</button>
-                        <button type="button" className="water-dtp-btn-today" onClick={goToday}>今日</button>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                            <button type="button" className="water-dtp-btn-today" onClick={goToday}>今日</button>
+                            <button type="button" className="water-dtp-btn-confirm" onClick={() => setOpen(false)}>確定</button>
+                        </div>
                     </div>
                 </div>,
                 document.body
