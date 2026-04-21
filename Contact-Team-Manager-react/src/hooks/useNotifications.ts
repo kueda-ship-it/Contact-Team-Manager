@@ -2,14 +2,76 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
+import { useNotificationContext } from '../context/NotificationContext';
+
+const RECONNECT_DELAY_MS = 5000;
+
+// 通知アイコンのパス（GitHub Pages のサブパス対応のため import.meta.env.BASE_URL を使用）
+const NOTIFICATION_ICON = `${import.meta.env.BASE_URL}favicon-v3.png`;
+
+async function showNotification(title: string, body: string, url: string, tag: string) {
+    if (typeof Notification === 'undefined') {
+        console.warn('[useNotifications] Notification API unavailable');
+        return;
+    }
+    if (Notification.permission !== 'granted') {
+        console.warn('[useNotifications] Notification permission not granted:', Notification.permission);
+        return;
+    }
+
+    const options: NotificationOptions = {
+        body,
+        icon: NOTIFICATION_ICON,
+        data: { url },
+        tag,
+        // 同じ tag でも毎回ポップアップさせる（既定 false だとサイレントに置き換わる）
+        renotify: true,
+    } as NotificationOptions & { renotify?: boolean };
+
+    if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.showNotification(title, options);
+            return;
+        } catch (e) {
+            console.warn('[useNotifications] Service Worker notification failed, falling back:', e);
+        }
+    }
+
+    try {
+        const n = new Notification(title, { body, icon: NOTIFICATION_ICON, data: { url } });
+        n.onclick = (e) => {
+            e.preventDefault();
+            window.focus();
+            try {
+                const params = new URLSearchParams(new URL(url).search);
+                const threadId = params.get('thread');
+                if (threadId) {
+                    // SW notificationclick と同じ経路で App.tsx に渡す
+                    window.postMessage({ type: 'notification-click', url }, window.location.origin);
+                } else {
+                    window.location.href = url;
+                }
+            } catch {
+                window.location.href = url;
+            }
+            n.close();
+        };
+    } catch (e) {
+        console.error('[useNotifications] Failed to show notification:', e);
+    }
+}
 
 export function useNotifications() {
     const { user, profile } = useAuth();
-    // Use refs to avoid re-subscribing to realtime channels when tag data changes
+    const { addNotification } = useNotificationContext();
     const tagsRef = useRef<any[]>([]);
     const tagMembersRef = useRef<any[]>([]);
+    // チームIDと通知有効フラグのマップ { teamId: boolean }
+    const teamNotifSettingsRef = useRef<Map<string, boolean>>(new Map());
+    const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+    const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Fetch tag data once and keep it updated via ref (no state → no re-render → no re-subscription)
     const fetchTagData = useCallback(async () => {
         try {
             const [tmRes, tagRes] = await Promise.all([
@@ -23,13 +85,58 @@ export function useNotifications() {
         }
     }, []);
 
-    const checkReminders = useCallback(async () => {
+    // チームごとの通知設定を取得
+    const fetchTeamNotifSettings = useCallback(async () => {
         if (!user) return;
         try {
+            const { data } = await supabase
+                .from('team_members')
+                .select('team_id, notifications_enabled')
+                .eq('user_id', user.id);
+            if (data) {
+                const map = new Map<string, boolean>();
+                data.forEach((m: any) => {
+                    map.set(String(m.team_id), m.notifications_enabled !== false);
+                });
+                teamNotifSettingsRef.current = map;
+            }
+        } catch (e) {
+            console.error('Failed to fetch team notification settings:', e);
+        }
+    }, [user]);
+
+    // チームの通知が有効かチェック（設定がない場合は有効とみなす）
+    const isTeamNotifEnabled = useCallback((teamId: string | number | null): boolean => {
+        if (!teamId) return true;
+        const map = teamNotifSettingsRef.current;
+        if (!map.has(String(teamId))) return true;
+        return map.get(String(teamId)) === true;
+    }, []);
+
+    const checkReminders = useCallback(async () => {
+        if (!user) return;
+        // ユーザーごとに通知済みリマインドIDを localStorage で管理
+        // （thread_reminders は user_id を持たないため、グローバルな reminder_sent
+        //   だけだと他ユーザーの未通知分まで「送信済み」にしてしまう）
+        const seenKey = `seen_reminder_ids_${user.id}`;
+        let seenIds: Set<string>;
+        try {
+            const raw = localStorage.getItem(seenKey);
+            seenIds = new Set(raw ? JSON.parse(raw) : []);
+        } catch {
+            seenIds = new Set();
+        }
+        const persistSeen = () => {
+            try {
+                localStorage.setItem(seenKey, JSON.stringify(Array.from(seenIds)));
+            } catch { /* quota exceeded などは無視 */ }
+        };
+
+        try {
             const now = new Date().toISOString();
-            const { data: threadsToRemind, error } = await supabase
-                .from('threads')
-                .select('*')
+            const { data: reminders, error } = await supabase
+                .from('thread_reminders')
+                .select('*, thread:threads(*)')
                 .lte('remind_at', now)
                 .eq('reminder_sent', false);
 
@@ -38,13 +145,19 @@ export function useNotifications() {
                 return;
             }
 
-            if (threadsToRemind && threadsToRemind.length > 0) {
-                for (const thread of threadsToRemind) {
-                    let isTarget = false;
+            if (reminders && reminders.length > 0) {
+                for (const reminder of reminders) {
+                    if (seenIds.has(reminder.id)) continue;
 
-                    if (thread.user_id === user.id) {
-                        isTarget = true;
-                    } else {
+                    const thread = reminder.thread;
+                    if (!thread) continue;
+
+                    if (!isTeamNotifEnabled(thread.team_id)) continue;
+
+                    const isCreator = thread.user_id === user.id;
+                    let isTarget = isCreator;
+
+                    if (!isCreator) {
                         const content = thread.content || '';
                         const myDisplayName = profile?.display_name || '';
                         const isMentionedByName = myDisplayName && content.includes(`@${myDisplayName}`);
@@ -70,70 +183,71 @@ export function useNotifications() {
 
                     if (isTarget) {
                         const title = `⏰ リマインド: ${thread.title}`;
-                        const body = thread.user_id === user.id ? 'あなたが設定したリマインドです' : 'メンションされたリマインドです';
+                        const body = isCreator
+                            ? 'あなたが設定したリマインドです'
+                            : 'メンションされたリマインドです';
+                        const url = `${window.location.origin}/Contact-Team-Manager/?thread=${thread.id}`;
 
-                        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                            try {
-                                navigator.serviceWorker.ready.then(registration => {
-                                    registration.showNotification(title, {
-                                        body: body,
-                                        icon: '/favicon-v2.png',
-                                        data: { url: `${window.location.origin}/Contact-Team-Manager/?thread=${thread.id}` },
-                                        tag: 'reminder'
-                                    });
-                                });
-                            } catch (e) {
-                                new Notification(title, {
-                                    body: body,
-                                    icon: '/favicon-v2.png'
-                                });
-                            }
-                        }
+                        await showNotification(title, body, url, `reminder-${reminder.id}`);
                     }
 
-                    // 1度送信を試みたらフラグを立てる（重複通知防止）
-                    await supabase.from('threads').update({ reminder_sent: true }).eq('id', thread.id);
+                    // 評価済みとして自分の localStorage に記録（対象外でも記録して再評価を防ぐ）
+                    seenIds.add(reminder.id);
+
+                    // グローバルな reminder_sent は創作者のみが更新（クリーンアップ用）
+                    // メンション対象者が更新すると他ユーザーが通知を受け取れなくなるため
+                    if (isCreator) {
+                        await supabase.from('thread_reminders').update({ reminder_sent: true }).eq('id', reminder.id);
+                    }
                 }
+                persistSeen();
             }
         } catch (e) {
             console.error('Reminder check error:', e);
         }
-    }, [user, profile]);
+    }, [user, profile, isTeamNotifEnabled]);
 
     useEffect(() => {
         fetchTagData();
+        fetchTeamNotifSettings();
         checkReminders();
-        // Periodically refresh tag data (every 60 seconds) and check reminders
         const interval = setInterval(() => {
             fetchTagData();
+            fetchTeamNotifSettings();
             checkReminders();
         }, 60000);
         return () => clearInterval(interval);
-    }, [fetchTagData, checkReminders]);
+    }, [fetchTagData, fetchTeamNotifSettings, checkReminders]);
 
+    // Subscribe with auto-reconnect on disconnect
     useEffect(() => {
         if (!user) return;
 
-        // Request permission
         if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
             Notification.requestPermission();
         }
 
-        const handleNewRecord = (payload: any, table: string) => {
+        const handleNewRecord = async (payload: any, table: string) => {
             const { new: newRecord } = payload;
+            console.log(`[useNotifications] New record in ${table}:`, newRecord);
 
-            // Skip if own action
-            if (newRecord.user_id === user.id) return;
-            // Also skip if author name matches (legacy check)
-            if (newRecord.author === (profile?.display_name || user.email)) return;
+            if (newRecord.user_id === user.id) {
+                console.log('[useNotifications] Skipping: Own action (UID match)', newRecord.id);
+                return;
+            }
 
-            // Check if the user is mentioned via @displayName or @all
+            // チームの通知設定を確認
+            const teamId = newRecord.team_id ?? newRecord.thread_team_id;
+            if (!isTeamNotifEnabled(teamId)) {
+                console.log('[useNotifications] Skipping: Team notifications disabled for team:', teamId);
+                return;
+            }
+
             const content = newRecord.content || '';
             const myDisplayName = profile?.display_name || '';
             const isMentionedByName = myDisplayName && content.includes(`@${myDisplayName}`);
             const isMentionedByAll = content.includes('@all');
 
-            // Check if the user is a member of any mentioned tags (#tagName)
             let isMentionedByTag = false;
             const tags = tagsRef.current;
             const allTagMembers = tagMembersRef.current;
@@ -149,57 +263,137 @@ export function useNotifications() {
                 }
             }
 
+            console.log(`[useNotifications] Mention check: Name=${isMentionedByName}, All=${isMentionedByAll}, Tag=${isMentionedByTag}`);
+
             let title = 'Contact Team Manager';
             let body = '';
             let url = '/';
+            const isMentioned = isMentionedByName || isMentionedByAll || isMentionedByTag;
+
+            // 通知本文用にテキストを整形（メンション記号や改行を整理して短縮）
+            // 通知本文用にテキストを整形（HTMLタグ・エンティティ・改行を除去して短縮）
+            const formatBody = (text: string): string => {
+                if (!text) return '';
+                // ブロック要素を空白に変換してから全タグを除去
+                let s = text
+                    .replace(/<br\s*\/?>/gi, ' ')
+                    .replace(/<\/(div|p|li)>/gi, ' ')
+                    .replace(/<[^>]+>/g, '');
+                // HTMLエンティティをデコード（&nbsp; &amp; &lt; &gt; &quot; &#39; など）
+                if (typeof DOMParser !== 'undefined') {
+                    try {
+                        const doc = new DOMParser().parseFromString(s, 'text/html');
+                        s = doc.documentElement.textContent || s;
+                    } catch { /* ignore */ }
+                } else {
+                    s = s.replace(/&nbsp;/g, ' ')
+                        .replace(/&amp;/g, '&')
+                        .replace(/&lt;/g, '<')
+                        .replace(/&gt;/g, '>')
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#39;/g, "'");
+                }
+                s = s.replace(/\s+/g, ' ').trim();
+                return s.length > 120 ? s.slice(0, 120) + '…' : s;
+            };
+
+            const mentionPrefix = isMentioned ? '📢 ' : '';
+            const authorLabel = newRecord.author ? `${newRecord.author}: ` : '';
 
             if (table === 'threads') {
-                if (isMentionedByName || isMentionedByAll || isMentionedByTag) {
-                    title = `📢 メンションされました`;
-                    body = `${newRecord.author}さんがあなたをメンションしました: ${newRecord.title}`;
-                } else {
-                    title = `新しい投稿: ${newRecord.title}`;
-                    body = `${newRecord.author}さんが新しい投稿を作成しました`;
-                }
+                // 新規投稿: スレッドタイトル（件名＋物件名）と本文を通知に表示
+                const threadTitle = newRecord.title || '新しい投稿';
+                title = `${mentionPrefix}${threadTitle}`;
+                body = `${authorLabel}${formatBody(content)}`;
                 url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.id}`;
             } else if (table === 'replies') {
-                if (isMentionedByName || isMentionedByAll || isMentionedByTag) {
-                    title = `📢 返信でメンションされました`;
-                    body = `${newRecord.author}さんがあなたをメンションしました`;
-                } else {
-                    title = `新しい返信`;
-                    body = `${newRecord.author}さんが返信しました`;
+                // 返信: 親スレッドのタイトルを取得して通知に表示
+                let threadTitle = '新しい返信';
+                try {
+                    const { data: parentThread } = await supabase
+                        .from('threads')
+                        .select('title')
+                        .eq('id', newRecord.thread_id)
+                        .single();
+                    if (parentThread?.title) threadTitle = parentThread.title;
+                } catch (e) {
+                    console.warn('[useNotifications] Failed to fetch parent thread title:', e);
                 }
+                title = `${mentionPrefix}${threadTitle}`;
+                body = `${authorLabel}${formatBody(content)}`;
                 url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.thread_id}`;
             }
 
-            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                try {
-                    navigator.serviceWorker.ready.then(registration => {
-                        registration.showNotification(title, {
-                            body: body,
-                            icon: '/favicon-v2.png',
-                            data: { url: url },
-                            tag: (isMentionedByName || isMentionedByAll || isMentionedByTag) ? 'mention' : 'new-message'
-                        });
-                    });
-                } catch (e) {
-                    new Notification(title, {
-                        body: body,
-                        icon: '/favicon-v2.png'
-                    });
-                }
-            }
+            // アプリ内通知リストに追加
+            addNotification({
+                title,
+                body,
+                url,
+                type: isMentioned ? 'mention' : 'new-message'
+            });
+
+            // tag は record id ベースで一意化（同じスレッドへの返信が連続しても個別に通知）
+            const tagId = `${table}-${newRecord.id}`;
+            await showNotification(title, body, url, tagId);
         };
 
-        const channel = supabase
-            .channel('global-notifications')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'threads' }, (payload) => handleNewRecord(payload, 'threads'))
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'replies' }, (payload) => handleNewRecord(payload, 'replies'))
-            .subscribe();
+        const subscribe = () => {
+            if (reconnectTimerRef.current) {
+                clearTimeout(reconnectTimerRef.current);
+                reconnectTimerRef.current = null;
+            }
+            if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+            }
+
+            const channel = supabase
+                .channel('global-notifications')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'threads' },
+                    (payload) => { handleNewRecord(payload, 'threads').catch(console.error); })
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'replies' },
+                    (payload) => { handleNewRecord(payload, 'replies').catch(console.error); })
+                .subscribe((status, err) => {
+                    // 意図的な切断（再レンダリングによる removeChannel）後のステータスは無視する
+                    if (channelRef.current !== channel) {
+                        return;
+                    }
+
+                    console.log('[useNotifications] Subscription status:', status);
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        console.warn('[useNotifications] Subscription lost, reconnecting in 5s...', err);
+                        reconnectTimerRef.current = setTimeout(subscribe, RECONNECT_DELAY_MS);
+                    }
+                });
+
+            channelRef.current = channel;
+        };
+
+        subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            if (reconnectTimerRef.current) {
+                clearTimeout(reconnectTimerRef.current);
+                reconnectTimerRef.current = null;
+            }
+            if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+            }
         };
-    }, [user, profile, fetchTagData]);
+    }, [user, profile, fetchTagData, isTeamNotifEnabled]);
+
+    // チームの通知設定を更新する関数を返す
+    const updateTeamNotifSetting = useCallback(async (teamId: string, enabled: boolean): Promise<void> => {
+        if (!user) return;
+        await supabase
+            .from('team_members')
+            .update({ notifications_enabled: enabled })
+            .eq('user_id', user.id)
+            .eq('team_id', teamId);
+        // ローカルのキャッシュも即時更新
+        teamNotifSettingsRef.current.set(String(teamId), enabled);
+    }, [user]);
+
+    return { updateTeamNotifSetting };
 }

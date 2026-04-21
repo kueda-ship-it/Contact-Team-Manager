@@ -3,18 +3,19 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useTeamMembers, useProfiles, useTeams, usePermissions, useUserMemberships, useTags } from '../../hooks/useSupabase';
 import { CustomSelect } from '../common/CustomSelect';
-import { msalInstance, signIn, signOut, initializeMsal } from '../../lib/microsoftGraph';
+import { msalInstance, signIn, signOut, initializeMsal, hasExternalAccessToken } from '../../lib/microsoftGraph';
 import type { AccountInfo } from '@azure/msal-browser';
 import { CHANGELOG } from '../../data/changelog';
 import { TagMemberEditor } from './TagMemberEditor';
 import { ImageCropModal } from '../common/ImageCropModal';
+import { OutlookWatchSettings } from './OutlookWatchSettings';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     currentTeamId: string | null;
     currentTeamName: string;
-    initialTab?: 'profile' | 'team' | 'admin' | 'team-mgmt' | 'history';
+    initialTab?: 'profile' | 'team' | 'admin' | 'team-mgmt' | 'history' | 'outlook';
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId, currentTeamName, initialTab = 'profile' }) => {
@@ -29,7 +30,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
     // Permission checks
     const { canEdit: canEditCurrentTeam, isAdmin: isGlobalAdmin } = usePermissions(currentTeamId);
-    const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history'>(initialTab as any);
+    const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history' | 'outlook'>(initialTab as any);
     const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
     const [newTagName, setNewTagName] = useState('');
 
@@ -123,15 +124,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     // Microsoft Graph Status
     const [msAccount, setMsAccount] = useState<AccountInfo | null>(null);
     const [msLoading, setMsLoading] = useState(false);
+    const [hasExternalToken, setHasExternalToken] = useState(false);
 
     useEffect(() => {
         const checkMsAccount = async () => {
             await initializeMsal();
             setMsAccount(msalInstance.getActiveAccount());
+            setHasExternalToken(hasExternalAccessToken());
         };
         if (isOpen) {
             checkMsAccount();
         }
+
+        const handleExternalToken = () => {
+            setHasExternalToken(true);
+        };
+        window.addEventListener('externalTokenUpdated', handleExternalToken);
+        return () => window.removeEventListener('externalTokenUpdated', handleExternalToken);
     }, [isOpen]);
 
     const handleMsLogin = async () => {
@@ -366,6 +375,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                 alert('チームの作成に失敗しました: ' + error.message);
             } else {
                 console.log('[handleSaveMgmtTeam] Create Success:', data);
+                
+                // Automatically add the creator as Admin
+                if (user && data) {
+                    const { error: memberError } = await supabase
+                        .from('team_members')
+                        .insert({
+                            team_id: data.id,
+                            user_id: user.id,
+                            role: 'Manager'
+                        });
+                    
+                    if (memberError) {
+                        console.error('[handleSaveMgmtTeam] Member Auto-Add Error:', memberError);
+                    } else {
+                        console.log('[handleSaveMgmtTeam] Member Auto-Add Success for user:', user.id);
+                    }
+                }
+
                 alert('チームを作成しました');
                 setSelectedTeamId(data.id);
                 setIsCreatingTeam(false);
@@ -422,27 +449,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                 .maybeSingle();
 
             if (existingProfile) {
-                if (existingProfile.is_active) {
-                    alert('このユーザーは既にシステムに登録されています。');
-                } else {
-                    alert('このメールアドレスは既に招待済みです（ログイン待ち）。');
-                }
+                alert('このメールアドレスは既に登録されています。');
                 setIsRegistering(false);
                 return;
             }
 
             // profiles に直接インサート（仮IDを割り当て）
+            // is_active: false = SSO初回ログイン時に true に自動更新される
             const { error } = await supabase.from('profiles').insert({
-                id: crypto.randomUUID(), // 仮ID
+                id: crypto.randomUUID(),
                 email: newUserEmail,
                 display_name: newDisplayName || newUserEmail.split('@')[0],
                 role: newUserRole,
-                is_active: false // ログインするまで false
+                is_active: false
             });
 
             if (error) throw error;
 
-            alert('ユーザーを招待しました。\nログイン時に名前と権限が自動的に紐付けられます。');
+            alert('ユーザーを追加しました。\nMicrosoft SSOでログインすると自動的にアカウントが有効化されます。');
             setNewUserEmail('');
             setNewDisplayName('');
             setNewUserRole('Member');
@@ -641,6 +665,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                     >
                         更新履歴
                     </button>
+                    <button
+                        className={`btn btn-sm ${activeTab === 'outlook' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ borderRadius: '8px', border: 'none' }}
+                        onClick={() => setActiveTab('outlook')}
+                    >
+                        Outlook連携
+                    </button>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '12px', minHeight: 0 }}>
@@ -706,20 +737,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                     ファイルを OneDrive にアップロードしたり、添付ファイルをダウンロードしたりするために必要です。
                                 </p>
 
-                                {msAccount ? (
+                                {(msAccount || hasExternalToken) ? (
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '10px 15px', borderRadius: '8px' }}>
                                         <div>
-                                            <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{msAccount.name || msAccount.username}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{msAccount.username}</div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{msAccount?.name || msAccount?.username || profile?.display_name || profile?.email || '連携済み'}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{msAccount?.username || profile?.email}</div>
                                         </div>
-                                        <button
-                                            className="btn btn-sm"
-                                            style={{ color: 'var(--danger)', background: 'rgba(196, 49, 75, 0.1)', border: '1px solid rgba(196, 49, 75, 0.2)' }}
-                                            onClick={handleMsLogout}
-                                            disabled={msLoading}
-                                        >
-                                            連携解除
-                                        </button>
+                                        {msAccount && (
+                                            <button
+                                                className="btn btn-sm"
+                                                style={{ color: 'var(--danger)', background: 'rgba(196, 49, 75, 0.1)', border: '1px solid rgba(196, 49, 75, 0.2)' }}
+                                                onClick={handleMsLogout}
+                                                disabled={msLoading}
+                                            >
+                                                連携解除
+                                            </button>
+                                        )}
                                     </div>
                                 ) : (
                                     <div style={{ textAlign: 'center', padding: '10px' }}>
@@ -1047,11 +1080,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 ))}
                             </div>
 
-                            {/* --- Modern Invite Form --- */}
+                            {/* --- Add User Form --- */}
                             <div style={{ padding: '20px', background: 'linear-gradient(145deg, rgba(0,183,189,0.08) 0%, rgba(255,255,255,0.03) 100%)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: '16px', border: '1px solid rgba(0,183,189,0.2)', boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07), 0 0 40px rgba(0,183,189,0.06)' }}>
                                 <h4 style={{ margin: '0 0 15px 0', fontSize: '1rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)' }}></span>
-                                    新規ユーザー招待
+                                    新規ユーザーを追加
                                 </h4>
                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                                     <div style={{ flex: '1 1 200px' }}>
@@ -1096,12 +1129,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                         disabled={isRegistering || !newUserEmail}
                                         style={{ height: '38px', padding: '0 20px', fontWeight: 600 }}
                                     >
-                                        {isRegistering ? '処理中...' : '招待を追加'}
+                                        {isRegistering ? '処理中...' : 'ユーザーを追加'}
                                     </button>
                                 </div>
                                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '10px', opacity: 0.7 }}>
-                                    ※招待されたユーザーは、初回ログイン時に設定した名前と権限が反映されます。
+                                    ※追加したユーザーは Microsoft SSO で初回ログイン時に自動的に有効化されます。
                                 </p>
+                            </div>
+
+                            {/* --- Role Permissions Table --- */}
+                            <div style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <h4 style={{ margin: '0 0 14px 0', fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--text-muted)' }}></span>
+                                    ロール別権限一覧
+                                </h4>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 600, width: '40%' }}>機能</th>
+                                                {(['Admin', 'Manager', 'Member', 'Viewer'] as const).map(r => (
+                                                    <th key={r} style={{ textAlign: 'center', padding: '8px 12px', color: r === 'Admin' ? '#FF6B6B' : r === 'Manager' ? 'var(--accent)' : 'var(--text-muted)', fontWeight: 600 }}>{r}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {[
+                                                { label: 'ユーザー招待・ロール変更', admin: true, manager: false, member: false, viewer: false },
+                                                { label: 'チーム作成（管理画面）', admin: true, manager: false, member: false, viewer: false },
+                                                { label: 'チーム作成（サイドバー）', admin: true, manager: true, member: false, viewer: false },
+                                                { label: 'チーム設定・メンバー管理', admin: true, manager: true, member: false, viewer: false },
+                                                { label: '投稿・コメント', admin: true, manager: true, member: true, viewer: false },
+                                                { label: '閲覧', admin: true, manager: true, member: true, viewer: true },
+                                            ].map((row, i) => (
+                                                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', transition: 'background 0.15s' }}
+                                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                                    <td style={{ padding: '8px 12px', color: 'var(--text-main)' }}>{row.label}</td>
+                                                    {(['admin', 'manager', 'member', 'viewer'] as const).map(r => (
+                                                        <td key={r} style={{ textAlign: 'center', padding: '8px 12px' }}>
+                                                            {row[r]
+                                                                ? <span style={{ color: '#33cc33', fontWeight: 700, fontSize: '1rem' }}>✓</span>
+                                                                : <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.9rem' }}>—</span>}
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
 
                             {/* --- Search & Filter Bar --- */}
@@ -1412,7 +1488,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                             placeholder="チームを選択..."
                                             options={[
                                                 { value: '', label: '選択してください...' },
-                                                ...(isAdmin ? [{ value: 'new', label: '+ 新規チーム作成' }] : []),
+                                                ...((isAdmin || canManageTeam) ? [{ value: 'new', label: '+ 新規チーム作成' }] : []),
                                                 ...teams.filter(t => {
                                                     if (isAdmin) return true;
                                                     const isDirectManager = memberships.some(m => String(m.team_id) === String(t.id) && m.role === 'Manager');
@@ -1530,6 +1606,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                             {renderChangelog(CHANGELOG)}
                         </div>
+                    )}
+
+                    {activeTab === 'outlook' && (
+                        <OutlookWatchSettings />
                     )}
                 </div>
             </div>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -32,6 +32,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
     const [authError, setAuthError] = useState<string | null>(null);
+    // Prevent concurrent loadProfile calls (race condition with SSO callbacks)
+    const profileLoadingRef = useRef<string | null>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -63,12 +65,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         loadProfile(session.user.id);
                         return session.user;
                     }
+                    // Same user: load profile if missing (e.g. page refresh after token refresh)
+                    if (!profile) {
+                        loadProfile(session.user.id);
+                    }
                     return prev;
                 });
-                // If we have a user but no profile (e.g. page refresh), fetch it
-                if (!profile && session.user) {
-                    loadProfile(session.user.id);
-                }
             } else {
                 setUser(null);
                 setProfile(null);
@@ -83,13 +85,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     async function loadProfile(userId: string) {
+        // Prevent concurrent loads for the same user (SSO race condition fix)
+        if (profileLoadingRef.current === userId) {
+            console.log('[AuthContext] Profile load already in progress, skipping.');
+            return;
+        }
+        profileLoadingRef.current = userId;
         console.log(`[AuthContext] Starting loadProfile for user: ${userId}`);
         try {
-            // Check if we already have the profile for this user
-            if (profile && profile.id === userId) {
-                console.log('[AuthContext] Profile already loaded.');
-                return;
-            }
 
             let { data, error } = await supabase
                 .from('profiles')
@@ -97,24 +100,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .eq('id', userId)
                 .single();
 
-            if (error) {
-                console.warn('[AuthContext] Fetched profile failed, checking fallback...', error);
+            // PGRST116 = "no rows returned" (not found). Other errors are network/transient - don't logout for those.
+            const isNotFound = error?.code === 'PGRST116';
+
+            if (error && isNotFound) {
+                console.warn('[AuthContext] Profile not found, checking fallback...');
                 const { data: { user: currentUser } } = await supabase.auth.getUser();
                 if (currentUser?.email) {
                     // Step 1: Check if a profile with this email already exists (Microsoft SSO re-login)
                     const { data: existingProfile } = await supabase
                         .from('profiles')
                         .select('*')
-                        .eq('email', currentUser.email)
+                        .ilike('email', currentUser.email)
                         .single();
 
                     if (existingProfile) {
-                        // Profile exists with old auth ID - update it to new auth ID
-                        console.log('[AuthContext] Found existing profile with email, updating ID...');
+                        // Profile exists (admin pre-registered or old auth ID) - update to new auth ID and activate
+                        console.log('[AuthContext] Found existing profile with email, updating ID and activating...');
                         const { data: updatedProfile, error: updateError } = await supabase
                             .from('profiles')
-                            .update({ id: userId })
-                            .eq('email', currentUser.email)
+                            .update({ id: userId, is_active: true })
+                            .ilike('email', currentUser.email)
                             .select()
                             .single();
                         if (!updateError) {
@@ -122,42 +128,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             error = null as any;
                         }
                     } else {
-                        // Step 2: Check whitelist for new user onboarding
-                        console.log('[AuthContext] Checking whitelist...');
-                        const { data: whitelistData, error: whitelistError } = await supabase
-                            .from('whitelist')
-                            .select('*')
-                            .eq('email', currentUser.email)
-                            .single();
-
-                        if (!whitelistError && whitelistData) {
-                            console.log('[AuthContext] User in whitelist, creating profile...');
-                            const { data: newProfile, error: createError } = await supabase
-                                .from('profiles')
-                                .insert({
-                                    id: userId,
-                                    email: currentUser.email,
-                                    display_name: currentUser.email.split('@')[0],
-                                    role: 'Member',
-                                    is_active: true
-                                })
-                                .select()
-                                .single();
-                            if (!createError) {
-                                await supabase.from('whitelist').delete().eq('email', currentUser.email);
-                                data = newProfile;
-                                error = null as any;
-                            }
-                        }
+                        // No profile found → admin has not added this user yet
+                        await signOut();
+                        setAuthError('このアカウントはシステムに登録されていません。管理者に追加を依頼してください。');
+                        return;
                     }
                 }
+            } else if (error && !isNotFound) {
+                // Network or other transient error - don't logout, just log and continue
+                console.warn('[AuthContext] Transient error loading profile, will retry on next auth event:', error);
             }
 
-            if (error) {
-                // Still no profile and not in whitelist
-                console.error('[AuthContext] Still no profile after fallback:', error);
+            if (!data && isNotFound) {
+                // Profile update failed after email match
+                console.error('[AuthContext] Still no profile after fallback.');
                 await signOut();
-                setAuthError('このアカウントは許可されていません。管理者に登録を依頼してください。');
+                setAuthError('アカウントの有効化に失敗しました。管理者に問い合わせてください。');
                 return;
             }
 
@@ -173,6 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (error) {
             console.error('[AuthContext] Error loading profile:', error);
         } finally {
+            profileLoadingRef.current = null;
             console.log('[AuthContext] loadProfile finished. Setting loading to false.');
             setLoading(false);
         }
@@ -195,8 +182,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error };
     }
 
+    const value = React.useMemo(() => ({
+        user,
+        profile,
+        session,
+        loading,
+        authError,
+        signIn,
+        signOut
+    }), [user, profile, session, loading, authError]);
+
     return (
-        <AuthContext.Provider value={{ user, profile, session, loading, authError, signIn, signOut }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

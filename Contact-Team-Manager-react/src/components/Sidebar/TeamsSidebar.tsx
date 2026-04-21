@@ -168,8 +168,8 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
         setDraggedId(null);
     };
 
-    if (loading) {
-        return <div style={{ padding: '20px', color: 'var(--text-muted)' }}>Loading teams...</div>;
+    if (loading && rawTeams.length === 0) {
+        return null;
     }
 
     const renderTeamIcon = (team: any) => {
@@ -447,7 +447,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                 <div className="sidebar-divider"></div>
 
                 {(() => {
-                    const canCreate = profile?.role !== 'Viewer';
+                    const canCreate = profile?.role === 'Admin' || profile?.role === 'Manager';
                     return (
                         <div
                             className="team-list-item"
