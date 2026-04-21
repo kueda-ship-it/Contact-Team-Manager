@@ -432,9 +432,30 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             const { threadId, rows } = remindPanel;
             const validRows = rows.filter(r => r.value.trim() !== '');
 
-            // 既存行を一括削除して再 insert（シンプルな差分なし戦略）
-            const { error: deleteError } = await supabase.from('thread_reminders').delete().eq('thread_id', threadId);
-            if (deleteError) throw deleteError;
+            // 既存行を取得し、削除が実際に成功したか .select() で検証する。
+            // RLS の DELETE ポリシーが欠落していると Supabase は「成功 / 0 行削除」を返してしまい
+            // 一括 delete + insert 戦略が累積バグを起こすため、明示的な検証を入れる。
+            const { data: existing, error: fetchError } = await supabase
+                .from('thread_reminders')
+                .select('id')
+                .eq('thread_id', threadId);
+            if (fetchError) throw fetchError;
+            const existingIds = (existing || []).map((r: any) => r.id);
+
+            if (existingIds.length > 0) {
+                const { data: deleted, error: deleteError } = await supabase
+                    .from('thread_reminders')
+                    .delete()
+                    .eq('thread_id', threadId)
+                    .select('id');
+                if (deleteError) throw deleteError;
+                if ((deleted || []).length !== existingIds.length) {
+                    throw new Error(
+                        `削除権限が不足しています（${existingIds.length} 件中 ${(deleted || []).length} 件のみ削除）。RLS DELETE ポリシーを確認してください。`
+                    );
+                }
+            }
+
             if (validRows.length > 0) {
                 const { error: insertError } = await supabase.from('thread_reminders').insert(
                     validRows.map(r => ({
