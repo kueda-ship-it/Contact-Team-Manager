@@ -6,6 +6,9 @@ import { useNotificationContext } from '../context/NotificationContext';
 
 const RECONNECT_DELAY_MS = 5000;
 
+// 通知アイコンのパス（GitHub Pages のサブパス対応のため import.meta.env.BASE_URL を使用）
+const NOTIFICATION_ICON = `${import.meta.env.BASE_URL}favicon-v3.png`;
+
 async function showNotification(title: string, body: string, url: string, tag: string) {
     if (typeof Notification === 'undefined') {
         console.warn('[useNotifications] Notification API unavailable');
@@ -18,7 +21,7 @@ async function showNotification(title: string, body: string, url: string, tag: s
 
     const options: NotificationOptions = {
         body,
-        icon: '/favicon-v2.png',
+        icon: NOTIFICATION_ICON,
         data: { url },
         tag,
         // 同じ tag でも毎回ポップアップさせる（既定 false だとサイレントに置き換わる）
@@ -36,7 +39,7 @@ async function showNotification(title: string, body: string, url: string, tag: s
     }
 
     try {
-        const n = new Notification(title, { body, icon: '/favicon-v2.png', data: { url } });
+        const n = new Notification(title, { body, icon: NOTIFICATION_ICON, data: { url } });
         n.onclick = (e) => {
             e.preventDefault();
             window.focus();
