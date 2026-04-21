@@ -149,6 +149,30 @@ header {
     border-radius: 10px;
 }
 
+/* チャネル（ネストされたチーム）のアクティブ強調: Discord 風の左白バー + 文字色強調 */
+.sidebar-submenu.children-list .team-list-item.active > .team-item-header {
+    background: rgba(255, 255, 255, 0.10) !important;
+    box-shadow:
+        inset 3px 0 0 rgba(255, 255, 255, 0.95),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+    border-radius: 6px !important;
+}
+.sidebar-submenu.children-list .team-list-item.active > .team-item-header .team-name-label {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+body.light-mode .sidebar-submenu.children-list .team-list-item.active > .team-item-header {
+    background: rgba(70, 130, 220, 0.14) !important;
+    box-shadow:
+        inset 3px 0 0 rgba(40, 100, 200, 0.85),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+}
+body.light-mode .sidebar-submenu.children-list .team-list-item.active > .team-item-header .team-name-label {
+    color: #0a2a55 !important;
+    font-weight: 700 !important;
+}
+
 .team-item-header:hover {
     background: rgba(160, 215, 255, 0.12) !important;
     box-shadow:
