@@ -450,11 +450,8 @@ select.input-field option,
     color: var(--text-muted);
 }
 
-/* パネル本体 */
+/* パネル本体（位置は React 側で portal + fixed で制御するため、ここでは見た目だけ） */
 .water-dtp-panel {
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 0;
     z-index: 9999999 !important;
     width: 260px;
     background: linear-gradient(150deg, rgba(18, 38, 75, 0.75), rgba(10, 20, 55, 0.85)) !important;
