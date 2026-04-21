@@ -1,6 +1,11 @@
 // Service Worker for Contact Team Manager
+// vite-plugin-pwa の injectManifest 戦略でビルドされる。
+// Workbox の precache を埋め込みつつ、独自の notificationclick ハンドラを保持する。
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
+import { NavigationRoute, registerRoute } from 'workbox-routing';
+
 // SW_VERSION を変更すると、ブラウザが SW の更新を検出して再インストールする
-const SW_VERSION = '2026-04-21-4';
+const SW_VERSION = '2026-04-21-5';
 
 self.addEventListener('install', (event) => {
     console.log(`[sw] install (version=${SW_VERSION})`);
@@ -11,6 +16,14 @@ self.addEventListener('activate', (event) => {
     console.log(`[sw] activate (version=${SW_VERSION})`);
     event.waitUntil(self.clients.claim());
 });
+
+// Workbox precache (vite-plugin-pwa が __WB_MANIFEST を注入)
+precacheAndRoute(self.__WB_MANIFEST);
+cleanupOutdatedCaches();
+
+// SPA ナビゲーションフォールバック
+const handler = createHandlerBoundToURL('/Contact-Team-Manager/index.html');
+registerRoute(new NavigationRoute(handler));
 
 self.addEventListener('notificationclick', (event) => {
     console.log('[sw] notificationclick fired', { data: event.notification.data });
@@ -41,7 +54,6 @@ self.addEventListener('notificationclick', (event) => {
         console.log(`[sw] ${appClients.length} match app scope`);
 
         if (appClients.length > 0) {
-            // 既存ウィンドウがある場合
             const client = appClients[0];
 
             // postMessage を投げる（focus 前に投げて確実に届ける）
