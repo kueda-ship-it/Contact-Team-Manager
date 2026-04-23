@@ -185,7 +185,9 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({ imageSrc, onConf
     return (
         <div style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            // SettingsModal の .modal-overlay (z-index: 10000) より上に表示する必要あり
+            zIndex: 100050
         }}>
             <div style={{
                 background: 'var(--bg-secondary, #2a2b3d)', borderRadius: '16px',
