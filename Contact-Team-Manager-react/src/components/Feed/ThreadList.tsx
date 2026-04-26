@@ -1,4 +1,5 @@
 import React from 'react';
+import DOMPurify from 'dompurify';
 import { useTeams, useProfiles, useTags, useReactions, useTeamMembers } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
@@ -1045,7 +1046,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     editRefs.current[thread.id] = el;
                                                     // Initialize content only once if empty
                                                     if (!el.innerHTML && thread.content) {
-                                                        el.innerHTML = thread.content;
+                                                        // DOMPurify でサニタイズしてから設定
+                                                        el.innerHTML = DOMPurify.sanitize(thread.content);
                                                     }
                                                 }
                                             }}
@@ -1174,7 +1176,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                                         if (el) {
                                                                                             editRefs.current[reply.id] = el;
                                                                                             if (!el.innerHTML && reply.content) {
-                                                                                                el.innerHTML = reply.content;
+                                                                                                // DOMPurify でサニタイズしてから設定
+                                                                                                el.innerHTML = DOMPurify.sanitize(reply.content);
                                                                                             }
                                                                                         }
                                                                                     }}

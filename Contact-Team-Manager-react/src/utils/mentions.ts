@@ -1,4 +1,5 @@
-﻿import { cleanText } from '../utils/text';
+﻿import DOMPurify from 'dompurify';
+import { cleanText } from '../utils/text';
 
 interface Profile {
     id: string;
@@ -30,7 +31,12 @@ interface HighlightMentionsOptions {
 export function highlightMentions(text: string | null, options: HighlightMentionsOptions): string {
     if (!text) return '';
 
-    let highlighted = text;
+    // まず入力 HTML をサニタイズ（スクリプト等の危険なタグを除去し、安全な要素のみ許可）
+    const sanitized = DOMPurify.sanitize(text, {
+        ALLOWED_TAGS: ['span', 'a', 'br', 'b', 'i', 'u', 'strong', 'em', 'p', 'div'],
+        ALLOWED_ATTR: ['class', 'href', 'target', 'rel'],
+    });
+    let highlighted = sanitized;
 
     // Helper to replace only in text nodes (roughly) by matching outside of tags
     const replaceOutsideTags = (str: string, regex: RegExp, replacement: string | ((match: string) => string)) => {
