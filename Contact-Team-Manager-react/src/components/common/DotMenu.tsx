@@ -44,15 +44,22 @@ export const DotMenu: React.FC<DotMenuProps> = ({
 
     useEffect(() => {
         if (!open) return;
-        const onScroll = () => onClose();
+        // NOTE: don't auto-close on scroll. Capture-phase scroll on window fires
+        // for any descendant scroll (incl. the focus-induced scroll-into-view
+        // triggered by clicking the trigger itself), which closes the menu the
+        // instant it opens. Keep the menu pinned via position:fixed and let the
+        // user dismiss with an outside click instead.
         const onResize = () => calcPosition();
-        window.addEventListener('scroll', onScroll, true);
+        const onScroll = () => calcPosition();
         window.addEventListener('resize', onResize);
+        // Listen for scroll only to recompute position so the menu follows the
+        // trigger if a sibling scroll container moves under it.
+        window.addEventListener('scroll', onScroll, true);
         return () => {
-            window.removeEventListener('scroll', onScroll, true);
             window.removeEventListener('resize', onResize);
+            window.removeEventListener('scroll', onScroll, true);
         };
-    }, [open, calcPosition, onClose]);
+    }, [open, calcPosition]);
 
     return (
         <div className="dot-menu-container" ref={triggerRef} style={containerStyle}>
