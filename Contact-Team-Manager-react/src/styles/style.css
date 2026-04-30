@@ -3303,6 +3303,19 @@ body.light-mode .dot-menu {
    stacking context if any ancestor establishes a context that the card
    participates in. The portal menu z-index handles layering on its own. */
 
+/* Defuse hover-flicker at the menu/card boundary:
+   `.task-card:hover { transform: translateY(-2px) }` lifts the card 2px on
+   hover. When the user moves the cursor near the boundary between the open
+   menu and the underlying card, the card cycles hover state at frame rate
+   (cursor enters card -> card lifts -> cursor outside card -> card drops ->
+   cursor enters again). Combined with the React Portal menu repositioning
+   on each layout shift, the screen visibly judders. Disable the lift while
+   any dot-menu is open in the page. */
+body.menu-open .task-card:hover,
+body.menu-open .reply-item:hover {
+    transform: none !important;
+}
+
 /* Disable pointer events on overlapping UI while any dot-menu is open */
 body.menu-open .static-form-container,
 body.menu-open .post-form-container,

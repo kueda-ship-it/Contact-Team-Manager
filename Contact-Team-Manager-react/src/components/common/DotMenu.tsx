@@ -31,7 +31,12 @@ export const DotMenu: React.FC<DotMenuProps> = ({
         const openUp = spaceBelow < menuH + 12 && rect.top > menuH + 12;
         const top = openUp ? rect.top - menuH - 4 : rect.bottom + 4;
         const left = Math.max(8, Math.min(window.innerWidth - MENU_WIDTH - 8, rect.right - MENU_WIDTH));
-        setPos({ top, left });
+        // Bail if nothing actually changed — every scroll event in the page
+        // (incl. capture-phase descendant scrolls fired during hover-induced
+        // layout changes) calls calcPosition. Without this guard, each call
+        // creates a new {top,left} object reference, React schedules a
+        // re-render, and the screen flickers heavily near the menu boundary.
+        setPos(prev => (prev && prev.top === top && prev.left === left) ? prev : { top, left });
     }, []);
 
     useLayoutEffect(() => {
