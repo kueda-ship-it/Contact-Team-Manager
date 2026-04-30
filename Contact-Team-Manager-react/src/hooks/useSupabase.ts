@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
+import { normalizeRole } from '../utils/role';
 
 // Inlined types to bypass persistent module resolution issues
 interface Profile {
@@ -270,7 +271,7 @@ export function useProfiles() {
                     .select('*');
 
                 if (error) throw error;
-                setProfiles(data || []);
+                setProfiles((data || []).map((p: any) => ({ ...p, role: normalizeRole(p.role) })));
             } catch (error) {
                 console.error('Error fetching profiles:', error);
             } finally {
@@ -543,7 +544,12 @@ export function useTeamMembers(teamId: number | string | null) {
                 .eq('team_id', teamId);
 
             if (error) throw error;
-            setMembers(data || []);
+            // Normalize both team_members.role and joined profile.role.
+            setMembers((data || []).map((m: any) => ({
+                ...m,
+                role: normalizeRole(m.role),
+                profile: m.profile ? { ...m.profile, role: normalizeRole(m.profile.role) } : m.profile,
+            })));
         } catch (error) {
             console.error('Error fetching team members:', error);
         } finally {
@@ -618,7 +624,10 @@ export function useUserMemberships(userId: string | undefined) {
                 .eq('user_id', userId);
 
             if (error) throw error;
-            setMemberships(data || []);
+            // Normalize role casing — team_members.role has mixed casing
+            // ('Manager', 'Member', 'member') and downstream === 'Manager' checks
+            // would otherwise miss the lowercase rows. See src/utils/role.ts.
+            setMemberships((data || []).map((m: any) => ({ ...m, role: normalizeRole(m.role) })));
         } catch (error) {
             console.error('Error fetching user memberships:', error);
         } finally {

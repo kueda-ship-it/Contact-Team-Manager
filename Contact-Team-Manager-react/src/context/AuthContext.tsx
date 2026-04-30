@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { normalizeRole } from '../utils/role';
 
 // Define Profile interface here or import from a types file if available
 export interface Profile {
@@ -154,7 +155,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return;
             }
 
-            setProfile(data);
+            // Normalize role casing so downstream === 'Admin'/'Manager' checks work
+            // even if the DB stores lowercase variants ('admin', 'manager').
+            // See src/utils/role.ts for rationale.
+            setProfile(data ? { ...data, role: normalizeRole(data.role) } : data);
             setAuthError(null);
         } catch (error) {
             console.error('[AuthContext] Error loading profile:', error);
