@@ -163,9 +163,24 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
     const [previewAttId, setPreviewAttId] = React.useState<string | null>(null);
 
-    // Close open menu when clicking outside
+    // Close open menu when clicking outside.
+    // We must check the click target explicitly: the dot-menu is now rendered
+    // via a React Portal into document.body, so its native click does NOT
+    // bubble through the React root container (createRoot was attached to
+    // #root, the portal target is body — a sibling, not a descendant). React's
+    // onClick + e.stopPropagation() inside the portal therefore can't stop
+    // this document-level listener from firing. Without the target guard,
+    // clicking the trigger or any menu-item closes the menu the same instant
+    // it opens.
     React.useEffect(() => {
-        const handleClickOutside = () => { setOpenMenuId(null); };
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (!target) return;
+            // Don't close if the click landed on the trigger, the portaled
+            // menu, the team-move submenu, or any of their descendants.
+            if (target.closest('.dot-menu-container, .dot-menu, .submenu')) return;
+            setOpenMenuId(null);
+        };
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);

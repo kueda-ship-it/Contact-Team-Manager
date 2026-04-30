@@ -51,15 +51,18 @@ export const DotMenu: React.FC<DotMenuProps> = ({
         // user dismiss with an outside click instead.
         const onResize = () => calcPosition();
         const onScroll = () => calcPosition();
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         window.addEventListener('resize', onResize);
         // Listen for scroll only to recompute position so the menu follows the
         // trigger if a sibling scroll container moves under it.
         window.addEventListener('scroll', onScroll, true);
+        document.addEventListener('keydown', onKey);
         return () => {
             window.removeEventListener('resize', onResize);
             window.removeEventListener('scroll', onScroll, true);
+            document.removeEventListener('keydown', onKey);
         };
-    }, [open, calcPosition]);
+    }, [open, calcPosition, onClose]);
 
     return (
         <div className="dot-menu-container" ref={triggerRef} style={containerStyle}>
