@@ -3268,12 +3268,13 @@ html {
     opacity: 1;
 }
 
+/* The menu is rendered via React Portal into document.body (see DotMenu.tsx),
+   so any inline position/top/right inherited from this rule is overridden by
+   inline `position: fixed; top; left; right: auto`. We DO NOT set a transform
+   here — the legacy block had `transform: scale(0.9) translateY(-10px)` that
+   was never reset by .dot-menu-open and made the menu invisible. */
 .dot-menu {
-    position: absolute;
-    top: 100%;
-    right: 0;
     width: 180px;
-    /* 透過しすぎを解消: 不透明寄りの濃いダーク背景 + 強めの blur */
     background: rgba(28, 32, 42, 0.96);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -3281,11 +3282,6 @@ html {
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
     border-radius: 12px;
     padding: 4px;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    z-index: 1010;
-    transition: opacity 0.15s ease, visibility 0s 1s;
 }
 body.light-mode .dot-menu {
     background: rgba(255, 255, 255, 0.98);
@@ -3293,34 +3289,19 @@ body.light-mode .dot-menu {
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
 }
 
-/* Hover Shield: Extends hover area significantly in all directions */
-.dot-menu::before {
-    content: '';
-    position: absolute;
-    top: -500px;
-    bottom: -500px;
-    right: 100%;
-    width: 300px;
-    background: transparent;
-    z-index: -1;
-    pointer-events: none;
-}
-
 .dot-menu.dot-menu-open {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transition: opacity 0.15s ease, visibility 0s 0s;
-    /* 投稿フォーム (z-index 5002) より確実に上、画面のあらゆる要素より上に */
-    z-index: 100000;
+    /* Render above absolutely everything — the menu is in document.body
+       so it competes with body's stacking context. 999999 beats every other
+       element's z-index (max in this codebase is 9999999 for the calendar
+       picker, but those panels never coexist). */
+    z-index: 999999;
 }
 
-/* Raise card above siblings when its menu is open
-   (post-form-container は z-index: 5002 なので、それより必ず上に来る必要あり) */
-.task-card.has-open-menu {
-    z-index: 100001;
-    position: relative;
-}
+/* NOTE: removed `.task-card.has-open-menu { z-index: 100001 }`. With Portal
+   rendering, raising the source card above other cards is unnecessary AND
+   harmful — it could put the card in front of the portal menu in body's
+   stacking context if any ancestor establishes a context that the card
+   participates in. The portal menu z-index handles layering on its own. */
 
 /* Disable pointer events on overlapping UI while any dot-menu is open */
 body.menu-open .static-form-container,
