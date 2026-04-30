@@ -175,10 +175,16 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     React.useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             const target = e.target as HTMLElement | null;
+            const matched = target?.closest('.dot-menu-container, .dot-menu, .submenu');
+            console.log('[ThreadList] document click', {
+                target: target?.tagName + '.' + target?.className,
+                matched: !!matched,
+                matchedTag: (matched as HTMLElement | null)?.tagName + '.' + (matched as HTMLElement | null)?.className,
+                t: performance.now().toFixed(0),
+            });
             if (!target) return;
-            // Don't close if the click landed on the trigger, the portaled
-            // menu, the team-move submenu, or any of their descendants.
-            if (target.closest('.dot-menu-container, .dot-menu, .submenu')) return;
+            if (matched) return;
+            console.log('[ThreadList] >> setOpenMenuId(null) triggered by document click');
             setOpenMenuId(null);
         };
         document.addEventListener('click', handleClickOutside);
@@ -899,7 +905,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
                                 <DotMenu
                                     open={openMenuId === thread.id}
-                                    onTriggerClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === thread.id ? null : thread.id); }}
+                                    onTriggerClick={(e) => { e.stopPropagation(); console.log('[ThreadList] trigger clicked thread.id=', thread.id, 't=', performance.now().toFixed(0)); setOpenMenuId(prev => { const next = prev === thread.id ? null : thread.id; console.log('[ThreadList] setOpenMenuId', prev, '->', next); return next; }); }}
                                     onClose={() => setOpenMenuId(null)}
                                 >
                                     {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
