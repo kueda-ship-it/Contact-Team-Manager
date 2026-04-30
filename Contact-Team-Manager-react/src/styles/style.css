@@ -2827,72 +2827,18 @@ body.light-mode .theme-toggle-btn:hover svg {
     border-left-color: var(--danger);
 }
 
-/* --- Dot Menu (Edit/Delete) --- */
-.dot-menu-container {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    cursor: pointer;
-    z-index: 10;
-}
-
-
-
-.dot-menu-trigger {
-    width: 28px;
-    height: 28px;
-    background: transparent;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1.5rem;
-    transition: all 0.2s;
-    opacity: 0;
-    visibility: hidden;
-}
-
-.task-card:hover .dot-menu-trigger {
-    opacity: 1;
-    visibility: visible;
-}
-
-.dot-menu-trigger:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.dot-menu {
-    position: absolute;
-    top: 35px;
-    right: 0;
-    background: var(--glass);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border-radius: 12px;
-    border: 1px solid var(--glass-border);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    opacity: 0;
-    visibility: hidden;
-    transform: scale(0.9) translateY(-10px);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    min-width: 140px;
-    z-index: 9999 !important;
-    pointer-events: none;
-}
-
-/* 透�EなブリチE�� (Dot Menu) */
-.dot-menu::before {
-    content: '';
-    position: absolute;
-    bottom: 100%;
-    right: 0;
-    width: 100%;
-    height: 20px;
-    background: transparent;
-}
-
-/* dot-menu is shown only via JS click state (.dot-menu-open class) */
+/* --- Dot Menu (Edit/Delete) ---
+   NOTE: actual .dot-menu / .dot-menu-container / .dot-menu-trigger rules are
+   defined further down (~ line 3280+). The legacy block that lived here had
+   `position: absolute; top: 35px; right: 0`,
+   `transform: scale(0.9) translateY(-10px)` (never reset by .dot-menu-open),
+   `transition: all 0.3s`, `z-index: 9999 !important`, `pointer-events: none`.
+   It collided with the React Portal + position:fixed implementation in
+   DotMenu.tsx — the menu rendered shifted/scaled, pinned at z-index 9999
+   instead of 100000, and animated from a hidden state on every open which
+   could make it appear "to disappear immediately" to users. Removed; single
+   source of truth lives below.
+   --- */
 
 .menu-item {
     padding: 10px 15px;

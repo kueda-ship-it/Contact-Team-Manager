@@ -58,29 +58,20 @@ export const DotMenu: React.FC<DotMenuProps> = ({
     //   menu DOM nodes. This is independent of any selector / class names so
     //   it can't be defeated by stale CSS or markup changes.
     useEffect(() => {
-        console.log('[DotMenu] useEffect run, open=', open, 'time=', performance.now().toFixed(0));
         if (!open) return;
 
         let armed = false;
-        const armId = window.setTimeout(() => { armed = true; console.log('[DotMenu] ARMED', performance.now().toFixed(0)); }, 0);
+        const armId = window.setTimeout(() => { armed = true; }, 0);
 
         const onPointerDown = (e: PointerEvent | MouseEvent) => {
-            const target = e.target as Node | null;
-            const inTrigger = !!(target && triggerRef.current?.contains(target));
-            const inMenu = !!(target && menuRef.current?.contains(target));
-            console.log('[DotMenu] pointerdown', {
-                armed, inTrigger, inMenu,
-                target: (target as HTMLElement)?.tagName + '.' + (target as HTMLElement)?.className,
-                t: performance.now().toFixed(0),
-            });
             if (!armed) return;
+            const target = e.target as Node | null;
             if (!target) return;
-            if (inTrigger) return;
-            if (inMenu) return;
-            console.log('[DotMenu] >> onClose() triggered by pointerdown');
+            if (triggerRef.current?.contains(target)) return;
+            if (menuRef.current?.contains(target)) return;
             onClose();
         };
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { console.log('[DotMenu] >> onClose() triggered by ESC'); onClose(); } };
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         const onResize = () => calcPosition();
         const onScroll = () => calcPosition();
 
@@ -89,7 +80,6 @@ export const DotMenu: React.FC<DotMenuProps> = ({
         window.addEventListener('resize', onResize);
         window.addEventListener('scroll', onScroll, true);
         return () => {
-            console.log('[DotMenu] cleanup, open was', open, 'time=', performance.now().toFixed(0));
             window.clearTimeout(armId);
             document.removeEventListener('pointerdown', onPointerDown, true);
             document.removeEventListener('keydown', onKey);

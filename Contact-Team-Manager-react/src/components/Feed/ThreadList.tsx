@@ -175,16 +175,10 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     React.useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             const target = e.target as HTMLElement | null;
-            const matched = target?.closest('.dot-menu-container, .dot-menu, .submenu');
-            console.log('[ThreadList] document click', {
-                target: target?.tagName + '.' + target?.className,
-                matched: !!matched,
-                matchedTag: (matched as HTMLElement | null)?.tagName + '.' + (matched as HTMLElement | null)?.className,
-                t: performance.now().toFixed(0),
-            });
             if (!target) return;
-            if (matched) return;
-            console.log('[ThreadList] >> setOpenMenuId(null) triggered by document click');
+            // Don't close if the click landed on the trigger, the portaled
+            // menu, the team-move submenu, or any of their descendants.
+            if (target.closest('.dot-menu-container, .dot-menu, .submenu')) return;
             setOpenMenuId(null);
         };
         document.addEventListener('click', handleClickOutside);
@@ -193,7 +187,6 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
     // Disable pointer events on overlapping UI when menu is open
     React.useEffect(() => {
-        console.log('[ThreadList] openMenuId state observed =', openMenuId, 't=', performance.now().toFixed(0));
         if (openMenuId !== null) {
             document.body.classList.add('menu-open');
         } else {
@@ -908,11 +901,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     open={openMenuId === thread.id}
                                     onTriggerClick={(e) => {
                                         e.stopPropagation();
-                                        const cur = openMenuId;
-                                        const next = cur === thread.id ? null : thread.id;
-                                        console.log('[ThreadList] trigger clicked thread.id=', thread.id, 'cur=', cur, '-> next=', next, 't=', performance.now().toFixed(0));
-                                        setOpenMenuId(next);
-                                        console.log('[ThreadList] setOpenMenuId called with', next);
+                                        setOpenMenuId(prev => prev === thread.id ? null : thread.id);
                                     }}
                                     onClose={() => setOpenMenuId(null)}
                                 >
@@ -1176,11 +1165,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                         open={openMenuId === reply.id}
                                                                         onTriggerClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            const cur = openMenuId;
-                                                                            const next = cur === reply.id ? null : reply.id;
-                                                                            console.log('[ThreadList] REPLY trigger clicked reply.id=', reply.id, 'cur=', cur, '-> next=', next, 't=', performance.now().toFixed(0));
-                                                                            setOpenMenuId(next);
-                                                                            console.log('[ThreadList] setOpenMenuId(reply) called with', next);
+                                                                            setOpenMenuId(prev => prev === reply.id ? null : reply.id);
                                                                         }}
                                                                         onClose={() => setOpenMenuId(null)}
                                                                         containerStyle={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}
