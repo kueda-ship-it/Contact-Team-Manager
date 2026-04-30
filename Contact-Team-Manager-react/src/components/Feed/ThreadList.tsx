@@ -12,6 +12,7 @@ import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
 import { LinkPreview } from '../common/LinkPreview';
 import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
+import { DotMenu } from '../common/DotMenu';
 
 // Helper component for auto-refreshing images
 const ThreadImage: React.FC<{ 
@@ -881,73 +882,74 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     </div>
                                 )}
 
-                                <div className="dot-menu-container">
-                                    <div className="dot-menu-trigger" onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === thread.id ? null : thread.id); }}>⋮</div>
-                                    <div className={`dot-menu${openMenuId === thread.id ? ' dot-menu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                        {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
-                                            <>
-                                                {user?.id === thread.user_id && (
-                                                    <div className="menu-item" onClick={() => {
-                                                        setOpenMenuId(null);
-                                                        setEditingThreadId(thread.id);
-                                                    }}>
-                                                        <span className="menu-icon">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                            </svg>
-                                                        </span> 編集
-                                                    </div>
-                                                )}
-                                                <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteThread(thread.id); }}>
-                                                    <span className="menu-icon">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <polyline points="3 6 5 6 21 6"></polyline>
-                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                                                        </svg>
-                                                    </span> 削除
-                                                </div>
+                                <DotMenu
+                                    open={openMenuId === thread.id}
+                                    onTriggerClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === thread.id ? null : thread.id); }}
+                                    onClose={() => setOpenMenuId(null)}
+                                >
+                                    {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                        <>
+                                            {user?.id === thread.user_id && (
                                                 <div className="menu-item" onClick={() => {
                                                     setOpenMenuId(null);
-                                                    openRemindPanel(thread.id);
+                                                    setEditingThreadId(thread.id);
                                                 }}>
                                                     <span className="menu-icon">
                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <circle cx="12" cy="12" r="10"></circle>
-                                                            <polyline points="12 6 12 12 16 14"></polyline>
+                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                                         </svg>
-                                                    </span> リマインド編集
+                                                    </span> 編集
                                                 </div>
-                                                {['Admin'].includes(currentProfile?.role || '') && (
-                                                    <div className="menu-item move-team-item" onClick={(e) => e.stopPropagation()}>
-                                                        <span className="menu-icon">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                                            </svg>
-                                                        </span> チーム移動
-                                                        <div className="submenu" onClick={(e) => e.stopPropagation()}>
-                                                            {teams.filter(t => t.id !== thread.team_id).map(t => (
-                                                                <div key={t.id} className="menu-item" onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenMenuId(null);
-                                                                    if (window.confirm(`この投稿を「${t.name}」へ移動しますか？`)) {
-                                                                        const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
-                                                                        if (error) alert('移動に失敗しました: ' + error.message);
-                                                                        else refetch(true);
-                                                                    }
-                                                                }}>
-                                                                    {t.name}
-                                                                </div>
-                                                            ))}
-                                                        </div>
+                                            )}
+                                            <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteThread(thread.id); }}>
+                                                <span className="menu-icon">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                    </svg>
+                                                </span> 削除
+                                            </div>
+                                            <div className="menu-item" onClick={() => {
+                                                setOpenMenuId(null);
+                                                openRemindPanel(thread.id);
+                                            }}>
+                                                <span className="menu-icon">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                                    </svg>
+                                                </span> リマインド編集
+                                            </div>
+                                            {['Admin'].includes(currentProfile?.role || '') && (
+                                                <div className="menu-item move-team-item" onClick={(e) => e.stopPropagation()}>
+                                                    <span className="menu-icon">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                                        </svg>
+                                                    </span> チーム移動
+                                                    <div className="submenu" onClick={(e) => e.stopPropagation()}>
+                                                        {teams.filter(t => t.id !== thread.team_id).map(t => (
+                                                            <div key={t.id} className="menu-item" onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                setOpenMenuId(null);
+                                                                if (window.confirm(`この投稿を「${t.name}」へ移動しますか？`)) {
+                                                                    const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
+                                                                    if (error) alert('移動に失敗しました: ' + error.message);
+                                                                    else refetch(true);
+                                                                }
+                                                            }}>
+                                                                {t.name}
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </DotMenu>
 
                                 <div className="task-header-meta">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
@@ -1141,35 +1143,37 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
                                                             return (
                                                                 <div key={reply.id} className="reply-item" style={{ position: 'relative' }}>
-                                                                    <div className="dot-menu-container" style={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}>
-                                                                        <div className="dot-menu-trigger" onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === reply.id ? null : reply.id); }}>⋮</div>
-                                                                        <div className={`dot-menu${openMenuId === reply.id ? ' dot-menu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                                                            {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
-                                                                                <>
-                                                                                    {user?.id === reply.user_id && (
-                                                                                        <div className="menu-item" onClick={() => { setOpenMenuId(null); setEditingReplyId(reply.id); }}>
-                                                                                            <span className="menu-icon">
-                                                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                                                                </svg>
-                                                                                            </span> 編集
-                                                                                        </div>
-                                                                                    )}
-                                                                                    <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteReply(reply.id); }}>
+                                                                    <DotMenu
+                                                                        open={openMenuId === reply.id}
+                                                                        onTriggerClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === reply.id ? null : reply.id); }}
+                                                                        onClose={() => setOpenMenuId(null)}
+                                                                        containerStyle={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}
+                                                                    >
+                                                                        {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                                                            <>
+                                                                                {user?.id === reply.user_id && (
+                                                                                    <div className="menu-item" onClick={() => { setOpenMenuId(null); setEditingReplyId(reply.id); }}>
                                                                                         <span className="menu-icon">
                                                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                                                <polyline points="3 6 5 6 21 6"></polyline>
-                                                                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                                                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                                                                             </svg>
-                                                                                        </span> 削除
+                                                                                        </span> 編集
                                                                                     </div>
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
+                                                                                )}
+                                                                                <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteReply(reply.id); }}>
+                                                                                    <span className="menu-icon">
+                                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                                                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                                                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                                                        </svg>
+                                                                                    </span> 削除
+                                                                                </div>
+                                                                            </>
+                                                                        )}
+                                                                    </DotMenu>
                                                                     <div className="reply-header">
                                                                         <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.6rem' }}>
                                                                             {replyAvatar ? (
