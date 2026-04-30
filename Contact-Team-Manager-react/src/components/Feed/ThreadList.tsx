@@ -1166,7 +1166,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                 <div key={reply.id} className="reply-item" style={{ position: 'relative' }}>
                                                                     <DotMenu
                                                                         open={openMenuId === reply.id}
-                                                                        onTriggerClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === reply.id ? null : reply.id); }}
+                                                                        onTriggerClick={(e) => { e.stopPropagation(); console.log('[ThreadList] REPLY trigger clicked reply.id=', reply.id, 't=', performance.now().toFixed(0)); setOpenMenuId(prev => { const next = prev === reply.id ? null : reply.id; console.log('[ThreadList] setOpenMenuId(reply)', prev, '->', next); return next; }); }}
                                                                         onClose={() => setOpenMenuId(null)}
                                                                         containerStyle={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}
                                                                     >
