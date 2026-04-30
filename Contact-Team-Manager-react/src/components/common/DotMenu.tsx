@@ -42,25 +42,55 @@ export const DotMenu: React.FC<DotMenuProps> = ({
         }
     }, [open, calcPosition]);
 
+    // Outside-click & ESC close, owned by DotMenu so it works regardless of
+    // any other document-level click handlers in the app.
+    //
+    // Why we need a real ref check (not target.closest('.dot-menu')):
+    // - The menu is rendered via React Portal into document.body. React 18
+    //   delegates events on the createRoot container (#root), so native clicks
+    //   inside the portal don't go through React's bubble path back to the
+    //   trigger's React parents — they hit document directly. Any document-
+    //   level click listener registered elsewhere in the tree therefore fires
+    //   on every menu click, including the one that opened the menu (the
+    //   click event finishes bubbling AFTER React's onClick has set state).
+    // - We attach a SHORT-LIVED listener only while open, and only consider
+    //   it an "outside" click if the target is not contained in trigger or
+    //   menu DOM nodes. This is independent of any selector / class names so
+    //   it can't be defeated by stale CSS or markup changes.
     useEffect(() => {
         if (!open) return;
-        // NOTE: don't auto-close on scroll. Capture-phase scroll on window fires
-        // for any descendant scroll (incl. the focus-induced scroll-into-view
-        // triggered by clicking the trigger itself), which closes the menu the
-        // instant it opens. Keep the menu pinned via position:fixed and let the
-        // user dismiss with an outside click instead.
+
+        // Skip the very click that opened the menu: the click event that fired
+        // setOpenMenuId still has to finish bubbling to document AFTER React's
+        // synchronous render of `open=true`. Without this guard, that same
+        // click would close the menu the instant it appeared.
+        let armed = false;
+        const armId = window.setTimeout(() => { armed = true; }, 0);
+
+        const onPointerDown = (e: PointerEvent | MouseEvent) => {
+            if (!armed) return;
+            const target = e.target as Node | null;
+            if (!target) return;
+            if (triggerRef.current?.contains(target)) return;
+            if (menuRef.current?.contains(target)) return;
+            onClose();
+        };
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         const onResize = () => calcPosition();
         const onScroll = () => calcPosition();
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('resize', onResize);
-        // Listen for scroll only to recompute position so the menu follows the
-        // trigger if a sibling scroll container moves under it.
-        window.addEventListener('scroll', onScroll, true);
+
+        // pointerdown fires before click; using it (capture phase) means we
+        // beat any conflicting click handlers that might re-open or thrash.
+        document.addEventListener('pointerdown', onPointerDown, true);
         document.addEventListener('keydown', onKey);
+        window.addEventListener('resize', onResize);
+        window.addEventListener('scroll', onScroll, true);
         return () => {
+            window.clearTimeout(armId);
+            document.removeEventListener('pointerdown', onPointerDown, true);
+            document.removeEventListener('keydown', onKey);
             window.removeEventListener('resize', onResize);
             window.removeEventListener('scroll', onScroll, true);
-            document.removeEventListener('keydown', onKey);
         };
     }, [open, calcPosition, onClose]);
 
