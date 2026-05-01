@@ -4642,17 +4642,23 @@ body.dark-mode .modal .input-field,
 body.dark-mode .side-panel .input-field,
 body.dark-mode .static-form-container .input-field {
     background: rgba(255, 255, 255, 0.06) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.28) !important;
     box-shadow: none !important;
     color: #FFFFFF !important;
 }
 body.dark-mode .input-field:focus,
 body.dark-mode input.glass-input-liquid:focus,
-body.dark-mode div.glass-input-liquid:focus {
+body.dark-mode div.glass-input-liquid:focus,
+body.dark-mode div.glass-input-liquid:focus-within {
     background: rgba(255, 255, 255, 0.10) !important;
-    border-color: rgba(255, 255, 255, 0.28) !important;
-    box-shadow: none !important;
+    border: 1px solid rgba(0, 210, 255, 0.7) !important;
+    border-top-color: rgba(0, 210, 255, 0.7) !important;
+    box-shadow:
+      0 0 0 2px rgba(0, 210, 255, 0.18),
+      0 0 16px rgba(0, 210, 255, 0.25),
+      inset 0 1px 2px rgba(255, 255, 255, 0.18) !important;
+    outline: none !important;
 }
 body.dark-mode .input-field::placeholder,
 body.dark-mode input.glass-input-liquid::placeholder {
@@ -4663,16 +4669,23 @@ body.dark-mode input.glass-input-liquid::placeholder {
 body.dark-mode .quick-reply-input,
 body.dark-mode .quick-reply-input.rich-editor {
     background: rgba(255, 255, 255, 0.06) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-top-color: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    border-top-color: rgba(255, 255, 255, 0.28) !important;
     color: #FFFFFF !important;
     box-shadow: none !important;
 }
 body.dark-mode .quick-reply-input:focus,
-body.dark-mode .quick-reply-input.rich-editor:focus {
+body.dark-mode .quick-reply-input.rich-editor:focus,
+body.dark-mode .quick-reply-input:focus-within,
+body.dark-mode .quick-reply-input.rich-editor:focus-within {
     background: rgba(255, 255, 255, 0.10) !important;
-    border-color: rgba(255, 255, 255, 0.25) !important;
-    box-shadow: none !important;
+    border: 1px solid rgba(0, 210, 255, 0.7) !important;
+    border-top-color: rgba(0, 210, 255, 0.7) !important;
+    box-shadow:
+      0 0 0 2px rgba(0, 210, 255, 0.18),
+      0 0 16px rgba(0, 210, 255, 0.25),
+      inset 0 1px 2px rgba(255, 255, 255, 0.18) !important;
+    outline: none !important;
 }
 
 /* Modal */
