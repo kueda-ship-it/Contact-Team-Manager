@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, REALTIME_ENABLED } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import { normalizeRole } from '../utils/role';
 
@@ -167,6 +167,8 @@ export function useThreads(
     useEffect(() => {
         fetchThreads();
 
+        if (!REALTIME_ENABLED) return;
+
         const threadsChannel = supabase
             .channel('public:threads')
             .on('postgres_changes', {
@@ -241,6 +243,8 @@ export function useTeams() {
     useEffect(() => {
         fetchTeams();
 
+        if (!REALTIME_ENABLED) return;
+
         const subscription = supabase
             .channel('teams')
             .on('postgres_changes', {
@@ -280,6 +284,8 @@ export function useProfiles() {
         }
 
         fetchProfiles();
+
+        if (!REALTIME_ENABLED) return;
 
         // Subscribe to realtime changes
         const subscription = supabase
@@ -322,6 +328,8 @@ export function useTags() {
 
     useEffect(() => {
         fetchTags();
+
+        if (!REALTIME_ENABLED) return;
 
         // Subscribe to realtime changes
         const subscription = supabase
@@ -388,6 +396,7 @@ export function useTagMembers(tagId: string | number | null) {
         fetchTagMembers();
 
         if (!tagId) return;
+        if (!REALTIME_ENABLED) return;
 
         const subscription = supabase
             .channel(`tag-members-${tagId}`)
@@ -447,6 +456,8 @@ export function useAllTagMembers() {
     useEffect(() => {
         fetchAllTagMembers();
 
+        if (!REALTIME_ENABLED) return;
+
         const subscription = supabase
             .channel('all-tag-members')
             .on('postgres_changes', {
@@ -504,6 +515,8 @@ export function useReactions() {
 
     useEffect(() => {
         fetchReactions();
+
+        if (!REALTIME_ENABLED) return;
 
         const subscription = supabase
             .channel('public:reactions')
@@ -747,6 +760,9 @@ export function useUnreadCounts(userId: string | undefined, memberships: any[]) 
         };
 
         checkUnread();
+
+        if (!REALTIME_ENABLED) return;
+
         // Set up real-time sub for threads to update unread status
         const channel = supabase
             .channel('unread-updates')

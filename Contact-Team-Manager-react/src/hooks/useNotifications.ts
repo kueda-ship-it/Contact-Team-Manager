@@ -1,6 +1,6 @@
 
 import { useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, REALTIME_ENABLED } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import { useNotificationContext } from '../context/NotificationContext';
 
@@ -368,6 +368,8 @@ export function useNotifications() {
 
             channelRef.current = channel;
         };
+
+        if (!REALTIME_ENABLED) return;
 
         subscribe();
 
