@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
+import { useRefetchOnFocus } from './useRefetchOnFocus';
 import { normalizeRole } from '../utils/role';
 
 // Inlined types to bypass persistent module resolution issues
@@ -167,18 +168,30 @@ export function useThreads(
     useEffect(() => {
         fetchThreads();
 
-        // realtime は team を一つに絞っている時のみ購読する。
-        // 全チーム表示 (teamId=null) では filter なしの全件購読になり Egress を焼く
-        // 過去事故 (#33) があったので、その場合は購読しない。データ更新はリロードで取り直す。
-        if (teamId === null || teamId === '') return;
+        // filter 用の team_id 集合を組み立てる。
+        // - 単一チーム表示 (teamId 指定): その team のみ
+        // - 全件表示 (teamId=null): Admin は購読しない (filter 不可で Egress 暴走 #33)、
+        //   非 Admin は memberships で in filter
+        const isAdmin = profile?.role === 'Admin';
+        let filterIds: string[] = [];
+        if (teamId !== null && teamId !== '') {
+            filterIds = [String(teamId)];
+        } else if (!isAdmin) {
+            filterIds = memberships.map(m => String(m.team_id));
+        }
+        if (filterIds.length === 0) return; // Admin 全件表示など → realtime 諦め
+
+        const isSingle = filterIds.length === 1;
+        const filterExpr = isSingle ? `team_id=eq.${filterIds[0]}` : `team_id=in.(${filterIds.join(',')})`;
+        const channelSuffix = isSingle ? `team-${filterIds[0]}` : `teams-${filterIds.length}`;
 
         const threadsChannel = supabase
-            .channel(`public:threads:team-${teamId}`)
+            .channel(`public:threads:${channelSuffix}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'threads',
-                filter: `team_id=eq.${teamId}`,
+                filter: filterExpr,
             }, () => {
                 fetchThreads(true);
             })
@@ -188,12 +201,12 @@ export function useThreads(
         // (replies_set_team_id_trigger) で thread.team_id が自動 populate されるので、
         // クライアントは team_id を意識せず insert できる。Realtime もこれで絞れる。
         const repliesChannel = supabase
-            .channel(`public:replies:team-${teamId}`)
+            .channel(`public:replies:${channelSuffix}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'replies',
-                filter: `team_id=eq.${teamId}`,
+                filter: filterExpr,
             }, () => {
                 fetchThreads(true);
             })
@@ -203,7 +216,7 @@ export function useThreads(
             supabase.removeChannel(threadsChannel);
             supabase.removeChannel(repliesChannel);
         };
-    }, [fetchThreads, teamId]);
+    }, [fetchThreads, teamId, profile?.role, memberships]);
 
     return { threads, loading, error, refetch: fetchThreads };
 }
@@ -249,11 +262,12 @@ export function useTeams() {
     }, [profile, memberships]);
 
     // teams テーブルの realtime 購読は撤去 (#33 Egress 事故対策)。
-    // チーム作成/更新/削除は管理画面の操作後のみで頻度が低く、
-    // リロード or 操作後の手動 refetch で十分。
+    // 他ユーザーが管理画面で作成/更新/削除した変更は、タブ復帰時の
+    // refetch (useRefetchOnFocus) で反映する。
     useEffect(() => {
         fetchTeams();
     }, [fetchTeams]);
+    useRefetchOnFocus(fetchTeams);
 
     return { teams, loading };
 }
@@ -262,29 +276,30 @@ export function useProfiles() {
     const [profiles, setProfiles] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function fetchProfiles(silent = false) {
-            try {
-                if (!silent) setLoading(true);
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('*');
+    const fetchProfiles = useCallback(async (silent = false) => {
+        try {
+            if (!silent) setLoading(true);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*');
 
-                if (error) throw error;
-                setProfiles((data || []).map((p: any) => ({ ...p, role: normalizeRole(p.role) })));
-            } catch (error) {
-                console.error('Error fetching profiles:', error);
-            } finally {
-                setLoading(false);
-            }
+            if (error) throw error;
+            setProfiles((data || []).map((p: any) => ({ ...p, role: normalizeRole(p.role) })));
+        } catch (error) {
+            console.error('Error fetching profiles:', error);
+        } finally {
+            setLoading(false);
         }
-
-        // profiles の realtime 購読は撤去 (#33 Egress 事故対策)。
-        // メンバー一覧変更は管理画面操作後のみで頻度が低い。リロードで再取得する。
-        fetchProfiles();
     }, []);
 
-    return { profiles, loading };
+    // profiles の realtime 購読は撤去 (#33 Egress 事故対策)。
+    // 他ユーザーが管理画面で変更した内容は、タブ復帰時に refetch で反映する。
+    useEffect(() => {
+        fetchProfiles();
+    }, [fetchProfiles]);
+    useRefetchOnFocus(fetchProfiles);
+
+    return { profiles, loading, refetch: fetchProfiles };
 }
 
 export function useTags() {
@@ -309,10 +324,11 @@ export function useTags() {
     }, []);
 
     // tags の realtime 購読は撤去 (#33 Egress 事故対策)。
-    // タグ追加/削除は手動操作後の fetchTags 再呼び出しで反映する。
+    // 他ユーザーの追加/削除はタブ復帰時の refetch で反映する。
     useEffect(() => {
         fetchTags();
     }, [fetchTags]);
+    useRefetchOnFocus(fetchTags);
 
     const addTag = useCallback(async (name: string, teamId?: string | number | null, color?: string) => {
         const insertData: any = { name };
@@ -421,10 +437,12 @@ export function useAllTagMembers() {
     }, []);
 
     // all-tag-members の realtime 購読は撤去 (#33 Egress 事故対策)。
-    // tag_members 全件購読は filter 不可で Egress を焼く。手動操作後の refetch で十分。
+    // tag_members 全件購読は filter 不可で Egress を焼くため不可。
+    // 他ユーザーの変更はタブ復帰時の refetch で反映する。
     useEffect(() => {
         fetchAllTagMembers();
     }, [fetchAllTagMembers]);
+    useRefetchOnFocus(fetchAllTagMembers);
 
     // Helper: get user IDs for a given tag name
     const getUserIdsForTag = useCallback((tagId: string | number): string[] => {
@@ -468,11 +486,12 @@ export function useReactions() {
     }, []);
 
     // reactions の realtime 購読は撤去 (#33 Egress 事故対策)。
-    // reactions テーブルは filter 不可で全件購読は Egress を焼く。
-    // リアクション追加/削除時は呼び出し側で refetch する。
+    // reactions テーブルは team_id を持たず filter 不可。
+    // 他ユーザーのリアクションはタブ復帰時の refetch で反映する。
     useEffect(() => {
         fetchReactions();
     }, [fetchReactions]);
+    useRefetchOnFocus(fetchReactions);
 
     return { reactions, loading, refetch: fetchReactions };
 }
