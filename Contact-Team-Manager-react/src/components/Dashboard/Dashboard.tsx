@@ -31,7 +31,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const [selectedReplyCount, setSelectedReplyCount] = useState<string | null>(null);
     const [replyChartType, setReplyChartType] = useState<'bar' | 'pie'>('bar');
 
-    if (threadsLoading) return <div style={{ padding: '20px', color: 'var(--text-main)' }}>統計データを読み込み中...</div>;
+    if (threadsLoading && threads.length === 0) return null;
 
     const getFilteredThreads = () => {
         if (period === 'all') return threads;
@@ -236,13 +236,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (completionRate / 100) * circumference;
 
-    if (threadsLoading) {
-        return (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div className="loading-spinner" style={{ marginBottom: '20px' }}></div>
-                データ読み込み中...
-            </div>
-        );
+    if (threadsLoading && threads.length === 0) {
+        return null;
     }
 
     const currentTeam = teams && Array.isArray(teams) && currentTeamId

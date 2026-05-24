@@ -11,6 +11,8 @@ import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
 import { LinkPreview } from '../common/LinkPreview';
+import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
+import { DotMenu } from '../common/DotMenu';
 
 // Helper component for auto-refreshing images
 const ThreadImage: React.FC<{ 
@@ -146,7 +148,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     // Using a simple object to manage attachments per reply form
     const [replyAttachments, setReplyAttachments] = React.useState<{ [key: string]: Attachment[] }>({});
     const [replyUploading, setReplyUploading] = React.useState<{ [key: string]: boolean }>({});
-    const [remindInput, setRemindInput] = React.useState<{ threadId: string, remindAt: string } | null>(null);
+    // リマインド編集パネル: threadId -> リマインド行リスト
+    const [remindPanel, setRemindPanel] = React.useState<{
+        threadId: string;
+        rows: { id: string | null; value: string }[];
+    } | null>(null);
+    const [remindSaving, setRemindSaving] = React.useState(false);
     const [replyPendingFiles, setReplyPendingFiles] = React.useState<{ [key: string]: { id: string, file: File, previewUrl: string }[] }>({});
     const [expandedThreads, setExpandedThreads] = React.useState<Set<string>>(new Set());
     const [needsExpandMap, setNeedsExpandMap] = React.useState<{ [key: string]: boolean }>({});
@@ -156,9 +163,24 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
     const [previewAttId, setPreviewAttId] = React.useState<string | null>(null);
 
-    // Close open menu when clicking outside
+    // Close open menu when clicking outside.
+    // We must check the click target explicitly: the dot-menu is now rendered
+    // via a React Portal into document.body, so its native click does NOT
+    // bubble through the React root container (createRoot was attached to
+    // #root, the portal target is body — a sibling, not a descendant). React's
+    // onClick + e.stopPropagation() inside the portal therefore can't stop
+    // this document-level listener from firing. Without the target guard,
+    // clicking the trigger or any menu-item closes the menu the same instant
+    // it opens.
     React.useEffect(() => {
-        const handleClickOutside = () => { setOpenMenuId(null); };
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (!target) return;
+            // Don't close if the click landed on the trigger, the portaled
+            // menu, the team-move submenu, or any of their descendants.
+            if (target.closest('.dot-menu-container, .dot-menu, .submenu')) return;
+            setOpenMenuId(null);
+        };
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
@@ -338,8 +360,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         }
     }, [scrollToThreadId, threadsLoading, threads.length, onScrollComplete]);
 
-    if (threadsLoading) {
-        return <div style={{ padding: '20px', textAlign: 'center' }}>Loading threads...</div>;
+    if (threadsLoading && threads.length === 0) {
+        return null;
     }
 
     if (error) {
@@ -403,14 +425,69 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         }
     };
 
-    const handleSaveRemind = async (threadId: string, remindAt: string) => {
-        const formattedDate = remindAt ? new Date(remindAt).toISOString() : null;
-        const { error } = await supabase.from('threads').update({ remind_at: formattedDate, reminder_sent: false }).eq('id', threadId);
-        if (error) {
-            alert('リマインドの設定に失敗しました: ' + error.message);
-        } else {
-            setRemindInput(null);
-            refetch(true); // スレッド一覧を再取得
+    // thread_reminders テーブルから対象スレッドのリマインドを取得してパネルを開く
+    const openRemindPanel = async (threadId: string) => {
+        const { data } = await supabase
+            .from('thread_reminders')
+            .select('id, remind_at')
+            .eq('thread_id', threadId)
+            .order('remind_at', { ascending: true });
+        const rows = (data || []).map((r: any) => {
+            const d = new Date(r.remind_at);
+            const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+                .toISOString().slice(0, 16);
+            return { id: r.id, value: local };
+        });
+        setRemindPanel({ threadId, rows: rows.length > 0 ? rows : [{ id: null, value: '' }] });
+    };
+
+    const handleSaveRemindPanel = async () => {
+        if (!remindPanel) return;
+        setRemindSaving(true);
+        try {
+            const { threadId, rows } = remindPanel;
+            const validRows = rows.filter(r => r.value.trim() !== '');
+
+            // 既存行を取得し、削除が実際に成功したか .select() で検証する。
+            // RLS の DELETE ポリシーが欠落していると Supabase は「成功 / 0 行削除」を返してしまい
+            // 一括 delete + insert 戦略が累積バグを起こすため、明示的な検証を入れる。
+            const { data: existing, error: fetchError } = await supabase
+                .from('thread_reminders')
+                .select('id')
+                .eq('thread_id', threadId);
+            if (fetchError) throw fetchError;
+            const existingIds = (existing || []).map((r: any) => r.id);
+
+            if (existingIds.length > 0) {
+                const { data: deleted, error: deleteError } = await supabase
+                    .from('thread_reminders')
+                    .delete()
+                    .eq('thread_id', threadId)
+                    .select('id');
+                if (deleteError) throw deleteError;
+                if ((deleted || []).length !== existingIds.length) {
+                    throw new Error(
+                        `削除権限が不足しています（${existingIds.length} 件中 ${(deleted || []).length} 件のみ削除）。RLS DELETE ポリシーを確認してください。`
+                    );
+                }
+            }
+
+            if (validRows.length > 0) {
+                const { error: insertError } = await supabase.from('thread_reminders').insert(
+                    validRows.map(r => ({
+                        thread_id: threadId,
+                        remind_at: new Date(r.value).toISOString(),
+                        reminder_sent: false,
+                    }))
+                );
+                if (insertError) throw insertError;
+            }
+            setRemindPanel(null);
+            refetch(true);
+        } catch (e: any) {
+            alert('リマインドの保存に失敗しました: ' + e.message);
+        } finally {
+            setRemindSaving(false);
         }
     };
 
@@ -820,75 +897,77 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     </div>
                                 )}
 
-                                <div className="dot-menu-container">
-                                    <div className="dot-menu-trigger" onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === thread.id ? null : thread.id); }}>⋮</div>
-                                    <div className={`dot-menu${openMenuId === thread.id ? ' dot-menu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                        {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
-                                            <>
-                                                {user?.id === thread.user_id && (
-                                                    <div className="menu-item" onClick={() => {
-                                                        setOpenMenuId(null);
-                                                        setEditingThreadId(thread.id);
-                                                    }}>
-                                                        <span className="menu-icon">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                            </svg>
-                                                        </span> 編集
-                                                    </div>
-                                                )}
-                                                <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteThread(thread.id); }}>
-                                                    <span className="menu-icon">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <polyline points="3 6 5 6 21 6"></polyline>
-                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                                                        </svg>
-                                                    </span> 削除
-                                                </div>
+                                <DotMenu
+                                    open={openMenuId === thread.id}
+                                    onTriggerClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenMenuId(prev => prev === thread.id ? null : thread.id);
+                                    }}
+                                    onClose={() => setOpenMenuId(null)}
+                                >
+                                    {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                        <>
+                                            {user?.id === thread.user_id && (
                                                 <div className="menu-item" onClick={() => {
-                                                    // Initialize with current remind_at if exists
-                                                    const currentVal = thread.remind_at ? new Date(thread.remind_at - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
                                                     setOpenMenuId(null);
-                                                    setRemindInput({ threadId: thread.id, remindAt: currentVal });
+                                                    setEditingThreadId(thread.id);
                                                 }}>
                                                     <span className="menu-icon">
                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <circle cx="12" cy="12" r="10"></circle>
-                                                            <polyline points="12 6 12 12 16 14"></polyline>
+                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                                         </svg>
-                                                    </span> リマインド
+                                                    </span> 編集
                                                 </div>
-                                                {['Admin'].includes(currentProfile?.role || '') && (
-                                                    <div className="menu-item move-team-item" onClick={(e) => e.stopPropagation()}>
-                                                        <span className="menu-icon">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                                            </svg>
-                                                        </span> チーム移動
-                                                        <div className="submenu" onClick={(e) => e.stopPropagation()}>
-                                                            {teams.filter(t => t.id !== thread.team_id).map(t => (
-                                                                <div key={t.id} className="menu-item" onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenMenuId(null);
-                                                                    if (window.confirm(`この投稿を「${t.name}」へ移動しますか？`)) {
-                                                                        const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
-                                                                        if (error) alert('移動に失敗しました: ' + error.message);
-                                                                        else refetch(true);
-                                                                    }
-                                                                }}>
-                                                                    {t.name}
-                                                                </div>
-                                                            ))}
-                                                        </div>
+                                            )}
+                                            <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteThread(thread.id); }}>
+                                                <span className="menu-icon">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                    </svg>
+                                                </span> 削除
+                                            </div>
+                                            <div className="menu-item" onClick={() => {
+                                                setOpenMenuId(null);
+                                                openRemindPanel(thread.id);
+                                            }}>
+                                                <span className="menu-icon">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                                    </svg>
+                                                </span> リマインド編集
+                                            </div>
+                                            {['Admin'].includes(currentProfile?.role || '') && (
+                                                <div className="menu-item move-team-item" onClick={(e) => e.stopPropagation()}>
+                                                    <span className="menu-icon">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                                        </svg>
+                                                    </span> チーム移動
+                                                    <div className="submenu" onClick={(e) => e.stopPropagation()}>
+                                                        {teams.filter(t => t.id !== thread.team_id).map(t => (
+                                                            <div key={t.id} className="menu-item" onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                setOpenMenuId(null);
+                                                                if (window.confirm(`この投稿を「${t.name}」へ移動しますか？`)) {
+                                                                    const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
+                                                                    if (error) alert('移動に失敗しました: ' + error.message);
+                                                                    else refetch(true);
+                                                                }
+                                                            }}>
+                                                                {t.name}
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </DotMenu>
 
                                 <div className="task-header-meta">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
@@ -902,51 +981,93 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                             </div>
                                             <div className="status-dot active"></div>
                                         </div>
-                                        <div className="task-author-info">
-                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                                <span className="author-name">{thread.author}</span>
-                                                <span className="thread-date" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                    {formatDate(thread.created_at)}
-                                                </span>
-                                            </div>
+                                        <div className="task-author-info" style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: '8px' }}>
+                                            <span className="author-name">{thread.author}</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                {formatDate(thread.created_at)}
+                                            </span>
+                                            {(() => {
+                                                const now = new Date().toISOString();
+                                                const upcoming = (thread.reminders || [])
+                                                    .filter((r: any) => r.remind_at > now)
+                                                    .sort((a: any, b: any) => a.remind_at.localeCompare(b.remind_at));
+                                                return upcoming.map((r: any) => (
+                                                    <span key={r.id} style={{ fontSize: '0.72rem', color: 'var(--accent)', background: 'rgba(0,210,255,0.07)', border: '1px solid rgba(0,210,255,0.2)', borderRadius: '4px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                                        </svg>
+                                                        {new Date(r.remind_at).toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                ));
+                                            })()}
                                         </div>
                                     </div>
                                 </div>
 
-                                {thread.remind_at && (
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--accent)', marginTop: '-8px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <span style={{ display: 'flex', alignItems: 'center' }}>
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <circle cx="12" cy="12" r="10"></circle>
-                                                <polyline points="12 6 12 12 16 14"></polyline>
-                                            </svg>
-                                        </span> リマインド: {new Date(thread.remind_at).toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                    </div>
-                                )}
 
-                                {remindInput && remindInput.threadId === thread.id && (
-                                    <div style={{ padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '10px' }}>
-                                        <div style={{ fontSize: '0.8rem', marginBottom: '5px' }}>リマインド日時設定</div>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <input
-                                                type="datetime-local"
-                                                className="input-field"
-                                                value={remindInput.remindAt}
-                                                onChange={(e) => remindInput && setRemindInput({ ...remindInput, remindAt: e.target.value })}
-                                                style={{ flex: 1, margin: 0 }}
-                                            />
+                                {remindPanel && remindPanel.threadId === thread.id && (
+                                    <div style={{ padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                            </svg>
+                                            リマインド設定
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            {remindPanel.rows.map((row, idx) => (
+                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <WaterDateTimePicker
+                                                        value={row.value}
+                                                        onChange={(v) => setRemindPanel(prev => prev ? {
+                                                            ...prev,
+                                                            rows: prev.rows.map((r, i) => i === idx ? { ...r, value: v } : r)
+                                                        } : null)}
+                                                        disabled={remindSaving}
+                                                        title={`リマインド ${idx + 1}`}
+                                                    />
+                                                    {remindPanel.rows.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setRemindPanel(prev => prev ? {
+                                                                ...prev,
+                                                                rows: prev.rows.filter((_, i) => i !== idx)
+                                                            } : null)}
+                                                            style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.7)', cursor: 'pointer', fontSize: '16px', padding: '0 2px' }}
+                                                            title="削除"
+                                                        >×</button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {/* ➕ 枠付きボタン */}
                                             <button
-                                                className="btn btn-primary"
-                                                style={{ padding: '0 12px' }}
-                                                onClick={() => remindInput && handleSaveRemind(thread.id, remindInput.remindAt)}
+                                                type="button"
+                                                onClick={() => setRemindPanel(prev => prev ? { ...prev, rows: [...prev.rows, { id: null, value: '' }] } : null)}
+                                                style={{
+                                                    background: 'rgba(100,180,255,0.1)',
+                                                    border: '1px solid rgba(100,180,255,0.35)',
+                                                    borderRadius: '6px',
+                                                    color: 'rgba(150,210,255,0.9)',
+                                                    cursor: 'pointer',
+                                                    fontSize: '14px',
+                                                    padding: '3px 10px',
+                                                    alignSelf: 'flex-start',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                }}
+                                                title="リマインドを追加"
                                             >
-                                                保存
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                                                </svg>
+                                                追加
                                             </button>
-                                            <button
-                                                className="btn btn-secondary"
-                                                style={{ padding: '0 12px' }}
-                                                onClick={() => setRemindInput(null)}
-                                            >
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                                            <button className="btn btn-primary" style={{ padding: '4px 14px', fontSize: '0.8rem' }} onClick={handleSaveRemindPanel} disabled={remindSaving}>
+                                                {remindSaving ? '保存中...' : '保存'}
+                                            </button>
+                                            <button className="btn btn-secondary" style={{ padding: '4px 14px', fontSize: '0.8rem' }} onClick={() => setRemindPanel(null)} disabled={remindSaving}>
                                                 キャンセル
                                             </button>
                                         </div>
@@ -1040,35 +1161,40 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
                                                             return (
                                                                 <div key={reply.id} className="reply-item" style={{ position: 'relative' }}>
-                                                                    <div className="dot-menu-container" style={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}>
-                                                                        <div className="dot-menu-trigger" onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === reply.id ? null : reply.id); }}>⋮</div>
-                                                                        <div className={`dot-menu${openMenuId === reply.id ? ' dot-menu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                                                            {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
-                                                                                <>
-                                                                                    {user?.id === reply.user_id && (
-                                                                                        <div className="menu-item" onClick={() => { setOpenMenuId(null); setEditingReplyId(reply.id); }}>
-                                                                                            <span className="menu-icon">
-                                                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                                                                </svg>
-                                                                                            </span> 編集
-                                                                                        </div>
-                                                                                    )}
-                                                                                    <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteReply(reply.id); }}>
+                                                                    <DotMenu
+                                                                        open={openMenuId === reply.id}
+                                                                        onTriggerClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setOpenMenuId(prev => prev === reply.id ? null : reply.id);
+                                                                        }}
+                                                                        onClose={() => setOpenMenuId(null)}
+                                                                        containerStyle={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}
+                                                                    >
+                                                                        {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                                                            <>
+                                                                                {user?.id === reply.user_id && (
+                                                                                    <div className="menu-item" onClick={() => { setOpenMenuId(null); setEditingReplyId(reply.id); }}>
                                                                                         <span className="menu-icon">
                                                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                                                <polyline points="3 6 5 6 21 6"></polyline>
-                                                                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                                                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                                                                             </svg>
-                                                                                        </span> 削除
+                                                                                        </span> 編集
                                                                                     </div>
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
+                                                                                )}
+                                                                                <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteReply(reply.id); }}>
+                                                                                    <span className="menu-icon">
+                                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                                                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                                                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                                                        </svg>
+                                                                                    </span> 削除
+                                                                                </div>
+                                                                            </>
+                                                                        )}
+                                                                    </DotMenu>
                                                                     <div className="reply-header">
                                                                         <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.6rem' }}>
                                                                             {replyAvatar ? (
@@ -1280,14 +1406,14 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 <div style={{ display: 'flex', gap: '5px', marginTop: '0px' }}>
                                                     <button
                                                         className="btn-sm btn-clip-yellow"
-                                                        style={{ padding: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                                        style={{ padding: 0, width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                                                         onClick={() => handleReplyAttachClick(thread.id)}
                                                         disabled={replyUploading[thread.id]}
                                                     >
                                                         {replyUploading[thread.id] ? (
-                                                            <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                            <div className="spinner-small" style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                                                         ) : (
-                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
                                                             </svg>
                                                         )}
@@ -1305,11 +1431,15 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                         className="btn-send-blue"
                                                         title="送信"
                                                         style={{
-                                                            width: '38px',
-                                                            height: '38px',
+                                                            width: '40px',
+                                                            height: '40px',
                                                             padding: 0,
                                                             flexShrink: 0,
-                                                            cursor: 'pointer'
+                                                            cursor: 'pointer',
+                                                            borderRadius: '50%',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center'
                                                         }}
                                                         onClick={() => handleAddReply(thread.id)}
                                                     >
@@ -1344,9 +1474,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 </div>
                                             )}
                                             <button
-                                                className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : ''}`}
+                                                className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : 'btn-complete'}`}
                                                 title={thread.status === 'completed' ? '未完了に戻す' : '完了にする'}
-                                                style={{ width: '38px', height: '38px' }}
+                                                style={{ width: '40px', height: '40px' }}
                                                 onClick={() => handleToggleStatus(thread.id, thread.status)}
                                             >
                                                 {thread.status === 'completed' ? (

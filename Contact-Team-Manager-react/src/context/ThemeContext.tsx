@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'dark' | 'light';
+type Theme = 'liquid-glass' | 'light' | 'dark';
 
 interface ThemeContextType {
     theme: Theme;
@@ -13,23 +13,29 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [theme, setTheme] = useState<Theme>(() => {
         // Check localStorage first
         const saved = localStorage.getItem('theme');
-        if (saved === 'dark' || saved === 'light') return saved;
-        // Default to dark
-        return 'dark';
+        if (saved === 'liquid-glass' || saved === 'light' || saved === 'dark') return saved;
+        // Default to liquid-glass
+        return 'liquid-glass';
     });
 
     useEffect(() => {
         const root = document.body;
+        root.classList.remove('light-mode', 'dark-mode');
         if (theme === 'light') {
             root.classList.add('light-mode');
-        } else {
-            root.classList.remove('light-mode');
+        } else if (theme === 'dark') {
+            root.classList.add('dark-mode');
         }
         localStorage.setItem('theme', theme);
     }, [theme]);
 
+    // Cycle: liquid-glass → light → dark → liquid-glass
     const toggleTheme = () => {
-        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+        setTheme(prev => {
+            if (prev === 'liquid-glass') return 'light';
+            if (prev === 'light') return 'dark';
+            return 'liquid-glass';
+        });
     };
 
     return (

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { msalInstance, getGraphClient, initializeMsal, signIn } from '../lib/microsoftGraph';
+import { msalInstance, getGraphClient, initializeMsal, signIn, hasExternalAccessToken } from '../lib/microsoftGraph';
 import { EventType } from "@azure/msal-browser";
 import { Attachment } from './useFileUpload';
 
@@ -15,7 +15,7 @@ export function useOneDriveUpload() {
         const checkAuth = async () => {
             await initializeMsal();
             const account = msalInstance.getActiveAccount();
-            setIsAuthenticated(!!account);
+            setIsAuthenticated(!!account || hasExternalAccessToken());
         };
 
         checkAuth();
@@ -28,12 +28,17 @@ export function useOneDriveUpload() {
                 event.eventType === EventType.ACTIVE_ACCOUNT_CHANGED
             ) {
                 const account = msalInstance.getActiveAccount();
-                setIsAuthenticated(!!account);
+                setIsAuthenticated(!!account || hasExternalAccessToken());
             }
         });
 
+        // Supabase provider_token がセットされた場合に検知
+        const handleExternalToken = () => setIsAuthenticated(true);
+        window.addEventListener('externalTokenUpdated', handleExternalToken);
+
         return () => {
             if (callbackId) msalInstance.removeEventCallback(callbackId);
+            window.removeEventListener('externalTokenUpdated', handleExternalToken);
         };
     }, []);
 
@@ -41,7 +46,7 @@ export function useOneDriveUpload() {
     const checkLoginStatus = useCallback(async () => {
         await initializeMsal();
         const account = msalInstance.getActiveAccount();
-        const isAuth = !!account;
+        const isAuth = !!account || hasExternalAccessToken();
         setIsAuthenticated(isAuth);
         return isAuth;
     }, []);

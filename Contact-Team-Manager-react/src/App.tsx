@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TeamsSidebar } from './components/Sidebar/TeamsSidebar';
 import { RightSidebar } from './components/Sidebar/RightSidebar';
 import { ThreadList } from './components/Feed/ThreadList';
@@ -7,41 +7,64 @@ import { SettingsModal } from './components/Settings/SettingsModal';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Login';
 import { useAuth } from './hooks/useAuth';
-import { useThreads, useTeams, useUserMemberships, useUnreadCounts } from './hooks/useSupabase';
+import { useThreads, useTeams, useUserMemberships, useUnreadCounts, usePopularTeamId } from './hooks/useSupabase';
 import { supabase } from './lib/supabase';
 import { useTheme } from './context/ThemeContext';
 import { useNotifications } from './hooks/useNotifications';
+import { useOutlookFolderWatch } from './hooks/useOutlookFolderWatch';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
+import { NotificationBell } from './components/common/NotificationBell';
 import './styles/style.css';
+import './styles/liquid-glass.css';
 
-import { initializeMsal, ssoLogin, setExternalAccessToken } from './lib/microsoftGraph';
+import { initializeMsal, ssoLogin, setExternalAccessToken, setExternalUserEmail } from './lib/microsoftGraph';
+
+const THEME_META: Record<string, { title: string; icon: React.ReactNode }> = {
+  'liquid-glass': {
+    title: 'ライトモードに切り替え',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+      </svg>
+    ),
+  },
+  light: {
+    title: 'ダークモードに切り替え',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    ),
+  },
+  dark: {
+    title: 'リキッドグラスモードに切り替え',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    ),
+  },
+};
 
 const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
+  const meta = THEME_META[theme];
   return (
     <button
       onClick={toggleTheme}
       className="btn icon-btn gear-btn-unified theme-toggle-btn"
-      title={theme === 'dark' ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+      title={meta.title}
       style={{ marginRight: '8px' }}
     >
-      {theme === 'dark' ? (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-      ) : (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-      )}
+      {meta.icon}
     </button>
   );
 };
@@ -49,6 +72,7 @@ const ThemeToggle = () => {
 function App() {
   const { user, profile, session, loading: authLoading, signOut } = useAuth();
   useNotifications(); // Initialize notifications
+  useOutlookFolderWatch(); // Outlook folder polling
 
 
   const [currentTeamId, setCurrentTeamId] = useState<number | string | null>(null);
@@ -91,19 +115,22 @@ function App() {
     refetch
   };
 
+  const { popularTeamId, loading: popularLoading } = usePopularTeamId(user?.id);
+
   // Redirect non-admins to their first team if no team is selected
-  // Mobile UI improvement (2026-03-03): If no team is selected initially, force the 'teams' tab to open
+  // Priority: 1. Popular team (most posts) 2. First membership team
   useEffect(() => {
-    if (!authLoading && !membershipsLoading && user && currentTeamId === null) {
+    if (!authLoading && !membershipsLoading && !popularLoading && user && currentTeamId === null) {
       // Switch tab to 'teams' to enforce team selection first on mobile
       setActiveMobileTab('teams');
 
       if (profile?.role !== 'Admin' && memberships.length > 0) {
-        console.log('Redirecting non-admin to first team:', memberships[0].team_id);
-        setCurrentTeamId(memberships[0].team_id);
+        const teamToSet = popularTeamId || memberships[0].team_id;
+        console.log('Redirecting to default team (Popular first):', teamToSet);
+        setCurrentTeamId(teamToSet);
       }
     }
-  }, [user, profile, memberships, membershipsLoading, authLoading, currentTeamId]);
+  }, [user, profile, memberships, membershipsLoading, authLoading, popularLoading, popularTeamId, currentTeamId]);
 
   // Initialize MSAL explicitly on mount
   useEffect(() => {
@@ -112,16 +139,22 @@ function App() {
 
   // Auto-login to Microsoft Graph (OneDrive) when Supabase user is available
   useEffect(() => {
+    const provider = session?.user?.app_metadata?.provider;
+    const isMicrosoftUser = provider === 'azure';
+
     if (session?.provider_token) {
       console.log('[App] Reusing Supabase provider token for Microsoft Graph.');
       setExternalAccessToken(session.provider_token);
-    } else if (user?.email) {
-      console.log('[App] Attempting auto-login to Microsoft Graph via MSAL for:', user.email);
+      // メールアドレスを loginHint として保持（acquireTokenPopup で管理者同意フローを回避するために使用）
+      if (user?.email) setExternalUserEmail(user.email);
+    }
+    // ssoSilentはMicrosoftログインユーザーのみ試行（email/passユーザーではタイムアウトする）
+    if (isMicrosoftUser && user?.email) {
       ssoLogin(user.email).catch(err => {
-        console.warn('[App] MSAL auto-login failed:', err);
+        console.warn('[App] MSAL auto-login failed (non-critical):', err);
       });
     }
-  }, [user, session]);
+  }, [user?.id, session?.provider_token]);
 
   // Clear hash from URL behavior removed to prevent conflict with MSAL popup handling
   // MSAL handles hash processing and clearing automatically.
@@ -133,42 +166,107 @@ function App() {
     }
   }, [currentTeamId]);
 
-  // Handle ?thread=ID query parameter from notifications
+  // Pending thread navigation (set by both SW message and ?thread=ID URL handlers).
+  // A separate effect drains this once threads/auth are ready, avoiding stale-closure issues.
+  const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
+
+  // Handle notification click from SW (3経路: BroadcastChannel / SW postMessage / window postMessage)
   useEffect(() => {
+    const handleNotificationClickMessage = (eventOrData: MessageEvent | { data: any }) => {
+      const data = (eventOrData as MessageEvent).data;
+      if (data?.type === 'notification-click') {
+        try {
+          const params = new URLSearchParams(new URL(data.url).search);
+          const threadId = params.get('thread');
+          if (threadId) {
+            console.log('[App] Notification click → navigating to thread:', threadId);
+            setPendingThreadId(threadId);
+          }
+        } catch (e) {
+          console.warn('[App] Failed to parse notification URL:', e);
+        }
+      }
+    };
+
+    // 1) BroadcastChannel（最も確実、SW から複数クライアントに配信される）
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('notification-clicks');
+        bc.onmessage = (e) => handleNotificationClickMessage(e);
+      } catch (e) {
+        console.warn('[App] BroadcastChannel unavailable', e);
+      }
+    }
+
+    // 2) SW message channel (traditional postMessage from SW)
+    navigator.serviceWorker?.addEventListener('message', handleNotificationClickMessage);
+    // 3) window message (native Notification フォールバック onclick から)
+    window.addEventListener('message', handleNotificationClickMessage);
+
+    return () => {
+      bc?.close();
+      navigator.serviceWorker?.removeEventListener('message', handleNotificationClickMessage);
+      window.removeEventListener('message', handleNotificationClickMessage);
+    };
+  }, []);
+
+  // Handle ?thread=ID query parameter from notifications (new-window case)
+  const initialThreadConsumedRef = useRef(false);
+  useEffect(() => {
+    if (initialThreadConsumedRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const threadId = params.get('thread');
-    if (threadId && !authLoading && user) {
-      // Find the thread and its team
-      const findAndNavigate = async () => {
-        // If thread is already in rawThreads, we can find its team_id
-        const loadedThread = rawThreads.find(t => t.id === threadId);
-        if (loadedThread) {
-          if (String(loadedThread.team_id) !== String(currentTeamId)) {
-            setCurrentTeamId(loadedThread.team_id);
-          }
-          handleSidebarThreadClick(threadId);
-          // Clear param from URL to avoid repeated navigation
-          const newUrl = window.location.pathname + window.location.hash;
-          window.history.replaceState({}, '', newUrl);
-        } else {
-          // If not loaded, we might need to fetch it to know the team
-          const { data } = await supabase.from('threads').select('team_id').eq('id', threadId).single();
-          if (data) {
-            if (String(data.team_id) !== String(currentTeamId)) {
-              setCurrentTeamId(data.team_id);
-            }
-            // Give it a moment to load threads for the new team
-            setTimeout(() => {
-              handleSidebarThreadClick(threadId);
-              const newUrl = window.location.pathname + window.location.hash;
-              window.history.replaceState({}, '', newUrl);
-            }, 500);
-          }
-        }
-      };
-      findAndNavigate();
+    if (threadId) {
+      initialThreadConsumedRef.current = true;
+      console.log('[App] ?thread= URL param → queuing navigation:', threadId);
+      setPendingThreadId(threadId);
+      const newUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
     }
-  }, [authLoading, user, rawThreads]);
+  }, []);
+
+  // Drain pending navigation once auth is ready. Resolves team via DB if needed,
+  // switches team, then sets scroll target. Uses live state to avoid stale closures.
+  useEffect(() => {
+    if (!pendingThreadId || authLoading || !user) return;
+
+    let cancelled = false;
+    const navigate = async () => {
+      const threadId = pendingThreadId;
+      console.log('[App] Resolving pending thread navigation:', threadId);
+
+      let targetTeamId: string | number | null = null;
+      const loaded = rawThreads.find(t => t.id === threadId);
+      if (loaded) {
+        targetTeamId = loaded.team_id;
+      } else {
+        const { data, error } = await supabase
+          .from('threads')
+          .select('team_id')
+          .eq('id', threadId)
+          .single();
+        if (error || !data) {
+          console.warn('[App] Thread not found:', threadId, error);
+          if (!cancelled) setPendingThreadId(null);
+          return;
+        }
+        targetTeamId = data.team_id;
+      }
+      if (cancelled) return;
+
+      setViewMode('feed');
+      setStatusFilter('all');
+      setActiveMobileTab('feed');
+      if (String(targetTeamId) !== String(currentTeamId)) {
+        setCurrentTeamId(targetTeamId);
+      }
+      setScrollToThreadId(threadId);
+      setPendingThreadId(null);
+    };
+    navigate();
+    return () => { cancelled = true; };
+  }, [pendingThreadId, authLoading, user]);
 
   // Title flashing for unread messages
   useEffect(() => {
@@ -221,17 +319,7 @@ function App() {
   };
 
   if (authLoading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        background: 'var(--bg-dark)'
-      }}>
-        <div style={{ color: 'var(--text-main)' }}>Loading...</div>
-      </div>
-    );
+    return null;
   }
 
   if (!user) {
@@ -263,6 +351,7 @@ function App() {
 
         <div className="user-profile">
           <ThemeToggle />
+          <NotificationBell onNotificationClick={(threadId) => setPendingThreadId(threadId)} />
           <button
             className="btn icon-btn gear-btn-unified"
             onClick={() => setIsSettingsOpen(true)}

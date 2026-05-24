@@ -9,8 +9,17 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // injectManifest: 自前の SW (public/sw.js) に Workbox の precache manifest を埋め込む。
+      // generateSW だと vite-plugin-pwa が自動生成した SW で上書きされ、独自の
+      // notificationclick ハンドラが本番に反映されないため。
+      strategies: 'injectManifest',
       registerType: 'autoUpdate',
+      srcDir: 'public',
+      filename: 'sw.js',
       includeAssets: ['favicon-v3.png'],
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+      },
       manifest: {
         name: 'Contact Team Manager',
         short_name: 'CT Manager',
@@ -28,10 +37,6 @@ export default defineConfig({
             type: 'image/png'
           }
         ]
-      },
-      workbox: {
-        navigateFallback: `${base}index.html`,
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       }
     })
   ],
@@ -40,5 +45,9 @@ export default defineConfig({
     alias: {
       '@': '/src',
     },
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
   },
 })

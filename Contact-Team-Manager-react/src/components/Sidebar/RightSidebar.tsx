@@ -78,7 +78,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
     // Fetch all pending threads separately
     const fetchPendingThreads = React.useCallback(async (silent = false) => {
         if (!user) return;
-        if (!silent) setPendingLoading(true);
+        
+        // Only show loading if we really have nothing to show
+        if (!silent && pendingThreads.length === 0) setPendingLoading(true);
+        
         try {
             // Fetch pending threads regardless of limit (up to 2000 safe limit)
             // Filter by currentTeamId if selected, or all if not.
@@ -110,7 +113,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         } finally {
             setPendingLoading(false);
         }
-    }, [currentTeamId, user, currentProfile]);
+    }, [currentTeamId, user, currentProfile, pendingThreads.length]);
 
     // Initial fetch and on team change
     React.useEffect(() => {
@@ -134,9 +137,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         insertMention
     } = useMentions({ profiles, tags, currentTeamId, teams });
 
-    if (mainLoading && pendingLoading) {
-        return <aside className="side-panel"><div style={{ padding: '20px', color: 'var(--text-muted)' }}>Loading...</div></aside>;
-    }
+    // loading時も構造を維持してアンマウントを防ぐ
+    const showLoading = mainLoading && pendingLoading && pendingThreads.length === 0;
 
     const mentionOptions = {
         allProfiles: profiles,
@@ -231,11 +233,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
     };
     return (
         <aside className="side-panel glass-panel">
-            <div style={{ paddingBottom: '20px' }}>
-                <div className="side-panel-section">
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', marginBottom: '15px' }}>
-                        <h3 className="side-panel-title" style={{ margin: 0, textAlign: 'left' }}>Not Finished</h3>
-                    </div>
+            {showLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>
+                    Loading...
+                </div>
+            ) : (
+                <div style={{ paddingBottom: '20px' }}>
+                    <div className="side-panel-section" style={{ paddingTop: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', marginBottom: '15px' }}>
+                            <h3 className="side-panel-title" style={{ margin: 0, textAlign: 'left' }}>Not Finished</h3>
+                        </div>
                     <div id="pending-sidebar-list">
                         {pendingThreads.length === 0 ? (
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px' }}>未完了のタスクはありません</div>
@@ -243,7 +250,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                             pendingThreads.map(t => (
                                 <div key={t.id} className="task-card mini-job-card" style={{ cursor: 'pointer', position: 'relative' }} onClick={() => scrollToThread(t.id)}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                        <div className="sidebar-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <div className="sidebar-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', color: '#a0d4ff' }}>
                                             {t.title}
                                         </div>
                                         <button
@@ -355,7 +362,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                                             return;
                                                         }
                                                     }
-                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                                         e.preventDefault();
                                                         handleQuickReply(t.id);
                                                     }
@@ -421,7 +428,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                         )}
                     </div>
                 </div>
-            </div >
-        </aside >
+                </div>
+            )}
+        </aside>
     );
 };
