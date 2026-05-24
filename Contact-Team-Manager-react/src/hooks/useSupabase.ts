@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import { useRefetchOnFocus } from './useRefetchOnFocus';
+import { useRefetchInterval } from './useRefetchInterval';
 import { normalizeRole } from '../utils/role';
 
 // Inlined types to bypass persistent module resolution issues
@@ -218,6 +219,12 @@ export function useThreads(
         };
     }, [fetchThreads, teamId, profile?.role, memberships]);
 
+    // Admin の全件表示時は filter 不可 (memberships に無い team も見る)
+    // で realtime 諦め → 60秒 polling で代替する。
+    const isAdminAllTeamsView = profile?.role === 'Admin' && (teamId === null || teamId === '');
+    const pollFetch = useCallback(() => { fetchThreads(true); }, [fetchThreads]);
+    useRefetchInterval(pollFetch, 60_000, isAdminAllTeamsView);
+
     return { threads, loading, error, refetch: fetchThreads };
 }
 
@@ -268,6 +275,7 @@ export function useTeams() {
         fetchTeams();
     }, [fetchTeams]);
     useRefetchOnFocus(fetchTeams);
+    useRefetchInterval(fetchTeams, 60_000);
 
     return { teams, loading };
 }
@@ -298,6 +306,7 @@ export function useProfiles() {
         fetchProfiles();
     }, [fetchProfiles]);
     useRefetchOnFocus(fetchProfiles);
+    useRefetchInterval(fetchProfiles, 60_000);
 
     return { profiles, loading, refetch: fetchProfiles };
 }
@@ -324,11 +333,12 @@ export function useTags() {
     }, []);
 
     // tags の realtime 購読は撤去 (#33 Egress 事故対策)。
-    // 他ユーザーの追加/削除はタブ復帰時の refetch で反映する。
+    // 他ユーザーの追加/削除はタブ復帰時 refetch + 60秒 polling で反映する。
     useEffect(() => {
         fetchTags();
     }, [fetchTags]);
     useRefetchOnFocus(fetchTags);
+    useRefetchInterval(fetchTags, 60_000);
 
     const addTag = useCallback(async (name: string, teamId?: string | number | null, color?: string) => {
         const insertData: any = { name };
@@ -438,11 +448,12 @@ export function useAllTagMembers() {
 
     // all-tag-members の realtime 購読は撤去 (#33 Egress 事故対策)。
     // tag_members 全件購読は filter 不可で Egress を焼くため不可。
-    // 他ユーザーの変更はタブ復帰時の refetch で反映する。
+    // タブ復帰時 refetch + 60秒 polling で反映する。
     useEffect(() => {
         fetchAllTagMembers();
     }, [fetchAllTagMembers]);
     useRefetchOnFocus(fetchAllTagMembers);
+    useRefetchInterval(fetchAllTagMembers, 60_000);
 
     // Helper: get user IDs for a given tag name
     const getUserIdsForTag = useCallback((tagId: string | number): string[] => {
@@ -487,11 +498,13 @@ export function useReactions() {
 
     // reactions の realtime 購読は撤去 (#33 Egress 事故対策)。
     // reactions テーブルは team_id を持たず filter 不可。
-    // 他ユーザーのリアクションはタブ復帰時の refetch で反映する。
+    // タブ復帰時 refetch + 120秒 polling で反映する。
+    // payload が大きくなりがちなので polling 間隔は他より長め。
     useEffect(() => {
         fetchReactions();
     }, [fetchReactions]);
     useRefetchOnFocus(fetchReactions);
+    useRefetchInterval(fetchReactions, 120_000);
 
     return { reactions, loading, refetch: fetchReactions };
 }
