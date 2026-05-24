@@ -1,6 +1,6 @@
 
 import { useEffect, useCallback, useRef } from 'react';
-import { supabase, REALTIME_ENABLED } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import { useNotificationContext } from '../context/NotificationContext';
 
@@ -369,8 +369,10 @@ export function useNotifications() {
             channelRef.current = channel;
         };
 
-        if (!REALTIME_ENABLED) return;
-
+        // 注: global-notifications は INSERT のみ + table 単位購読 (threads/replies)。
+        // メンバーシップ判定は受信側 (handleNewRecord 内) で行うため filter は付けない。
+        // 過去 filter なし全件購読で Egress を焼いた事故 (#33) があるので、
+        // ここで購読する event は必ず INSERT のみに限定すること (UPDATE/DELETE は含めない)。
         subscribe();
 
         return () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase, REALTIME_ENABLED } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import { normalizeRole } from '../utils/role';
 
@@ -167,25 +167,33 @@ export function useThreads(
     useEffect(() => {
         fetchThreads();
 
-        if (!REALTIME_ENABLED) return;
+        // realtime は team を一つに絞っている時のみ購読する。
+        // 全チーム表示 (teamId=null) では filter なしの全件購読になり Egress を焼く
+        // 過去事故 (#33) があったので、その場合は購読しない。データ更新はリロードで取り直す。
+        if (teamId === null || teamId === '') return;
 
         const threadsChannel = supabase
-            .channel('public:threads')
+            .channel(`public:threads:team-${teamId}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'threads'
+                table: 'threads',
+                filter: `team_id=eq.${teamId}`,
             }, () => {
                 fetchThreads(true);
             })
             .subscribe();
 
+        // replies.team_id はマイグレーション (#34) で追加した列。INSERT 前 trigger
+        // (replies_set_team_id_trigger) で thread.team_id が自動 populate されるので、
+        // クライアントは team_id を意識せず insert できる。Realtime もこれで絞れる。
         const repliesChannel = supabase
-            .channel('public:replies')
+            .channel(`public:replies:team-${teamId}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'replies'
+                table: 'replies',
+                filter: `team_id=eq.${teamId}`,
             }, () => {
                 fetchThreads(true);
             })
@@ -195,7 +203,7 @@ export function useThreads(
             supabase.removeChannel(threadsChannel);
             supabase.removeChannel(repliesChannel);
         };
-    }, [fetchThreads]);
+    }, [fetchThreads, teamId]);
 
     return { threads, loading, error, refetch: fetchThreads };
 }
@@ -240,23 +248,11 @@ export function useTeams() {
         }
     }, [profile, memberships]);
 
+    // teams テーブルの realtime 購読は撤去 (#33 Egress 事故対策)。
+    // チーム作成/更新/削除は管理画面の操作後のみで頻度が低く、
+    // リロード or 操作後の手動 refetch で十分。
     useEffect(() => {
         fetchTeams();
-
-        if (!REALTIME_ENABLED) return;
-
-        const subscription = supabase
-            .channel('teams')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'teams',
-            }, () => fetchTeams(true))
-            .subscribe();
-
-        return () => {
-            subscription.unsubscribe();
-        };
     }, [fetchTeams]);
 
     return { teams, loading };
@@ -283,23 +279,9 @@ export function useProfiles() {
             }
         }
 
+        // profiles の realtime 購読は撤去 (#33 Egress 事故対策)。
+        // メンバー一覧変更は管理画面操作後のみで頻度が低い。リロードで再取得する。
         fetchProfiles();
-
-        if (!REALTIME_ENABLED) return;
-
-        // Subscribe to realtime changes
-        const subscription = supabase
-            .channel('profiles')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'profiles',
-            }, () => fetchProfiles(true))
-            .subscribe();
-
-        return () => {
-            subscription.unsubscribe();
-        };
     }, []);
 
     return { profiles, loading };
@@ -326,24 +308,10 @@ export function useTags() {
         }
     }, []);
 
+    // tags の realtime 購読は撤去 (#33 Egress 事故対策)。
+    // タグ追加/削除は手動操作後の fetchTags 再呼び出しで反映する。
     useEffect(() => {
         fetchTags();
-
-        if (!REALTIME_ENABLED) return;
-
-        // Subscribe to realtime changes
-        const subscription = supabase
-            .channel('tags')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'tags',
-            }, () => fetchTags(true))
-            .subscribe();
-
-        return () => {
-            subscription.unsubscribe();
-        };
     }, [fetchTags]);
 
     const addTag = useCallback(async (name: string, teamId?: string | number | null, color?: string) => {
@@ -396,7 +364,6 @@ export function useTagMembers(tagId: string | number | null) {
         fetchTagMembers();
 
         if (!tagId) return;
-        if (!REALTIME_ENABLED) return;
 
         const subscription = supabase
             .channel(`tag-members-${tagId}`)
@@ -453,23 +420,10 @@ export function useAllTagMembers() {
         }
     }, []);
 
+    // all-tag-members の realtime 購読は撤去 (#33 Egress 事故対策)。
+    // tag_members 全件購読は filter 不可で Egress を焼く。手動操作後の refetch で十分。
     useEffect(() => {
         fetchAllTagMembers();
-
-        if (!REALTIME_ENABLED) return;
-
-        const subscription = supabase
-            .channel('all-tag-members')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'tag_members',
-            }, () => fetchAllTagMembers())
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(subscription);
-        };
     }, [fetchAllTagMembers]);
 
     // Helper: get user IDs for a given tag name
@@ -513,25 +467,11 @@ export function useReactions() {
         }
     }, []);
 
+    // reactions の realtime 購読は撤去 (#33 Egress 事故対策)。
+    // reactions テーブルは filter 不可で全件購読は Egress を焼く。
+    // リアクション追加/削除時は呼び出し側で refetch する。
     useEffect(() => {
         fetchReactions();
-
-        if (!REALTIME_ENABLED) return;
-
-        const subscription = supabase
-            .channel('public:reactions')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'reactions',
-            }, () => {
-                fetchReactions(true);
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(subscription);
-        };
     }, [fetchReactions]);
 
     return { reactions, loading, refetch: fetchReactions };
@@ -761,14 +701,24 @@ export function useUnreadCounts(userId: string | undefined, memberships: any[]) 
 
         checkUnread();
 
-        if (!REALTIME_ENABLED) return;
-
-        // Set up real-time sub for threads to update unread status
+        // 自分が所属しているチームの threads INSERT のみ購読する。
+        // 過去 filter なし全件購読で Egress を焼いた事故 (#33) があったため、
+        // 必ず team_id=in.(...) で絞ること。
+        const filterIds = memberTeamIds.join(',');
         const channel = supabase
-            .channel('unread-updates')
-            .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'threads' }, () => {
-                checkUnread();
-            })
+            .channel(`unread-updates:${userId}`)
+            .on(
+                'postgres_changes' as any,
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'threads',
+                    filter: `team_id=in.(${filterIds})`,
+                },
+                () => {
+                    checkUnread();
+                },
+            )
             .subscribe();
 
         return () => {

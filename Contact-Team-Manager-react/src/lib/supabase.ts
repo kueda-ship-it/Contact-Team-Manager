@@ -18,10 +18,3 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         }
     }
 });
-
-// Realtime のキルスイッチ。Egress クオータ枯渇時 / 暴走時に全 channel 購読をスキップする。
-// 既定: 無効 (購読しない)。`VITE_REALTIME_ENABLED=true` を環境変数に設定すると復活。
-// 各 channel 購読箇所 (hooks/useSupabase / hooks/useNotifications) でこのフラグを参照し、
-// false の場合は購読自体を行わない (websocket 接続も走らない)。
-export const REALTIME_ENABLED =
-    String(import.meta.env.VITE_REALTIME_ENABLED ?? '').toLowerCase() === 'true';
