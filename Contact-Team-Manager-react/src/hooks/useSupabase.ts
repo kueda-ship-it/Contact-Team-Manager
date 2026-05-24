@@ -184,8 +184,24 @@ export function useThreads(
             })
             .subscribe();
 
+        // replies.team_id はマイグレーション (#34) で追加した列。INSERT 前 trigger
+        // (replies_set_team_id_trigger) で thread.team_id が自動 populate されるので、
+        // クライアントは team_id を意識せず insert できる。Realtime もこれで絞れる。
+        const repliesChannel = supabase
+            .channel(`public:replies:team-${teamId}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'replies',
+                filter: `team_id=eq.${teamId}`,
+            }, () => {
+                fetchThreads(true);
+            })
+            .subscribe();
+
         return () => {
             supabase.removeChannel(threadsChannel);
+            supabase.removeChannel(repliesChannel);
         };
     }, [fetchThreads, teamId]);
 
