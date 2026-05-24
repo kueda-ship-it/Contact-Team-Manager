@@ -1,6 +1,6 @@
 
 import { useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, REALTIME_ENABLED } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
 export function useNotifications() {
@@ -191,6 +191,8 @@ export function useNotifications() {
                 }
             }
         };
+
+        if (!REALTIME_ENABLED) return;
 
         const channel = supabase
             .channel('global-notifications')
