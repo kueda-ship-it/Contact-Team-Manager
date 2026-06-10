@@ -23,9 +23,28 @@ initializeMsal()
 
     // Register Service Worker for Notifications
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js')
+      // 新しい SW が制御を取得したら自動リロード。
+      // precache 方式のため、これが無いと開きっぱなしの PWA は
+      // 何度デプロイしても旧バンドルを配り続ける（sw.js は skipWaiting + clients.claim 済み）。
+      let reloading = false;
+      let hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        // 初回インストール（未制御 → 制御）ではリロードしない
+        if (!hadController) { hadController = true; return; }
+        if (reloading) return;
+        reloading = true;
+        window.location.reload();
+      });
+
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
         .then(registration => {
           console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          // 長時間開きっぱなしでも更新を拾えるよう、定期 + フォーカス時に更新チェック
+          const check = () => registration.update().catch(() => { });
+          setInterval(check, 10 * 60 * 1000);
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') check();
+          });
         })
         .catch(error => {
           console.error('ServiceWorker registration failed: ', error);
