@@ -94,7 +94,8 @@ header {
         0 12px 48px var(--w-shadow2),
         inset 0  1px 0 rgba(255, 255, 255, 0.62),
         inset 0 -1px 0 rgba(60, 140, 230, 0.20) !important;
-    transform: translateY(-2px) !important;
+    /* translateY(-2px) は禁止: カード下端でホバー判定が往復して画面が振動する。
+       浮遊感は box-shadow のグローで表現する。 */
 }
 
 /* ────────────────────────────────────────────────────────────────
