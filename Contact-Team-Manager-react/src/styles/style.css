@@ -3372,6 +3372,12 @@ body.menu-open .quick-reply-form {
     pointer-events: auto;
 }
 
+/* トリガーが画面下半分にあるときは上方向に展開（下方向だと画面外に見切れる） */
+.submenu.submenu-up {
+    top: auto;
+    bottom: 0;
+}
+
 .menu-item:hover {
     background: var(--primary);
     color: white;

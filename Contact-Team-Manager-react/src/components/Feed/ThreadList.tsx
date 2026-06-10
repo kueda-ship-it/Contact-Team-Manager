@@ -160,6 +160,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
     // チーム移動サブメニューの開閉。ホバーだと境目でパタつくのでクリックトグルにする
     const [openSubmenuId, setOpenSubmenuId] = React.useState<string | null>(null);
+    // トリガーが画面下半分にあるときはサブメニューを上方向に展開（下方向だと見切れる）
+    const [submenuUp, setSubmenuUp] = React.useState(false);
     const [selectedPreviewUrl, setSelectedPreviewUrl] = React.useState<string | null>(null);
     const measureRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
     const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
@@ -950,6 +952,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     className="menu-item move-team-item"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        setSubmenuUp(e.currentTarget.getBoundingClientRect().top > window.innerHeight / 2);
                                                         setOpenSubmenuId(prev => prev === thread.id ? null : thread.id);
                                                     }}
                                                 >
@@ -958,18 +961,30 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                                                         </svg>
                                                     </span> チーム移動
-                                                    <div className={`submenu${openSubmenuId === thread.id ? ' submenu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                                        {teams.filter(t => t.id !== thread.team_id).map(t => (
+                                                    <div className={`submenu${openSubmenuId === thread.id ? ' submenu-open' : ''}${submenuUp ? ' submenu-up' : ''}`} onClick={(e) => e.stopPropagation()}>
+                                                        {teams
+                                                            .filter(t => t.id !== thread.team_id)
+                                                            .map(t => {
+                                                                const parentName = t.parent_id ? teams.find(p => p.id === t.parent_id)?.name : null;
+                                                                return { team: t, parentName, label: parentName ? `${parentName} / ${t.name}` : t.name };
+                                                            })
+                                                            .sort((a, b) => a.label.localeCompare(b.label, 'ja'))
+                                                            .map(({ team: t, parentName, label }) => (
                                                             <div key={t.id} className="menu-item" onClick={async (e) => {
                                                                 e.stopPropagation();
                                                                 setOpenSubmenuId(null);
                                                                 setOpenMenuId(null);
-                                                                if (window.confirm(`この投稿を「${t.name}」へ移動しますか？`)) {
+                                                                if (window.confirm(`この投稿を「${label}」へ移動しますか？`)) {
                                                                     const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
                                                                     if (error) alert('移動に失敗しました: ' + error.message);
                                                                     else refetch(true);
                                                                 }
                                                             }}>
+                                                                {parentName && (
+                                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.78em', whiteSpace: 'nowrap' }}>
+                                                                        {parentName} /&nbsp;
+                                                                    </span>
+                                                                )}
                                                                 {t.name}
                                                             </div>
                                                         ))}
