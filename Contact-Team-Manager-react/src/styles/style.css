@@ -3360,8 +3360,8 @@ body.menu-open .quick-reply-form {
     z-index: 10000;
 }
 
-.submenu.submenu-open,
-.move-team-item:hover .submenu {
+/* クリックトグルのみで開く（:hover だと親とサブメニューの境目でパタついて画面が震えるため） */
+.submenu.submenu-open {
     display: block;
     opacity: 1;
     visibility: visible;

@@ -158,6 +158,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [expandedThreads, setExpandedThreads] = React.useState<Set<string>>(new Set());
     const [needsExpandMap, setNeedsExpandMap] = React.useState<{ [key: string]: boolean }>({});
     const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
+    // チーム移動サブメニューの開閉。ホバーだと境目でパタつくのでクリックトグルにする
+    const [openSubmenuId, setOpenSubmenuId] = React.useState<string | null>(null);
     const [selectedPreviewUrl, setSelectedPreviewUrl] = React.useState<string | null>(null);
     const measureRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
     const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
@@ -180,6 +182,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             // menu, the team-move submenu, or any of their descendants.
             if (target.closest('.dot-menu-container, .dot-menu, .submenu')) return;
             setOpenMenuId(null);
+            setOpenSubmenuId(null);
         };
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
@@ -901,9 +904,10 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     open={openMenuId === thread.id}
                                     onTriggerClick={(e) => {
                                         e.stopPropagation();
+                                        setOpenSubmenuId(null);
                                         setOpenMenuId(prev => prev === thread.id ? null : thread.id);
                                     }}
-                                    onClose={() => setOpenMenuId(null)}
+                                    onClose={() => { setOpenMenuId(null); setOpenSubmenuId(null); }}
                                 >
                                     {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
                                         <>
@@ -941,17 +945,24 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     </svg>
                                                 </span> リマインド編集
                                             </div>
-                                            {['Admin'].includes(currentProfile?.role || '') && (
-                                                <div className="menu-item move-team-item" onClick={(e) => e.stopPropagation()}>
+                                            {['Admin', 'Manager'].includes(currentProfile?.role || '') && (
+                                                <div
+                                                    className="menu-item move-team-item"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setOpenSubmenuId(prev => prev === thread.id ? null : thread.id);
+                                                    }}
+                                                >
                                                     <span className="menu-icon">
                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                                                         </svg>
                                                     </span> チーム移動
-                                                    <div className="submenu" onClick={(e) => e.stopPropagation()}>
+                                                    <div className={`submenu${openSubmenuId === thread.id ? ' submenu-open' : ''}`} onClick={(e) => e.stopPropagation()}>
                                                         {teams.filter(t => t.id !== thread.team_id).map(t => (
                                                             <div key={t.id} className="menu-item" onClick={async (e) => {
                                                                 e.stopPropagation();
+                                                                setOpenSubmenuId(null);
                                                                 setOpenMenuId(null);
                                                                 if (window.confirm(`この投稿を「${t.name}」へ移動しますか？`)) {
                                                                     const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
