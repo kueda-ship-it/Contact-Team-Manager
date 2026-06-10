@@ -1039,7 +1039,7 @@ body {
 .side-panel .task-card:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
+    /* translateY は境界でのホバー振動の原因になるため使わない */
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
@@ -1645,10 +1645,13 @@ body:not(.light-mode) .rich-editor * {
     scroll-margin-top: 170px;
 }
 
+/* ホバーで transform による移動はしない:
+   translateY(-2px) だとカード下端 2px の帯でホバー判定が
+   「浮く→カーソルが外れる→落ちる→再ホバー」とフレーム単位で往復し
+   画面全体が振動する。浮遊感はグロー（box-shadow）のみで表現する。 */
 .task-card:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
 }
 
