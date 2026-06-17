@@ -148,6 +148,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     // Using a simple object to manage attachments per reply form
     const [replyAttachments, setReplyAttachments] = React.useState<{ [key: string]: Attachment[] }>({});
     const [replyUploading, setReplyUploading] = React.useState<{ [key: string]: boolean }>({});
+    // 編集モードで貼り付けた画像を保存時に attachments へマージするための一時保持（id = threadId/replyId）
+    const [editAttachments, setEditAttachments] = React.useState<{ [key: string]: Attachment[] }>({});
+    const [editUploading, setEditUploading] = React.useState<{ [key: string]: boolean }>({});
     // リマインド編集パネル: threadId -> リマインド行リスト
     const [remindPanel, setRemindPanel] = React.useState<{
         threadId: string;
@@ -606,39 +609,116 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         }
     };
 
-    const handleUpdateThread = async (threadId: string) => {
+    // 編集中の contentEditable に画像を貼ると base64 の原寸 <img> が本文へ埋め込まれ巨大表示になる。
+    // 新規投稿/返信と同じく、画像はインライン埋め込みせず添付としてアップロードし、保存時に attachments へマージする。
+    const handleEditPaste = async (e: React.ClipboardEvent, id: string) => {
+        const items = e.clipboardData.items;
+        const blobs: File[] = [];
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const blob = items[i].getAsFile();
+                if (blob) blobs.push(blob);
+            }
+        }
+
+        if (blobs.length > 0 && user) {
+            e.preventDefault(); // インライン埋め込みを防ぐ
+            setEditUploading(prev => ({ ...prev, [id]: true }));
+            try {
+                for (const blob of blobs) {
+                    const uploaded = await uploadFile(blob);
+                    if (uploaded) {
+                        setEditAttachments(prev => ({ ...prev, [id]: [...(prev[id] || []), uploaded] }));
+                    }
+                }
+            } finally {
+                setEditUploading(prev => ({ ...prev, [id]: false }));
+            }
+        } else {
+            // 画像以外はプレーンテキストとして挿入（書式付き貼り付けの混入を防ぐ）
+            e.preventDefault();
+            const text = e.clipboardData.getData('text/plain');
+            document.execCommand('insertText', false, text);
+        }
+    };
+
+    const handleUpdateThread = async (threadId: string, existingAttachments?: any[] | null) => {
         const el = editRefs.current[threadId];
         if (!el) {
             console.error("Edit ref not found for thread:", threadId);
             return;
         }
         const content = el.innerHTML;
-        console.log("Updating thread:", threadId, "Content length:", content.length);
+        const pasted = editAttachments[threadId] || [];
+        const payload: { content: string; attachments?: any[] } = { content };
+        if (pasted.length > 0) {
+            payload.attachments = [...(existingAttachments || []), ...pasted];
+        }
 
-        const { data, error } = await supabase.from('threads').update({ content: content }).eq('id', threadId).select();
+        const { error } = await supabase.from('threads').update(payload).eq('id', threadId);
 
         if (error) {
             console.error("Update failed:", error);
             alert('更新に失敗しました: ' + error.message);
         } else {
-            console.log("Update success:", data);
             setEditingThreadId(null);
+            setEditAttachments(prev => { const n = { ...prev }; delete n[threadId]; return n; });
             refetch(true);
         }
     };
 
-    const handleUpdateReply = async (replyId: string) => {
+    const handleUpdateReply = async (replyId: string, existingAttachments?: any[] | null) => {
         const el = editRefs.current[replyId];
         if (!el) return;
         const content = el.innerHTML;
+        const pasted = editAttachments[replyId] || [];
+        const payload: { content: string; attachments?: any[] } = { content };
+        if (pasted.length > 0) {
+            payload.attachments = [...(existingAttachments || []), ...pasted];
+        }
 
-        const { error } = await supabase.from('replies').update({ content: content }).eq('id', replyId);
+        const { error } = await supabase.from('replies').update(payload).eq('id', replyId);
         if (error) {
             alert('更新に失敗しました: ' + error.message);
         } else {
             setEditingReplyId(null);
+            setEditAttachments(prev => { const n = { ...prev }; delete n[replyId]; return n; });
             refetch(true);
         }
+    };
+
+    const removeEditAttachment = (id: string, index: number) => {
+        setEditAttachments(prev => ({ ...prev, [id]: (prev[id] || []).filter((_, i) => i !== index) }));
+    };
+
+    const renderEditAttachmentPreview = (id: string) => {
+        const atts = editAttachments[id] || [];
+        if (atts.length === 0 && !editUploading[id]) return null;
+        return (
+            <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                {atts.map((att, idx) => (
+                    <div key={`edit-att-${idx}`} className="attachment-item" style={{ position: 'relative', width: '64px', height: '64px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
+                        {att.type.startsWith('image/') ? (
+                            <img src={att.downloadUrl || att.thumbnailUrl || ''} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            <span style={{ fontSize: '14px' }}>📄</span>
+                        )}
+                        <div
+                            className="attachment-remove"
+                            onClick={(e) => { e.stopPropagation(); removeEditAttachment(id, idx); }}
+                            style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', zIndex: 2 }}
+                        >
+                            ×
+                        </div>
+                    </div>
+                ))}
+                {editUploading[id] && (
+                    <div className="attachment-item uploading" style={{ width: '64px', height: '64px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--primary-light)' }}>
+                        <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                    </div>
+                )}
+            </div>
+        );
     };
 
     const handleAddReaction = async (emoji: string, threadId?: string, replyId?: string) => {
@@ -1117,6 +1197,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                             className="input-field rich-editor"
                                             style={{ minHeight: '80px', marginBottom: '8px', color: 'var(--text-main)' }}
                                             onInput={(e) => handleInput(e, thread.id)}
+                                            onPaste={(e) => handleEditPaste(e, thread.id)}
                                             onKeyDown={(e) => {
                                                 handleKeyDown(e, thread.id, e.currentTarget);
                                                 if (isOpen && targetThreadId === thread.id) {
@@ -1124,6 +1205,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 }
                                             }}
                                         />
+                                        {renderEditAttachmentPreview(thread.id)}
                                         {isOpen && targetThreadId === thread.id && (
                                             <MentionList
                                                 candidates={candidates}
@@ -1142,7 +1224,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                         )}
                                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                                             <button className="btn btn-sm" onClick={() => setEditingThreadId(null)}>キャンセル</button>
-                                            <button className="btn btn-sm btn-primary" onClick={() => handleUpdateThread(thread.id)}>保存</button>
+                                            <button className="btn btn-sm btn-primary" onClick={() => handleUpdateThread(thread.id, thread.attachments)}>保存</button>
                                         </div>
                                     </div>
                                 ) : (
@@ -1248,14 +1330,16 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                                     className="input-field rich-editor"
                                                                                     style={{ minHeight: '60px', marginBottom: '8px', color: 'var(--text-main)', fontSize: '0.85rem' }}
                                                                                     onInput={(e) => handleInput(e, reply.id)}
+                                                                                    onPaste={(e) => handleEditPaste(e, reply.id)}
                                                                                     onKeyDown={(e) => {
                                                                                         handleKeyDown(e, reply.id, e.currentTarget);
                                                                                     }}
                                                                                 />
                                                                             </div>
+                                                                            {renderEditAttachmentPreview(reply.id)}
                                                                             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                                                                                 <button className="btn btn-sm" onClick={() => setEditingReplyId(null)}>キャンセル</button>
-                                                                                <button className="btn btn-sm btn-primary" onClick={() => handleUpdateReply(reply.id)}>保存</button>
+                                                                                <button className="btn btn-sm btn-primary" onClick={() => handleUpdateReply(reply.id, reply.attachments)}>保存</button>
                                                                             </div>
                                                                         </div>
                                                                     ) : (

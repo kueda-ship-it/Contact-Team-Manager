@@ -2390,6 +2390,15 @@ textarea.input-field {
     transform: scale(1.02);
 }
 
+/* 安全網: 本文HTMLに直接埋め込まれた <img>（過去に編集中の貼り付けで混入したもの）が
+   カード幅を突き破って巨大表示になるのを防ぐ。新規分は添付化されるため通常は発生しない。 */
+.task-content img,
+.reply-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
 .file-link {
     display: flex;
     align-items: center;
@@ -4416,6 +4425,22 @@ body.light-mode .btn-status.btn-revert:hover svg { stroke: #7B1FA2 !important; f
     display: inline !important; 
     white-space: normal !important;
     border: none !important; /* 基本枠線を削除 */
+}
+
+/* メンションチップとテキストを水平・垂直中央で「きっちり」揃える。
+   display:inline だと縦位置がベースライン依存でブレるため、表示側のみ inline-flex 化する。
+   （.rich-editor 側は編集中のキャレット挙動を変えないよう従来の inline のまま温存） */
+.task-content .mention,
+.reply-content .mention {
+    display: inline-flex !important;
+    align-items: center !important;
+    /* CJK では vertical-align:middle がフォントメトリクス依存で約2.4px 下にずれる。
+       baseline ならチップ内テキストと本文テキストのベースラインが一致し、左右対称 padding と相まって
+       実測オフセット ≈ 0.2px できっちり中央に揃う。 */
+    vertical-align: baseline !important;
+    line-height: 1 !important;
+    padding: 2px 7px !important;
+    white-space: nowrap !important;
 }
 
 /* ネストされたメンションの装飾をリセット（二重枠解消） */
