@@ -1037,3 +1037,37 @@ body.light-mode .team-list-item.active .team-item-header {
   background: transparent !important;
 }
 
+/* ────────────────────────────────────────────────────────────────
+   MENTION — ハイライト除去（色・太さは各テーマルールのまま維持）
+   背景ピル / グロー(text-shadow) / backdrop-filter / 枠を外し、
+   色付き太字のプレーンテキストにする。背景を外すと本文と同じ
+   ベースラインに自然に揃うため整列用の padding も不要。
+   liquid-glass の dark(0,3,1) / light(0,3,1) / sidebar(id) 各ルールに
+   勝つよう、同等以上の specificity で「最終ファイルの末尾」に置く。 */
+body:not(.light-mode) .task-content .mention,
+body:not(.light-mode) .reply-content .mention,
+body.light-mode .task-content .mention,
+body.light-mode .reply-content .mention,
+#pending-sidebar-list .mention,
+#assigned-sidebar-list .mention {
+    display: inline !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+}
+
+body:not(.light-mode) .task-content .mention:hover,
+body:not(.light-mode) .reply-content .mention:hover,
+body.light-mode .task-content .mention:hover,
+body.light-mode .reply-content .mention:hover {
+    background: transparent !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+

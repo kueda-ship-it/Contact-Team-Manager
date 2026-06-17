@@ -4427,21 +4427,9 @@ body.light-mode .btn-status.btn-revert:hover svg { stroke: #7B1FA2 !important; f
     border: none !important; /* 基本枠線を削除 */
 }
 
-/* メンションチップとテキストを水平・垂直中央で「きっちり」揃える。
-   display:inline だと縦位置がベースライン依存でブレるため、表示側のみ inline-flex 化する。
-   （.rich-editor 側は編集中のキャレット挙動を変えないよう従来の inline のまま温存） */
-.task-content .mention,
-.reply-content .mention {
-    display: inline-flex !important;
-    align-items: center !important;
-    /* CJK では vertical-align:middle がフォントメトリクス依存で約2.4px 下にずれる。
-       baseline ならチップ内テキストと本文テキストのベースラインが一致し、左右対称 padding と相まって
-       実測オフセット ≈ 0.2px できっちり中央に揃う。 */
-    vertical-align: baseline !important;
-    line-height: 1 !important;
-    padding: 2px 7px !important;
-    white-space: nowrap !important;
-}
+/* メンションのハイライト除去は theme レイヤ（liquid-glass.css 末尾）で一括指定する。
+   liquid-glass の body:not(.light-mode) .task-content .mention が specificity 高 + 後勝ちのため、
+   こちらに書いても背景が上書きされてしまうので、最終ファイル側に集約している。 */
 
 /* ネストされたメンションの装飾をリセット（二重枠解消） */
 .mention .mention {
