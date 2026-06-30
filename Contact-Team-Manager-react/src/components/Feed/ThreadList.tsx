@@ -171,25 +171,33 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
     const [previewAttId, setPreviewAttId] = React.useState<string | null>(null);
     const [previewShareUrl, setPreviewShareUrl] = React.useState<string | null>(null);
-    // PDF インラインプレビュー（Blob Object URL）。
-    // 自分がアクセスできるファイルはアプリ内 iframe 表示。他ユーザーの個人OneDriveファイルは
-    // Graph が 403 になるため、共有リンクを SharePoint ビューアで開くフォールバックに切替える。
-    const [pdfPreview, setPdfPreview] = React.useState<{ url: string; name: string; shareUrl: string; failed: boolean } | null>(null);
+    // PDF インラインプレビュー。
+    // 共有リンクがあれば SharePoint の embedview をアプリ内 iframe に埋め込む（cross-user でも
+    // ブラウザのSharePointセッションで表示できる）。共有リンクが無い古い添付のみ Graph blob で試す。
+    const [pdfPreview, setPdfPreview] = React.useState<{ name: string; blobUrl: string; embedUrl: string; shareUrl: string; failed: boolean } | null>(null);
     const [pdfLoading, setPdfLoading] = React.useState(false);
 
     const openPdfPreview = React.useCallback(async (att: any) => {
-        const shareUrl = att.url || '';
-        setPdfPreview({ url: '', name: att.name, shareUrl, failed: false });
+        const shareUrl: string = att.url || '';
+        if (shareUrl) {
+            // SharePoint 共有リンクを embedview にしてアプリ内 iframe で表示
+            const sep = shareUrl.includes('?') ? '&' : '?';
+            setPdfPreview({ name: att.name, blobUrl: '', embedUrl: `${shareUrl}${sep}action=embedview`, shareUrl, failed: false });
+            setPdfLoading(false);
+            return;
+        }
+        // 共有リンクが無い添付のみ Graph blob を試みる（自分のファイルなら表示可）
+        setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl: '', failed: false });
         setPdfLoading(true);
         try {
             const url = await getAttachmentBlobUrl(att);
             if (url) {
-                setPdfPreview({ url, name: att.name, shareUrl, failed: false });
+                setPdfPreview({ name: att.name, blobUrl: url, embedUrl: '', shareUrl: '', failed: false });
             } else {
-                setPdfPreview({ url: '', name: att.name, shareUrl, failed: true });
+                setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl: '', failed: true });
             }
         } catch {
-            setPdfPreview({ url: '', name: att.name, shareUrl, failed: true });
+            setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl: '', failed: true });
         } finally {
             setPdfLoading(false);
         }
@@ -197,7 +205,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
     const closePdfPreview = React.useCallback(() => {
         setPdfPreview(prev => {
-            if (prev?.url) URL.revokeObjectURL(prev.url);
+            if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl);
             return null;
         });
     }, []);
@@ -1771,14 +1779,14 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                 {pdfPreview?.name || '読み込み中...'}
                             </span>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                {pdfPreview?.url && (
+                                {(pdfPreview?.blobUrl || pdfPreview?.shareUrl) && (
                                     <button
                                         className="btn btn-sm"
                                         style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}
-                                        onClick={() => window.open(pdfPreview.url, '_blank')}
+                                        onClick={() => window.open(pdfPreview.blobUrl || pdfPreview.shareUrl, '_blank')}
                                         title="新しいタブで開く"
                                     >
-                                        別タブ
+                                        {pdfPreview?.shareUrl ? 'SharePointで開く' : '別タブ'}
                                     </button>
                                 )}
                                 <button
@@ -1797,27 +1805,30 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     <p>PDF を読み込み中...</p>
                                 </div>
                             )}
-                            {!pdfLoading && pdfPreview?.url && (
+                            {!pdfLoading && (pdfPreview?.blobUrl || pdfPreview?.embedUrl) && (
                                 <iframe
-                                    src={pdfPreview.url}
+                                    src={pdfPreview.blobUrl || pdfPreview.embedUrl}
                                     title={pdfPreview.name}
                                     style={{ width: '100%', height: '100%', border: 'none' }}
                                 />
                             )}
+                            {/* embed iframe がフレーム制限で表示されない場合の保険リンク */}
+                            {!pdfLoading && pdfPreview?.embedUrl && pdfPreview?.shareUrl && (
+                                <div style={{ position: 'absolute', bottom: 8, right: 12, fontSize: '0.72rem' }}>
+                                    <button
+                                        onClick={() => window.open(pdfPreview.shareUrl, '_blank')}
+                                        style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
+                                        title="表示されない場合はこちら"
+                                    >
+                                        表示されない場合 → SharePointで開く
+                                    </button>
+                                </div>
+                            )}
                             {!pdfLoading && pdfPreview?.failed && (
                                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', gap: '14px', padding: '20px', textAlign: 'center' }}>
                                     <span style={{ fontSize: '2.5rem' }}>📕</span>
-                                    <p style={{ margin: 0, fontSize: '0.9rem' }}>このPDFはアプリ内で表示できません<br />（他ユーザーがアップしたファイル）</p>
-                                    {pdfPreview.shareUrl ? (
-                                        <button
-                                            className="btn btn-primary"
-                                            onClick={() => { window.open(pdfPreview.shareUrl, '_blank'); }}
-                                        >
-                                            SharePoint で開く
-                                        </button>
-                                    ) : (
-                                        <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.7 }}>共有リンクがありません。投稿者に再アップロードを依頼してください。</p>
-                                    )}
+                                    <p style={{ margin: 0, fontSize: '0.9rem' }}>このPDFはアプリ内で表示できませんでした</p>
+                                    <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.7 }}>共有リンクがありません。投稿者に再アップロードを依頼してください。</p>
                                 </div>
                             )}
                         </div>
