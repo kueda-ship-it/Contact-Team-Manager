@@ -180,10 +180,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const openPdfPreview = React.useCallback(async (att: any) => {
         const shareUrl: string = att.url || '';
         if (shareUrl) {
-            // SharePoint 共有リンクを embedview にしてアプリ内 iframe で表示
-            const sep = shareUrl.includes('?') ? '&' : '?';
-            setPdfPreview({ name: att.name, blobUrl: '', embedUrl: `${shareUrl}${sep}action=embedview`, shareUrl, failed: false });
-            setPdfLoading(false);
+            // SharePoint は frame-ancestors CSP で外部サイト(github.io)からの iframe 埋め込みを
+            // 禁止しているため、アプリ内 iframe 表示は不可能。新規タブで SharePoint ビューアを開く。
+            window.open(shareUrl, '_blank');
             return;
         }
         // 共有リンクが無い添付のみ Graph blob を試みる（自分のファイルなら表示可）
