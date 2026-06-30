@@ -179,24 +179,20 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
     const openPdfPreview = React.useCallback(async (att: any) => {
         const shareUrl: string = att.url || '';
-        if (shareUrl) {
-            // SharePoint は frame-ancestors CSP で外部サイト(github.io)からの iframe 埋め込みを
-            // 禁止しているため、アプリ内 iframe 表示は不可能。新規タブで SharePoint ビューアを開く。
-            window.open(shareUrl, '_blank');
-            return;
-        }
-        // 共有リンクが無い添付のみ Graph blob を試みる（自分のファイルなら表示可）
-        setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl: '', failed: false });
+        // まず Graph でファイル本体を取得してアプリ内 iframe 表示を試みる。
+        // Files.Read.All が付与されていれば他ユーザーの共有ファイルも取得できる。
+        // 取得できない (権限/同意未済) 場合は失敗状態にし、SharePoint 新規タブへ誘導する。
+        setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl, failed: false });
         setPdfLoading(true);
         try {
             const url = await getAttachmentBlobUrl(att);
             if (url) {
-                setPdfPreview({ name: att.name, blobUrl: url, embedUrl: '', shareUrl: '', failed: false });
+                setPdfPreview({ name: att.name, blobUrl: url, embedUrl: '', shareUrl, failed: false });
             } else {
-                setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl: '', failed: true });
+                setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl, failed: true });
             }
         } catch {
-            setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl: '', failed: true });
+            setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl, failed: true });
         } finally {
             setPdfLoading(false);
         }
@@ -1804,30 +1800,27 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     <p>PDF を読み込み中...</p>
                                 </div>
                             )}
-                            {!pdfLoading && (pdfPreview?.blobUrl || pdfPreview?.embedUrl) && (
+                            {!pdfLoading && pdfPreview?.blobUrl && (
                                 <iframe
-                                    src={pdfPreview.blobUrl || pdfPreview.embedUrl}
+                                    src={pdfPreview.blobUrl}
                                     title={pdfPreview.name}
                                     style={{ width: '100%', height: '100%', border: 'none' }}
                                 />
                             )}
-                            {/* embed iframe がフレーム制限で表示されない場合の保険リンク */}
-                            {!pdfLoading && pdfPreview?.embedUrl && pdfPreview?.shareUrl && (
-                                <div style={{ position: 'absolute', bottom: 8, right: 12, fontSize: '0.72rem' }}>
-                                    <button
-                                        onClick={() => window.open(pdfPreview.shareUrl, '_blank')}
-                                        style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}
-                                        title="表示されない場合はこちら"
-                                    >
-                                        表示されない場合 → SharePointで開く
-                                    </button>
-                                </div>
-                            )}
                             {!pdfLoading && pdfPreview?.failed && (
                                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', gap: '14px', padding: '20px', textAlign: 'center' }}>
                                     <span style={{ fontSize: '2.5rem' }}>📕</span>
-                                    <p style={{ margin: 0, fontSize: '0.9rem' }}>このPDFはアプリ内で表示できませんでした</p>
-                                    <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.7 }}>共有リンクがありません。投稿者に再アップロードを依頼してください。</p>
+                                    <p style={{ margin: 0, fontSize: '0.9rem' }}>アプリ内で表示できませんでした<br /><span style={{ fontSize: '0.8rem', opacity: 0.7 }}>（ファイル読取の同意が未済か、権限不足の可能性）</span></p>
+                                    {pdfPreview.shareUrl ? (
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={() => { window.open(pdfPreview.shareUrl, '_blank'); }}
+                                        >
+                                            SharePoint で開く
+                                        </button>
+                                    ) : (
+                                        <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.7 }}>共有リンクがありません。投稿者に再アップロードを依頼してください。</p>
+                                    )}
                                 </div>
                             )}
                         </div>
