@@ -322,36 +322,47 @@ export function useOneDriveUpload() {
         setAttachments([]);
     };
 
-    const downloadFileFromOneDrive = async (fileId: string, fileName: string, driveId?: string, shareUrl?: string) => {
-        try {
-            let client;
-            try {
-                client = await getGraphClient();
-            } catch (e) {
-                const account = await login();
-                if (!account) return;
-                client = await getGraphClient();
-            }
-
-            const response = await fetchDriveItem(client, { id: fileId, driveId, shareUrl }, '@microsoft.graph.downloadUrl');
-
-            const downloadUrl = response["@microsoft.graph.downloadUrl"];
-
-            if (downloadUrl) {
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = fileName;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } else {
-                throw new Error("Download URL not found");
-            }
-        } catch (error: any) {
-            console.error("Download failed:", error);
-            alert(`ダウンロードに失敗しました: ${error.message || error}`);
+    const downloadFileFromOneDrive = (fileId: string, fileName: string, driveId?: string, shareUrl?: string) => {
+        // 他ユーザーがアップした個人OneDriveのファイルは Graph 直アクセス(/drives も /shares も)が
+        // 403 になる。組織共有リンクはブラウザで開くと SharePoint 側でアクセスが引き換えられ確実に通るため、
+        // 共有リンクがあれば新規タブで開く(download=1 で直ダウンロード)。
+        if (shareUrl) {
+            const sep = shareUrl.includes('?') ? '&' : '?';
+            window.open(`${shareUrl}${sep}download=1`, '_blank');
+            return;
         }
+
+        // 共有リンクが無い古い添付のみ、Graph 経由(自分のファイルなら可)でダウンロードを試みる
+        (async () => {
+            try {
+                let client;
+                try {
+                    client = await getGraphClient();
+                } catch (e) {
+                    const account = await login();
+                    if (!account) return;
+                    client = await getGraphClient();
+                }
+
+                const response = await fetchDriveItem(client, { id: fileId, driveId }, '@microsoft.graph.downloadUrl');
+                const downloadUrl = response["@microsoft.graph.downloadUrl"];
+
+                if (downloadUrl) {
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = fileName;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } else {
+                    throw new Error("Download URL not found");
+                }
+            } catch (error: any) {
+                console.error("Download failed:", error);
+                alert(`ダウンロードに失敗しました: ${error.message || error}`);
+            }
+        })();
     };
 
     const getFreshAttachmentMetadata = useCallback(async (fileId: string, driveId?: string, shareUrl?: string): Promise<{ thumbnailUrl: string, downloadUrl: string } | null> => {
