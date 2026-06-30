@@ -17,7 +17,7 @@ import { DotMenu } from '../common/DotMenu';
 // Helper component for auto-refreshing images
 const ThreadImage: React.FC<{ 
     att: any; 
-    getFreshMetadata: (id: string, driveId?: string) => Promise<any>;
+    getFreshMetadata: (id: string, driveId?: string, shareUrl?: string) => Promise<any>;
     isAuthenticated: boolean;
     onLogin: () => Promise<any>;
 }> = ({ att, getFreshMetadata, isAuthenticated, onLogin }) => {
@@ -53,7 +53,7 @@ const ThreadImage: React.FC<{
         console.log(`[ThreadImage] Image failed to load, fetching fresh metadata for ${att.id} (drive: ${att.driveId})`);
         setRetryCount(prev => prev + 1);
         
-        const fresh = await getFreshMetadata(att.id, att.driveId);
+        const fresh = await getFreshMetadata(att.id, att.driveId, att.url);
         if (fresh) {
             setSrc(fresh.downloadUrl || fresh.thumbnailUrl);
             setIsAuthNeeded(false);
@@ -138,6 +138,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         uploadFile,
         downloadFileFromOneDrive,
         getFreshAttachmentMetadata,
+        getAttachmentBlobUrl,
         isAuthenticated,
         login
     } = useOneDriveUpload();
@@ -169,6 +170,32 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const measureRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
     const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
     const [previewAttId, setPreviewAttId] = React.useState<string | null>(null);
+    const [previewShareUrl, setPreviewShareUrl] = React.useState<string | null>(null);
+    // PDF インラインプレビュー（Blob Object URL）
+    const [pdfPreview, setPdfPreview] = React.useState<{ url: string; name: string } | null>(null);
+    const [pdfLoading, setPdfLoading] = React.useState(false);
+
+    const openPdfPreview = React.useCallback(async (att: any) => {
+        setPdfLoading(true);
+        try {
+            const url = await getAttachmentBlobUrl(att);
+            if (url) {
+                setPdfPreview({ url, name: att.name });
+            } else {
+                // 取得できない場合はダウンロードにフォールバック
+                downloadFileFromOneDrive(att.id, att.name, att.driveId, att.url);
+            }
+        } finally {
+            setPdfLoading(false);
+        }
+    }, [getAttachmentBlobUrl, downloadFileFromOneDrive]);
+
+    const closePdfPreview = React.useCallback(() => {
+        setPdfPreview(prev => {
+            if (prev?.url) URL.revokeObjectURL(prev.url);
+            return null;
+        });
+    }, []);
 
     // Close open menu when clicking outside.
     // We must check the click target explicitly: the dot-menu is now rendered
@@ -761,6 +788,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         return (type?.startsWith('image/')) || (name && imgExtensions.some(ext => name.toLowerCase().endsWith(ext)));
                     };
                     const isImage = isImageFile(att.name, att.type);
+                    const isPdf = att.type === 'application/pdf' || (att.name && att.name.toLowerCase().endsWith('.pdf'));
                     return (
                         <div key={idx} className="attachment-group" style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                             <div className="attachment-wrapper" style={{ position: 'relative' }}>
@@ -770,27 +798,30 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                             // Prefer direct link for <img> tag. If only webUrl exists, wait for refresh.
                                             const isDirectLink = (url: string) => url && (url.includes('download.aspx') || url.includes('content.office.net') || url.includes('public.blob.core.windows.net'));
                                             const initialUrl = isDirectLink(att.downloadUrl) ? att.downloadUrl : (isDirectLink(att.thumbnailUrl) ? att.thumbnailUrl : null);
-                                            
+
                                             setPreviewAttId(att.id);
+                                            setPreviewShareUrl(att.url || null);
                                             setPreviewImageUrl(initialUrl);
 
                                             // Always attempt to refresh on click to get the high-res direct link
                                             if (att.id) {
-                                                const fresh = await getFreshAttachmentMetadata(att.id, att.driveId);
+                                                const fresh = await getFreshAttachmentMetadata(att.id, att.driveId, att.url);
                                                 if (fresh) {
                                                     setPreviewImageUrl(fresh.downloadUrl || fresh.thumbnailUrl);
                                                 } else if (!isAuthenticated) {
                                                     // Request login without confirmation for direct feedback
                                                     const account = await login();
                                                     if (account) {
-                                                        const freshAfter = await getFreshAttachmentMetadata(att.id, att.driveId);
+                                                        const freshAfter = await getFreshAttachmentMetadata(att.id, att.driveId, att.url);
                                                         if (freshAfter) setPreviewImageUrl(freshAfter.downloadUrl || freshAfter.thumbnailUrl);
                                                     }
                                                 }
                                             }
+                                        } else if (isPdf) {
+                                            openPdfPreview(att);
                                         } else {
                                             if (att.id) {
-                                                downloadFileFromOneDrive(att.id, att.name, att.driveId);
+                                                downloadFileFromOneDrive(att.id, att.name, att.driveId, att.url);
                                             } else {
                                                 window.open(att.url, '_blank');
                                             }
@@ -799,15 +830,16 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     style={{ cursor: 'pointer' }}
                                 >
                                     {isImage ? (
-                                        <ThreadImage 
-                                            att={att} 
-                                            getFreshMetadata={getFreshAttachmentMetadata} 
+                                        <ThreadImage
+                                            att={att}
+                                            getFreshMetadata={getFreshAttachmentMetadata}
                                             isAuthenticated={isAuthenticated}
                                             onLogin={login}
                                         />
                                     ) : (
-                                        <div className="attachment-file-icon" style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                            📄
+                                        <div className="attachment-file-icon" title={isPdf ? 'クリックでプレビュー' : 'クリックでダウンロード'} style={{ width: '60px', height: '60px', background: isPdf ? 'rgba(229,57,53,0.08)' : 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '24px', border: isPdf ? '1px solid rgba(229,57,53,0.3)' : '1px solid rgba(255,255,255,0.1)', gap: '2px' }}>
+                                            {isPdf ? '📕' : '📄'}
+                                            {isPdf && <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>PDF</span>}
                                         </div>
                                     )}
                                 </div>
@@ -820,7 +852,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     className="btn-download-icon"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        downloadFileFromOneDrive(att.id || att.url, att.name, att.driveId);
+                                        downloadFileFromOneDrive(att.id, att.name, att.driveId, att.url);
                                     }}
                                     title="OneDriveからダウンロード"
                                     style={{ padding: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', marginTop: '4px' }}
@@ -1655,7 +1687,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                 onError={async () => {
                                     if (previewAttId) {
                                         console.log("[Preview] Image failed, refreshing metadata...");
-                                        const fresh = await getFreshAttachmentMetadata(previewAttId);
+                                        const fresh = await getFreshAttachmentMetadata(previewAttId, undefined, previewShareUrl || undefined);
                                         if (fresh) {
                                             setPreviewImageUrl(fresh.downloadUrl || fresh.thumbnailUrl);
                                         }
@@ -1718,6 +1750,60 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                     </div>
                 </div>
             )}
+            {/* PDF Inline Preview Modal */}
+            {(pdfPreview || pdfLoading) && (
+                <div
+                    className="pdf-preview-overlay"
+                    style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)' }}
+                    onClick={closePdfPreview}
+                >
+                    <div
+                        style={{ position: 'relative', width: '90vw', height: '90vh', background: '#fff', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#2b2b2b', color: '#fff', flexShrink: 0 }}>
+                            <span style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                                {pdfPreview?.name || '読み込み中...'}
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                {pdfPreview && (
+                                    <button
+                                        className="btn btn-sm"
+                                        style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}
+                                        onClick={() => window.open(pdfPreview.url, '_blank')}
+                                        title="新しいタブで開く"
+                                    >
+                                        別タブ
+                                    </button>
+                                )}
+                                <button
+                                    onClick={closePdfPreview}
+                                    style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }}
+                                    title="閉じる"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+                        <div style={{ flex: 1, position: 'relative', background: '#525659' }}>
+                            {pdfLoading && !pdfPreview && (
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', gap: '10px' }}>
+                                    <div className="spinner"></div>
+                                    <p>PDF を読み込み中...</p>
+                                </div>
+                            )}
+                            {pdfPreview && (
+                                <iframe
+                                    src={pdfPreview.url}
+                                    title={pdfPreview.name}
+                                    style={{ width: '100%', height: '100%', border: 'none' }}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Image Preview Overlay Modal */}
             {selectedPreviewUrl && (
                 <div 

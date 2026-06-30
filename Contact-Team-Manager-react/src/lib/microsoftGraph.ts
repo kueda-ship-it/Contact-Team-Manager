@@ -54,6 +54,20 @@ export const loginRequest = {
     scopes: ["User.Read", "Files.ReadWrite"]
 };
 
+/**
+ * 共有リンク URL を Graph の /shares/{id} 形式へエンコードする。
+ * 仕様: base64(url) を URL-safe 化し ("/"→"_", "+"→"-", "=" 除去)、先頭に "u!" を付ける。
+ * 他ユーザーがアップロードしたファイルは /drives/{driveId} 直アクセスだと 403 になるため、
+ * 組織共有リンク経由 (/shares/{enc}/driveItem) でアクセスするのに使う。
+ */
+export const encodeShareUrl = (sharingUrl: string): string => {
+    const bytes = new TextEncoder().encode(sharingUrl);
+    let bin = '';
+    bytes.forEach((b) => { bin += String.fromCharCode(b); });
+    const base64 = btoa(bin);
+    return 'u!' + base64.replace(/=+$/, '').replace(/\//g, '_').replace(/\+/g, '-');
+};
+
 // メール関連の型定義
 export interface MailFolder {
     id: string;
@@ -345,9 +359,26 @@ export const getNewMessagesInFolder = async (
 
 // Graphクライアントの取得
 export const getGraphClient = async (scopes: string[] = loginRequest.scopes) => {
-    // 外部トークン（Supabase SSO経由）が利用可能な場合はそれを使用する
+    await initializeMsal();
+
+    const account = msalInstance.getActiveAccount();
+
+    // MSAL アカウントがあれば最優先で使う。
+    // MSAL は offline_access の refresh token を保持しサイレント更新するため、
+    // ログイン後しばらく（約1時間）で失効する Supabase provider_token と違い権限が切れない。
+    if (account) {
+        const authProvider = new AuthCodeMSALBrowserAuthenticationProvider(msalInstance, {
+            account: account,
+            scopes: scopes,
+            interactionType: InteractionType.Popup,
+        });
+        return Client.initWithMiddleware({
+            authProvider,
+        });
+    }
+
+    // MSAL アカウントがまだ無い場合のみ、ログイン直後の Supabase provider_token をブートストラップに使う。
     if (externalAccessToken) {
-        // console.log("[MSAL] Using external access token from Supabase.");
         return Client.init({
             authProvider: (done) => {
                 done(null, externalAccessToken!);
@@ -355,22 +386,7 @@ export const getGraphClient = async (scopes: string[] = loginRequest.scopes) => 
         });
     }
 
-    await initializeMsal();
-
-    const account = msalInstance.getActiveAccount();
-    if (!account) {
-        throw new Error("User not signed in");
-    }
-
-    const authProvider = new AuthCodeMSALBrowserAuthenticationProvider(msalInstance, {
-        account: account,
-        scopes: scopes,
-        interactionType: InteractionType.Popup,
-    });
-
-    return Client.initWithMiddleware({
-        authProvider,
-    });
+    throw new Error("User not signed in");
 };
 
 

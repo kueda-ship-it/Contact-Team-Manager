@@ -1,7 +1,39 @@
 import { useState, useCallback, useEffect } from 'react';
-import { msalInstance, getGraphClient, initializeMsal, signIn, hasExternalAccessToken } from '../lib/microsoftGraph';
+import { msalInstance, getGraphClient, initializeMsal, signIn, hasExternalAccessToken, encodeShareUrl } from '../lib/microsoftGraph';
 import { EventType } from "@azure/msal-browser";
 import { Attachment } from './useFileUpload';
+
+interface ItemRef { id?: string; driveId?: string; shareUrl?: string }
+
+// 共有リンク優先でドライブアイテムへアクセスするためのベースパスを返す。
+// 他ユーザーがアップロードしたファイルは /drives/{driveId} 直アクセスだと 403 になるため、
+// 組織共有リンク (att.url) があれば /shares/{enc}/driveItem を使う。
+const buildItemBase = (ref: ItemRef): { base: string; isShare: boolean }[] => {
+    const paths: { base: string; isShare: boolean }[] = [];
+    if (ref.shareUrl) {
+        paths.push({ base: `/shares/${encodeShareUrl(ref.shareUrl)}/driveItem`, isShare: true });
+    }
+    if (ref.id) {
+        paths.push({ base: ref.driveId ? `/drives/${ref.driveId}/items/${ref.id}` : `/me/drive/items/${ref.id}`, isShare: false });
+    }
+    return paths;
+};
+
+// メタ（downloadUrl 等）を共有リンク優先＋driveId フォールバックで取得
+const fetchDriveItem = async (client: any, ref: ItemRef, select = 'id,name,file,@microsoft.graph.downloadUrl') => {
+    const candidates = buildItemBase(ref);
+    if (candidates.length === 0) throw new Error('No item reference');
+    let lastError: any;
+    for (const { base } of candidates) {
+        try {
+            return await client.api(base).select(select).get();
+        } catch (e) {
+            lastError = e;
+            console.warn(`[OneDrive] item fetch failed via ${base}, trying next...`, e);
+        }
+    }
+    throw lastError;
+};
 
 export function useOneDriveUpload() {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -290,7 +322,7 @@ export function useOneDriveUpload() {
         setAttachments([]);
     };
 
-    const downloadFileFromOneDrive = async (fileId: string, fileName: string, driveId?: string) => {
+    const downloadFileFromOneDrive = async (fileId: string, fileName: string, driveId?: string, shareUrl?: string) => {
         try {
             let client;
             try {
@@ -301,10 +333,7 @@ export function useOneDriveUpload() {
                 client = await getGraphClient();
             }
 
-            const itemPath = driveId ? `/drives/${driveId}/items/${fileId}` : `/me/drive/items/${fileId}`;
-            const response = await client.api(itemPath)
-                .select('@microsoft.graph.downloadUrl')
-                .get();
+            const response = await fetchDriveItem(client, { id: fileId, driveId, shareUrl }, '@microsoft.graph.downloadUrl');
 
             const downloadUrl = response["@microsoft.graph.downloadUrl"];
 
@@ -325,27 +354,68 @@ export function useOneDriveUpload() {
         }
     };
 
-    const getFreshAttachmentMetadata = useCallback(async (fileId: string, driveId?: string): Promise<{ thumbnailUrl: string, downloadUrl: string } | null> => {
+    const getFreshAttachmentMetadata = useCallback(async (fileId: string, driveId?: string, shareUrl?: string): Promise<{ thumbnailUrl: string, downloadUrl: string } | null> => {
         try {
             const client = await getGraphClient();
-            const itemPath = driveId ? `/drives/${driveId}/items/${fileId}` : `/me/drive/items/${fileId}`;
-            
-            // Get thumbnails and downloadUrl in one call if possible, or two
-            const item = await client.api(itemPath).select('id,name,description,@microsoft.graph.downloadUrl').get();
-            const thumbResponse = await client.api(`${itemPath}/thumbnails`).select('large,c1600x1600').get();
-            
-            let thumbnailUrl = '';
-            if (thumbResponse.value && thumbResponse.value.length > 0) {
-                const thumb = thumbResponse.value[0];
-                thumbnailUrl = thumb.c1600x1600?.url || thumb.large?.url || '';
-            }
 
-            return {
-                thumbnailUrl,
-                downloadUrl: item["@microsoft.graph.downloadUrl"] || ''
-            };
+            // 共有リンク優先＋driveId フォールバックでベースパスを順に試す
+            const candidates = buildItemBase({ id: fileId, driveId, shareUrl });
+            let lastError: any;
+            for (const { base } of candidates) {
+                try {
+                    const item = await client.api(base).select('id,name,@microsoft.graph.downloadUrl').get();
+                    let thumbnailUrl = '';
+                    try {
+                        const thumbResponse = await client.api(`${base}/thumbnails`).select('large,c1600x1600').get();
+                        if (thumbResponse.value && thumbResponse.value.length > 0) {
+                            const thumb = thumbResponse.value[0];
+                            thumbnailUrl = thumb.c1600x1600?.url || thumb.large?.url || '';
+                        }
+                    } catch (thumbErr) {
+                        console.warn("[OneDrive] thumbnail fetch failed (non-critical)", thumbErr);
+                    }
+                    return {
+                        thumbnailUrl,
+                        downloadUrl: item["@microsoft.graph.downloadUrl"] || ''
+                    };
+                } catch (e) {
+                    lastError = e;
+                    console.warn(`[OneDrive] metadata fetch failed via ${base}, trying next...`, e);
+                }
+            }
+            throw lastError || new Error('No item reference');
         } catch (error) {
             console.error("Failed to refresh attachment metadata:", error);
+            return null;
+        }
+    }, []);
+
+    // PDF 等をインラインプレビューするため、ファイル本体を取得して Blob の Object URL を返す。
+    const getAttachmentBlobUrl = useCallback(async (att: any): Promise<string | null> => {
+        try {
+            let client;
+            try {
+                client = await getGraphClient();
+            } catch (e) {
+                const account = await login();
+                if (!account) return null;
+                client = await getGraphClient();
+            }
+            const item = await fetchDriveItem(client, { id: att.id, driveId: att.driveId, shareUrl: att.url });
+            const downloadUrl = item["@microsoft.graph.downloadUrl"];
+            if (!downloadUrl) throw new Error('ダウンロードURLが取得できませんでした');
+
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 15000);
+            const res = await fetch(downloadUrl, { signal: controller.signal });
+            clearTimeout(timer);
+            if (!res.ok) throw new Error(`取得に失敗しました (${res.status})`);
+
+            const raw = await res.blob();
+            const typed = raw.type ? raw : new Blob([raw], { type: att.type || 'application/pdf' });
+            return URL.createObjectURL(typed);
+        } catch (error: any) {
+            console.error("Failed to load attachment blob:", error);
             return null;
         }
     }, []);
@@ -363,6 +433,7 @@ export function useOneDriveUpload() {
         clearFiles,
         downloadFileFromOneDrive,
         getFreshAttachmentMetadata,
+        getAttachmentBlobUrl,
         pendingFiles
     };
 }
