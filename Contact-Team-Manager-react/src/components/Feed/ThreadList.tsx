@@ -179,20 +179,25 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
     const openPdfPreview = React.useCallback(async (att: any) => {
         const shareUrl: string = att.url || '';
-        // まず Graph でファイル本体を取得してアプリ内 iframe 表示を試みる。
-        // Files.Read.All が付与されていれば他ユーザーの共有ファイルも取得できる。
-        // 取得できない (権限/同意未済) 場合は失敗状態にし、SharePoint 新規タブへ誘導する。
-        setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl, failed: false });
+        if (shareUrl) {
+            // cross-user の個人OneDrive PDF はアプリ内表示が不可
+            // (Graph 403 / SharePoint frame-ancestors / CORS, かつ Files.Read.All はテナント方針で不可)。
+            // 共有リンクを新規タブで開けば SharePoint ビューアで確実に閲覧できる。
+            window.open(shareUrl, '_blank');
+            return;
+        }
+        // 共有リンクが無い添付のみ Graph blob を試す（自分のファイルならアプリ内表示可）
+        setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl: '', failed: false });
         setPdfLoading(true);
         try {
             const url = await getAttachmentBlobUrl(att);
             if (url) {
-                setPdfPreview({ name: att.name, blobUrl: url, embedUrl: '', shareUrl, failed: false });
+                setPdfPreview({ name: att.name, blobUrl: url, embedUrl: '', shareUrl: '', failed: false });
             } else {
-                setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl, failed: true });
+                setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl: '', failed: true });
             }
         } catch {
-            setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl, failed: true });
+            setPdfPreview({ name: att.name, blobUrl: '', embedUrl: '', shareUrl: '', failed: true });
         } finally {
             setPdfLoading(false);
         }

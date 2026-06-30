@@ -50,11 +50,10 @@ const msalConfig: Configuration = {
 };
 
 // スコープ定義 (標準的な読み書き権限)
-// Files.Read.All は「サインインユーザーがアクセスできる全ファイル」の読取 (delegated)。
-// 他ユーザーが組織共有リンクで配ったファイルを Graph 経由で読む (cross-user プレビュー) のに必要。
-// 管理者同意ではなくユーザー同意で付与される (テナントがユーザー同意を許可している場合)。
+// 注: Files.Read.All (cross-user 読取) は fts.co.jp テナントが管理者同意必須かつ
+//     その同意を付与できないため使えない。よって自分のドライブのみの Files.ReadWrite に留める。
 export const loginRequest = {
-    scopes: ["User.Read", "Files.ReadWrite", "Files.Read.All"]
+    scopes: ["User.Read", "Files.ReadWrite"]
 };
 
 /**
