@@ -1547,8 +1547,12 @@ body:not(.light-mode) .rich-editor * {
     /* transition removed for instant response */
 }
 
+/* has-open-menu: DotMenu は Portal 描画でカードの子孫でないため、メニューに
+   カーソルが乗ると :hover が外れてフォームが畳まれ、カード高さが変わって
+   メニュー位置が再計算され振動する。メニュー開放中は展開状態を維持する。 */
 .feed-list .task-card:hover .reply-form,
-.feed-list .task-card:focus-within .reply-form {
+.feed-list .task-card:focus-within .reply-form,
+.feed-list .task-card.has-open-menu .reply-form {
     max-height: initial;
     /* Use specific height if causing layout shift issues, but initial/auto is best for varying content */
     opacity: 1;
@@ -3245,7 +3249,8 @@ html {
 }
 
 .task-card:hover .dot-menu-container,
-.reply-item:hover .dot-menu-container {
+.reply-item:hover .dot-menu-container,
+.task-card.has-open-menu .dot-menu-container {
     opacity: 1;
 }
 
@@ -3276,7 +3281,8 @@ html {
 }
 
 .task-card:hover .dot-menu-container,
-.reply-item:hover .dot-menu-container {
+.reply-item:hover .dot-menu-container,
+.task-card.has-open-menu .dot-menu-container {
     opacity: 1;
 }
 
