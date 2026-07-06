@@ -4739,3 +4739,66 @@ body.dark-mode .water-dtp-trigger:hover {
     border-color: rgba(255, 255, 255, 0.20) !important;
     box-shadow: none !important;
 }
+
+/* ================================================================
+   連絡待ち（Waiting for contact）
+   ================================================================ */
+
+/* カード枠: 黄色。dark/light の !important 付き border 上書きより後勝ちさせる */
+.task-card.is-waiting,
+body.dark-mode .task-card.is-waiting,
+body.light-mode .task-card.is-waiting,
+body.light-mode .side-panel .task-card.is-waiting {
+    border: 1px solid rgba(234, 179, 8, 0.65) !important;
+    border-top: 1px solid rgba(234, 179, 8, 0.65) !important;
+}
+
+.task-card.is-waiting::after {
+    background: #EAB308;
+}
+
+.task-card.is-waiting:hover,
+body.dark-mode .task-card.is-waiting:hover,
+body.light-mode .task-card.is-waiting:hover {
+    border-color: #EAB308 !important;
+    border-top-color: #EAB308 !important;
+    box-shadow: 0 0 12px rgba(234, 179, 8, 0.25) !important;
+}
+
+/* 連絡待ちトグルボタン: btn-status の黄色バリアント */
+.btn-status.btn-waiting:not(.btn-revert):hover {
+    background: rgba(234, 179, 8, 0.12) !important;
+    border-color: #EAB308 !important;
+    color: #EAB308 !important;
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.25);
+}
+
+.btn-status.btn-waiting:not(.btn-revert):hover svg {
+    stroke: #EAB308 !important;
+    filter: drop-shadow(0 0 6px rgba(234, 179, 8, 0.9));
+}
+
+/* 連絡待ち中（active）: 常時黄色で点灯 */
+.btn-status.btn-waiting.active {
+    background: rgba(234, 179, 8, 0.15) !important;
+    border: 1px solid #EAB308 !important;
+    color: #EAB308 !important;
+}
+
+.btn-status.btn-waiting.active svg {
+    stroke: #EAB308 !important;
+}
+
+body.light-mode .btn-status.btn-waiting:hover,
+body.light-mode .btn-status.btn-waiting.active {
+    background: rgba(234, 179, 8, 0.12) !important;
+    border-color: #B8860B !important;
+    color: #B8860B !important;
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.2) !important;
+}
+
+body.light-mode .btn-status.btn-waiting:hover svg,
+body.light-mode .btn-status.btn-waiting.active svg {
+    stroke: #B8860B !important;
+    filter: drop-shadow(0 0 4px rgba(234, 179, 8, 0.5));
+}

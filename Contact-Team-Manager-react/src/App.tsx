@@ -14,6 +14,7 @@ import { useNotifications } from './hooks/useNotifications';
 import { useOutlookFolderWatch } from './hooks/useOutlookFolderWatch';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import { NotificationBell } from './components/common/NotificationBell';
+import { WhatsNewModal } from './components/common/WhatsNewModal';
 import './styles/style.css';
 import './styles/liquid-glass.css';
 
@@ -77,7 +78,7 @@ function App() {
 
   const [currentTeamId, setCurrentTeamId] = useState<number | string | null>(null);
   const [viewMode, setViewMode] = useState<'feed' | 'dashboard'>('feed');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'mentions' | 'myposts'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts'>('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history'>('profile');
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,7 +99,7 @@ function App() {
 
   const { teams } = useTeams();
   // Ensure we fetch ALL pending items if that filter is active, regardless of default limit
-  const fetchLimit = (statusFilter === 'pending' || statusFilter === 'mentions' || searchQuery) ? 2000 : threadsLimit;
+  const fetchLimit = (statusFilter === 'pending' || statusFilter === 'waiting' || statusFilter === 'mentions' || searchQuery) ? 2000 : threadsLimit;
   // Pass searchQuery to useThreads for server-side filtering
   const threadsData = useThreads(currentTeamId, fetchLimit, sortAscending, statusFilter, searchQuery);
   const { threads: rawThreads, loading: threadsLoading, error: threadsError, refetch } = threadsData;
@@ -306,8 +307,11 @@ function App() {
 
     // 2. Ensure we are in feed mode
     setViewMode('feed');
-    // 3. Ensure we can see the thread
-    setStatusFilter('all');
+    // 3. Ensure we can see the thread.
+    // サイドバーのカードは全て未完了スレッドなので「未完了」フィルタに切り替える。
+    // 'all' だと既定50件に古い投稿が含まれずスクロール先が描画されない
+    // （2000件に上限を上げる案は描画で10秒以上フリーズするため不採用）。
+    setStatusFilter('pending');
 
     // 4. Switch team if necessary
     if (String(targetTeamId) !== String(currentTeamId)) {
@@ -328,6 +332,7 @@ function App() {
 
   return (
     <div className="app-container">
+      <WhatsNewModal />
       <header>
         <div className="logo">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ background: 'rgba(0,183,195,0.1)', padding: '4px', borderRadius: '4px' }}>

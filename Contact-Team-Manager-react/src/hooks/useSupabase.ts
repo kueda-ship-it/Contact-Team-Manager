@@ -72,6 +72,7 @@ interface Thread {
     author_name: string;
     team_id: number;
     status: 'pending' | 'completed';
+    waiting_contact?: boolean;
     is_pinned: boolean;
     completed_by?: string;
     completed_at?: string;
@@ -89,7 +90,7 @@ export function useThreads(
     teamId: number | string | null,
     limit: number = 50,
     ascending: boolean = true,
-    filter: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts' = 'all',
+    filter: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts' = 'all',
     searchQuery: string = ''
 ) {
     const { user, profile } = useAuth();
@@ -102,7 +103,7 @@ export function useThreads(
         try {
             // Override limit if filtering for pending or mentions OR SEARCHING to ensure good results
             const isSearching = searchQuery.trim().length > 0;
-            const effectiveLimit = (filter === 'pending' || filter === 'mentions' || isSearching) ? 2000 : limit;
+            const effectiveLimit = (filter === 'pending' || filter === 'waiting' || filter === 'mentions' || isSearching) ? 2000 : limit;
 
             console.log(`[useThreads] Fetching. Team: ${teamId}, Filter: ${filter}, Search: ${searchQuery}, Silent: ${silent}`);
 
@@ -129,6 +130,8 @@ export function useThreads(
 
             if (filter === 'pending') {
                 query = query.eq('status', 'pending');
+            } else if (filter === 'waiting') {
+                query = query.eq('status', 'pending').eq('waiting_contact', true);
             } else if (filter === 'completed') {
                 query = query.eq('status', 'completed');
             } else if (filter === 'myposts') {

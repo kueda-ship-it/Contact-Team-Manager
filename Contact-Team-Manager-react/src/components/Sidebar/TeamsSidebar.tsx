@@ -8,8 +8,8 @@ export interface TeamsSidebarProps {
     onSelectTeam: (id: number | string | null) => void;
     viewMode: 'feed' | 'dashboard';
     onSelectDashboard: () => void;
-    statusFilter: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts';
-    onSelectStatus: (status: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts') => void;
+    statusFilter: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts';
+    onSelectStatus: (status: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts') => void;
     onEditTeam: (teamId: number) => void;
     onAddTeam?: () => void;
     unreadTeams?: Set<string>;

@@ -106,8 +106,8 @@ interface ThreadListProps {
         error: Error | null;
         refetch: (silent?: boolean) => void;
     };
-    statusFilter: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts';
-    onStatusChange: (status: 'all' | 'pending' | 'completed' | 'mentions' | 'myposts') => void;
+    statusFilter: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts';
+    onStatusChange: (status: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts') => void;
     sortAscending: boolean;
     onToggleSort: () => void;
     onLoadMore: () => void;
@@ -347,6 +347,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         if (!threadsLoading && sortAscending && threads.length > 0) {
             // Always try to scroll to bottom on initial load of the view or when switching to Chat mode
             if (!initialScrollDone.current) {
+                // サイドバーからのジャンプ待機中は最下部スクロールで上書きしない
+                if (scrollToThreadId) {
+                    initialScrollDone.current = true;
+                    return;
+                }
                 // Use a small timeout to ensure DOM is updated
                 const timer = setTimeout(() => {
                     bottomAnchorRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
@@ -355,7 +360,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 return () => clearTimeout(timer);
             }
         }
-    }, [currentTeamId, sortAscending, threads.length, threadsLoading]);
+    }, [currentTeamId, sortAscending, threads.length, threadsLoading, scrollToThreadId]);
     // Actually user wants "Default is bottom is newest".
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -384,6 +389,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     // Handle scroll to specific thread (from sidebar navigation)
     React.useEffect(() => {
         if (scrollToThreadId && !threadsLoading && threads.length > 0) {
+            // チーム切替/フィルタ変更の refetch 完了前に古い DOM へスクロールすると、
+            // 直後の再描画で位置がリセットされる。対象がデータに現れるまで待つ。
+            if (!threads.some(t => t.id === scrollToThreadId)) return;
             let retryCount = 0;
             const maxRetries = 20; // 2 seconds total
 
@@ -391,7 +399,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 const el = document.getElementById(`thread-${scrollToThreadId}`);
                 if (el) {
                     console.log('Scrolling to thread:', scrollToThreadId);
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // smooth は直後の Replies 描画等でキャンセルされるため即時スクロール。
+                    // 遅れて高さが変わってもズレないよう少し後に再度合わせる。
+                    el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    setTimeout(() => {
+                        document.getElementById(`thread-${scrollToThreadId}`)?.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    }, 600);
                     el.classList.add('highlight-thread');
                     setTimeout(() => el.classList.remove('highlight-thread'), 3000);
                     if (onScrollComplete) onScrollComplete();
@@ -406,7 +419,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
             tryScroll();
         }
-    }, [scrollToThreadId, threadsLoading, threads.length, onScrollComplete]);
+    }, [scrollToThreadId, threadsLoading, threads, onScrollComplete]);
 
     if (threadsLoading && threads.length === 0) {
         return null;
@@ -450,6 +463,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         if (newStatus === 'completed') {
             payload.completed_by = user.id;
             payload.completed_at = new Date().toISOString();
+            payload.waiting_contact = false;
         } else {
             payload.completed_by = null;
             payload.completed_at = null;
@@ -460,6 +474,23 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             alert('更新に失敗しました: ' + error.message);
         } else {
             refetch(true);
+        }
+    };
+
+    const handleToggleWaiting = async (threadId: string, current: boolean) => {
+        if (!user) return;
+        try {
+            const timeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
+            );
+            const { error } = await Promise.race([
+                supabase.from('threads').update({ waiting_contact: !current }).eq('id', threadId),
+                timeout
+            ]) as any;
+            if (error) throw error;
+            refetch(true);
+        } catch (e: any) {
+            alert('連絡待ちの更新に失敗しました: ' + e.message);
         }
     };
 
@@ -898,6 +929,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         options={[
                             { value: 'all', label: 'すべて表示' },
                             { value: 'pending', label: '未完了' },
+                            { value: 'waiting', label: '連絡待ち' },
                             { value: 'completed', label: '完了済み' },
                             { value: 'mentions', label: '自分宛て' },
                             { value: 'myposts', label: '自分の投稿' }
@@ -953,6 +985,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                     {[
                         { value: 'all', label: 'すべて表示' },
                         { value: 'pending', label: '未完了' },
+                        { value: 'waiting', label: '連絡待ち' },
                         { value: 'completed', label: '完了済み' },
                         { value: 'mentions', label: '自分宛て' },
                         { value: 'myposts', label: '自分の投稿' }
@@ -978,6 +1011,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             {displayThreads
                 .filter(thread => {
                     if (statusFilter === 'pending') return thread.status === 'pending';
+                    if (statusFilter === 'waiting') return thread.status === 'pending' && thread.waiting_contact;
                     if (statusFilter === 'completed') return thread.status === 'completed';
                     if (statusFilter === 'mentions') {
                         return hasMention(thread.content, currentProfile, user?.email || null) ||
@@ -996,6 +1030,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 displayThreads
                     .filter(thread => {
                         if (statusFilter === 'pending') return thread.status === 'pending';
+                        if (statusFilter === 'waiting') return thread.status === 'pending' && thread.waiting_contact;
                         if (statusFilter === 'completed') return thread.status === 'completed';
                         if (statusFilter === 'mentions') {
                             return hasMention(thread.content, currentProfile, user?.email || null) ||
@@ -1017,7 +1052,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                             <div
                                 key={thread.id}
                                 id={`thread-${thread.id}`}
-                                className={`task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''} ${openMenuId === thread.id ? 'has-open-menu' : ''}`}
+                                className={`task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''} ${thread.status !== 'completed' && thread.waiting_contact ? 'is-waiting' : ''} ${openMenuId === thread.id ? 'has-open-menu' : ''}`}
                                 style={{ position: 'relative', paddingBottom: '50px' }}
                             >
                                 {thread.is_pinned && <div className="pinned-badge">重要</div>}
@@ -1627,6 +1662,18 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     <span style={{ fontWeight: 600 }}>完了者: {completerName}</span>
                                                     <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.completed_at)}</span>
                                                 </div>
+                                            )}
+                                            {thread.status !== 'completed' && (
+                                                <button
+                                                    className={`btn btn-sm btn-status btn-waiting ${thread.waiting_contact ? 'active' : ''}`}
+                                                    title={thread.waiting_contact ? '連絡待ちを解除' : '連絡待ちにする'}
+                                                    style={{ width: '40px', height: '40px' }}
+                                                    onClick={() => handleToggleWaiting(thread.id, !!thread.waiting_contact)}
+                                                >
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                                    </svg>
+                                                </button>
                                             )}
                                             <button
                                                 className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : 'btn-complete'}`}
