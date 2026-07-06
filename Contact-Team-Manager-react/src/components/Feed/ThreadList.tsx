@@ -1641,7 +1641,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 </div>
                                             </div>
                                         )}
-                                        <div style={{ position: 'absolute', bottom: '10px', right: (thread.replies && thread.replies.length > 0) ? '20px' : '15px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 100 }}>
+                                        {/* right/gap は返信フォームの添付・送信ボタン列（padding 18px + gap 5px）と縦に揃える */}
+                                        <div style={{ position: 'absolute', bottom: '10px', right: '18px', display: 'flex', alignItems: 'center', gap: '5px', zIndex: 100 }}>
                                             {thread.status === 'completed' && (
                                                 <div style={{
                                                     fontSize: '0.75rem',
