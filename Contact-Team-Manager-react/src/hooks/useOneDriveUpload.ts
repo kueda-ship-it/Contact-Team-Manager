@@ -84,10 +84,10 @@ export function useOneDriveUpload() {
     }, []);
 
     // ログイン処理
-    const login = async (promptType: "select_account" | "consent" = "select_account") => {
+    const login = async () => {
         try {
-            setStatusMessage(promptType === "consent" ? '権限の承認が必要です...' : 'Microsoft アカウントにログイン中...');
-            const account = await signIn(promptType);
+            setStatusMessage('Microsoft アカウントにログイン中...');
+            const account = await signIn();
             if (account) {
                 setIsAuthenticated(true);
                 // Also set this as active account forcefully if not set
@@ -138,9 +138,8 @@ export function useOneDriveUpload() {
                         errorString.includes("AADSTS65002") || /* Consent required */
                         error.code === "InvalidAuthenticationToken"
                     ) {
-                        console.warn("Auth/Consent error during operation, retrying with force consent...", error);
-                        // Force consent prompt
-                        const account = await login("consent");
+                        console.warn("Auth/Consent error during operation, retrying with re-login...", error);
+                        const account = await login();
                         if (account) {
                             // Refresh client after login just in case
                             client = await getGraphClient();
