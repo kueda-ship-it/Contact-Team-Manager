@@ -1415,6 +1415,23 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                                         handleKeyDown(e, reply.id, e.currentTarget);
                                                                                     }}
                                                                                 />
+                                                                                {isOpen && targetThreadId === reply.id && (
+                                                                                    <MentionList
+                                                                                        candidates={candidates}
+                                                                                        activeIndex={activeIndex}
+                                                                                        onSelect={(c) => {
+                                                                                            const el = editRefs.current[reply.id];
+                                                                                            if (el) insertMention(c, el);
+                                                                                        }}
+                                                                                        style={{
+                                                                                            top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
+                                                                                            left: mentionCoords.left,
+                                                                                            position: 'fixed',
+                                                                                            transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none',
+                                                                                            zIndex: 10000
+                                                                                        }}
+                                                                                    />
+                                                                                )}
                                                                             </div>
                                                                             {renderEditAttachmentPreview(reply.id)}
                                                                             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

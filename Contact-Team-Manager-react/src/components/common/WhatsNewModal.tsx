@@ -34,11 +34,11 @@ export const WhatsNewModal: React.FC = () => {
     const [visible, setVisible] = React.useState(() => {
         if (!section) return false;
         try {
-            const seen = localStorage.getItem(STORAGE_KEY);
-            // 旧キー形式からの移行: 2026-07-06 のお知らせ確認済みユーザーには再表示しない
-            if (seen === '2026-07-06-waiting-contact' && section.version.startsWith('2026-07-06')) {
-                localStorage.setItem(STORAGE_KEY, section.version);
-                return false;
+            let seen = localStorage.getItem(STORAGE_KEY);
+            // 旧キー形式からの移行: 確認済みだったのは「2026-07-06 更新履歴」セクション
+            if (seen === '2026-07-06-waiting-contact') {
+                seen = '2026-07-06 更新履歴';
+                localStorage.setItem(STORAGE_KEY, seen);
             }
             return seen !== section.version;
         } catch {
