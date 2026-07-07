@@ -363,8 +363,16 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     }, [currentTeamId, sortAscending, threads.length, threadsLoading, scrollToThreadId]);
     // Actually user wants "Default is bottom is newest".
 
+    const scrollbarHideTimer = React.useRef<number | null>(null);
+
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const el = e.currentTarget;
+
+        // スクロール中のみバーを表示(.is-scrolling は style.css の scrollbar-color と連動)
+        el.classList.add('is-scrolling');
+        if (scrollbarHideTimer.current) window.clearTimeout(scrollbarHideTimer.current);
+        scrollbarHideTimer.current = window.setTimeout(() => el.classList.remove('is-scrolling'), 900);
+
         // Check for top reach for "Load More" (Chat Mode)
         if (sortAscending && el.scrollTop === 0 && threads.length >= 50) {
             // Reached top, load more

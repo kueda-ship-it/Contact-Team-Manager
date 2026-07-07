@@ -1530,6 +1530,17 @@ body:not(.light-mode) .rich-editor * {
     padding-bottom: 20px;
     scrollbar-width: thin;
     scrollbar-gutter: stable;
+    /* 非スクロール時はサム・トラックとも透明(白い帯を出さない)。
+       スクロール中のみ .is-scrolling (ThreadList.tsx が付与) で表示 */
+    scrollbar-color: transparent transparent;
+}
+
+.feed-list.is-scrolling {
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+body.light-mode .feed-list.is-scrolling {
+    scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
 }
 
 /* スクロールコンテナは全幅のまま、カード列・ヘッダーだけ中央寄せ。
