@@ -393,7 +393,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             // 直後の再描画で位置がリセットされる。対象がデータに現れるまで待つ。
             if (!threads.some(t => t.id === scrollToThreadId)) return;
             let retryCount = 0;
-            const maxRetries = 20; // 2 seconds total
+            const maxRetries = 80; // 8 秒。ジャンプ時に limit 拡大 → 再フェッチが挟まるため長めに待つ
 
             const tryScroll = () => {
                 const el = document.getElementById(`thread-${scrollToThreadId}`);

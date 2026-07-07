@@ -9,6 +9,14 @@ interface DashboardProps {
     onThreadClick?: (threadId: string) => void;
 }
 
+// 同一人物の表記ゆれ・別アカウントを統計上ひとりに統合する
+const USER_ALIASES: { [alias: string]: string } = {
+    'ビルグーン': 'ボルドバートル・ビルグーン',
+    '上田　晃平': '上田晃平',
+    'k_oya@fts.co.jp': '大家光世',
+};
+const normalizeUserName = (name: string) => USER_ALIASES[name] || name;
+
 export const Dashboard: React.FC<DashboardProps> = ({
     currentTeamId,
     onSelectTeam,
@@ -17,9 +25,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const { teams } = useTeams();
     const { user, profile } = useAuth();
     const { memberships } = useUserMemberships(user?.id);
-    // Fetch more threads for accurate dashboard stats (limit 1000)
-    // useThreads(teamId, limit, ascending)
-    const { threads, loading: threadsLoading } = useThreads(currentTeamId, 1000, false);
+    // ダッシュボード統計は全件対象。limit 0 = useThreads 側で 1000 行ずつページングして全件取得
+    const { threads, loading: threadsLoading } = useThreads(currentTeamId, 0, false);
     const { profiles } = useProfiles();
     const [period, setPeriod] = useState<'all' | 'year' | 'month' | 'week' | 'day' | 'custom'>('all');
     // User Activity Stats State - Moved up to avoid hook order errors
@@ -30,6 +37,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
     const [selectedReplyCount, setSelectedReplyCount] = useState<string | null>(null);
     const [replyChartType, setReplyChartType] = useState<'bar' | 'pie'>('bar');
+    const [selectedThread, setSelectedThread] = useState<any | null>(null);
 
     if (threadsLoading && threads.length === 0) return null;
 
@@ -96,17 +104,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return `${days}日 ${hours}時間`;
     };
 
-    const calculateDailyActivitySpan = (userThreads: any[]) => {
-        if (userThreads.length === 0) return 'N/A';
+    // 投稿作成・完了操作・返信投稿のすべてを「活動」として稼働時間に含める
+    const calculateDailyActivitySpan = (timestamps: string[]) => {
+        if (timestamps.length === 0) return 'N/A';
 
         const byDate: { [date: string]: number[] } = {};
-        userThreads.forEach(t => {
-            const dates = [t.created_at, t.completed_at].filter(Boolean);
-            dates.forEach(d => {
-                const dateKey = new Date(d).toLocaleDateString();
-                if (!byDate[dateKey]) byDate[dateKey] = [];
-                byDate[dateKey].push(new Date(d).getTime());
-            });
+        timestamps.forEach(d => {
+            const dateKey = new Date(d).toLocaleDateString();
+            if (!byDate[dateKey]) byDate[dateKey] = [];
+            byDate[dateKey].push(new Date(d).getTime());
         });
 
         const dailySpans = Object.values(byDate).map(times => {
@@ -125,24 +131,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     const overallAvgTime = calculateAvgTime(displayThreads);
 
-    const userStats: { [key: string]: { name: string; count: number; completedCount: number; avgTime: string; completionRate: number; dailySpan: string; totalRepliesInCompleted: number; avgReplies: number } } = {};
+    const userStats: { [key: string]: { name: string; count: number; replyCount: number; completedCount: number; avgTime: string; completionRate: number; dailySpan: string; totalRepliesInCompleted: number; avgReplies: number } } = {};
+    const getUserStat = (name: string) => {
+        if (!userStats[name]) {
+            userStats[name] = { name, count: 0, replyCount: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A', totalRepliesInCompleted: 0, avgReplies: 0 };
+        }
+        return userStats[name];
+    };
+
+    // ユーザーごとの活動時刻(投稿・完了・返信)。稼働時間の算出に使う
+    const userActivityTimes: { [name: string]: string[] } = {};
+    const pushActivityTime = (name: string, ts?: string | null) => {
+        if (!ts) return;
+        if (!userActivityTimes[name]) userActivityTimes[name] = [];
+        userActivityTimes[name].push(ts);
+    };
+
+    // 完了者の表示名(統合済み)を返す
+    const getCompleterName = (t: any) => {
+        const completerProfile = t.completed_by ? (profiles.find((p: any) => p.id === t.completed_by)) : null;
+        return normalizeUserName(completerProfile?.display_name || completerProfile?.email || t.author_name || t.author || 'Unknown');
+    };
 
     displayThreads.forEach(t => {
-        const author = t.author_name || t.author || 'Unknown';
-        if (!userStats[author]) {
-            userStats[author] = { name: author, count: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A', totalRepliesInCompleted: 0, avgReplies: 0 };
-        }
-        userStats[author].count++;
+        const author = normalizeUserName(t.author_name || t.author || 'Unknown');
+        getUserStat(author).count++;
+        pushActivityTime(author, t.created_at);
+
+        // 投稿(FC)しないメンバーも返信を活動としてカウントする
+        (t.replies || []).forEach((r: any) => {
+            const replyAuthor = normalizeUserName(r.author || 'Unknown');
+            getUserStat(replyAuthor).replyCount++;
+            pushActivityTime(replyAuthor, r.created_at);
+        });
 
         if (t.status === 'completed') {
-            const completerProfile = t.completed_by ? (profiles.find((p: any) => p.id === t.completed_by)) : null;
-            const completerName = completerProfile?.display_name || completerProfile?.email || t.author_name || t.author || 'Unknown';
-
-            if (!userStats[completerName]) {
-                userStats[completerName] = { name: completerName, count: 0, completedCount: 0, avgTime: 'N/A', completionRate: 0, dailySpan: 'N/A', totalRepliesInCompleted: 0, avgReplies: 0 };
-            }
-            userStats[completerName].completedCount++;
-            userStats[completerName].totalRepliesInCompleted += (t.replies?.length || 0);
+            const completerName = getCompleterName(t);
+            const completerStat = getUserStat(completerName);
+            completerStat.completedCount++;
+            completerStat.totalRepliesInCompleted += (t.replies?.length || 0);
+            pushActivityTime(completerName, t.completed_at);
         }
     });
 
@@ -193,25 +221,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     Object.keys(userStats).forEach(userName => {
         const stats = userStats[userName];
-        const userThreadsAsAuthor = displayThreads.filter(t => (t.author_name || t.author || 'Unknown') === userName);
+        const userThreadsAsAuthor = displayThreads.filter(t => normalizeUserName(t.author_name || t.author || 'Unknown') === userName);
         const myThreadsCompleted = userThreadsAsAuthor.filter(t => t.status === 'completed').length;
         stats.completionRate = stats.count > 0 ? Math.round((myThreadsCompleted / stats.count) * 100) : 0;
         stats.avgTime = calculateAvgTime(userThreadsAsAuthor);
-        stats.dailySpan = calculateDailyActivitySpan(userThreadsAsAuthor);
+        stats.dailySpan = calculateDailyActivitySpan(userActivityTimes[userName] || []);
         stats.avgReplies = stats.completedCount > 0 ? Number((stats.totalRepliesInCompleted / stats.completedCount).toFixed(1)) : 0;
     });
 
     const completerStats: { [name: string]: number } = {};
     displayThreads.forEach(t => {
         if (t.status === 'completed') {
-            const completerProfile = t.completed_by ? (profiles.find((p: any) => p.id === t.completed_by)) : null;
-            const completerName = completerProfile?.display_name || completerProfile?.email || t.author_name || t.author || 'Unknown';
+            const completerName = getCompleterName(t);
             completerStats[completerName] = (completerStats[completerName] || 0) + 1;
         }
     });
 
     const sortedUserStats = Object.values(userStats).sort((a, b) => b.completedCount - a.completedCount);
     const maxCompletions = Math.max(...sortedUserStats.map(s => s.completedCount), 1);
+
+    // 活動ユーザー一覧は投稿+返信+完了の総活動量で並べる(返信のみのメンバーも含む)
+    const sortedActivityStats = Object.values(userStats).sort((a, b) =>
+        (b.count + b.replyCount + b.completedCount) - (a.count + a.replyCount + a.completedCount));
 
     const teamStats: { [key: string]: { id: number | string; name: string; completedCount: number } } = {};
     displayThreads.forEach(t => {
@@ -386,7 +417,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                                 return [
                                     ...(isAdmin ? [{ value: '', label: 'すべてのチーム' }] : []),
-                                    ...visibleTeams.map(t => ({ value: t.id, label: t.name }))
+                                    ...visibleTeams
+                                        .map(t => {
+                                            const parentName = t.parent_id ? teams.find(p => p.id === t.parent_id)?.name : null;
+                                            return { team: t, parentName, sortKey: parentName ? `${parentName} / ${t.name}` : t.name };
+                                        })
+                                        .sort((a, b) => a.sortKey.localeCompare(b.sortKey, 'ja'))
+                                        .map(({ team: t, parentName }) => ({
+                                            value: t.id,
+                                            label: (
+                                                <>
+                                                    {parentName && (
+                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.78em', whiteSpace: 'nowrap' }}>
+                                                            {parentName} /&nbsp;
+                                                        </span>
+                                                    )}
+                                                    {t.name}
+                                                </>
+                                            )
+                                        }))
                                 ];
                             })()}
                             value={currentTeamId || ''}
@@ -652,60 +701,59 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </div>
 
                         <div className="card glass-panel" style={{ padding: '25px' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>完了数（チーム別）</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                {sortedTeamStats.length === 0 ? (
-                                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>データなし</div>
-                                ) : (
-                                    sortedTeamStats.slice(0, 5).map((stat) => (
-                                        <div key={String(stat.id)}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.9rem' }}>
-                                                <span style={{ fontWeight: 600 }}>{stat.name}</span>
-                                                <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{stat.completedCount}件</span>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>完了数（チーム別）/ 全体の完了率</h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '25px', flexWrap: 'wrap' }}>
+                                <div style={{ position: 'relative', width: '140px', height: '140px', flexShrink: 0 }}>
+                                    <svg width="140" height="140" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+                                        <circle
+                                            cx="50"
+                                            cy="50"
+                                            r={radius}
+                                            fill="transparent"
+                                            stroke="rgba(255,255,255,0.05)"
+                                            strokeWidth="8"
+                                        />
+                                        <circle
+                                            cx="50"
+                                            cy="50"
+                                            r={radius}
+                                            fill="transparent"
+                                            stroke="var(--primary)"
+                                            strokeWidth="8"
+                                            strokeDasharray={circumference}
+                                            strokeDashoffset={offset}
+                                            strokeLinecap="round"
+                                            style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)' }}
+                                        />
+                                    </svg>
+                                    <div style={{ position: 'absolute', top: '0', left: '0', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{completionRate}%</div>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>全体完了率</div>
+                                    </div>
+                                </div>
+                                <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                    {sortedTeamStats.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>データなし</div>
+                                    ) : (
+                                        sortedTeamStats.slice(0, 5).map((stat) => (
+                                            <div key={String(stat.id)}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.9rem' }}>
+                                                    <span style={{ fontWeight: 600 }}>{stat.name}</span>
+                                                    <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{stat.completedCount}件</span>
+                                                </div>
+                                                <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                                                    <div
+                                                        style={{
+                                                            height: '100%',
+                                                            width: `${(stat.completedCount / maxTeamCompletions) * 100}%`,
+                                                            background: 'var(--accent)',
+                                                            transition: 'width 1s ease-out'
+                                                        }}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                                                <div
-                                                    style={{
-                                                        height: '100%',
-                                                        width: `${(stat.completedCount / maxTeamCompletions) * 100}%`,
-                                                        background: 'var(--accent)',
-                                                        transition: 'width 1s ease-out'
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="task-card" style={{ padding: '25px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '25px', width: '100%', color: 'var(--text-muted)' }}>全体の完了率</h3>
-                            <div style={{ position: 'relative', width: '160px', height: '160px' }}>
-                                <svg width="160" height="160" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-                                    <circle
-                                        cx="50"
-                                        cy="50"
-                                        r={radius}
-                                        fill="transparent"
-                                        stroke="rgba(255,255,255,0.05)"
-                                        strokeWidth="8"
-                                    />
-                                    <circle
-                                        cx="50"
-                                        cy="50"
-                                        r={radius}
-                                        fill="transparent"
-                                        stroke="var(--primary)"
-                                        strokeWidth="8"
-                                        strokeDasharray={circumference}
-                                        strokeDashoffset={offset}
-                                        strokeLinecap="round"
-                                        style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)' }}
-                                    />
-                                </svg>
-                                <div style={{ position: 'absolute', top: '0', left: '0', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                                    <div style={{ fontSize: '2rem', fontWeight: 800 }}>{completionRate}%</div>
+                                        ))
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -713,7 +761,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="task-card" style={{ padding: '25px', gridColumn: 'span 1' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>活動ユーザー一覧</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto' }} className="custom-scrollbar">
-                                {sortedUserStats.map((stat, index) => (
+                                {sortedActivityStats.map((stat, index) => (
                                     <div
                                         key={stat.name}
                                         onClick={() => setSelectedUser(stat.name)}
@@ -747,8 +795,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                             </div>
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
-                                            <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{stat.count} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>件</span></div>
-                                            <div style={{ fontSize: '0.75rem', color: stat.completionRate > 80 ? 'var(--success)' : 'var(--text-muted)' }}>{stat.completionRate}% 完了</div>
+                                            <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{stat.count + stat.replyCount + stat.completedCount} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>件</span></div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>投稿{stat.count}・返信{stat.replyCount}・完了{stat.completedCount}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -860,7 +908,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-muted)' }}>解決まで時間を要したスレッド (Top 100)</h3>
                         <div style={{ overflowX: 'auto', maxHeight: '500px' }} className="custom-scrollbar">
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                                <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-main)', zIndex: 1 }}>
+                                <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
                                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)' }}>
                                         <th style={{ padding: '10px', textAlign: 'left' }}>スレッドタイトル</th>
                                         <th style={{ padding: '10px', textAlign: 'center' }}>返信数</th>
@@ -873,16 +921,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                         <tr><td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>データなし</td></tr>
                                     ) : (
                                         longestThreads.map(t => {
-                                            const completerProfile = t.completed_by ? (profiles.find((p: any) => p.id === t.completed_by)) : null;
-                                            const completerName = completerProfile?.display_name || completerProfile?.email || t.author_name || t.author || 'Unknown';
-                                            
+                                            const completerName = getCompleterName(t);
+
                                             return (
-                                                <tr 
-                                                    key={t.id} 
+                                                <tr
+                                                    key={t.id}
                                                     style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}
                                                     onClick={(e) => {
                                                         e.preventDefault();
-                                                        onThreadClick && onThreadClick(t.id);
+                                                        setSelectedThread(t);
                                                     }}
                                                     className="dashboard-ranking-row"
                                                 >
@@ -943,13 +990,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 15px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    onThreadClick && onThreadClick(t.id);
-                                                    setSelectedReplyCount(null);
+                                                    setSelectedThread(t);
                                                 }}
                                             >
                                                 <div style={{ maxWidth: '70%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t.title}</div>
-                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>対応者: {profiles.find((p: any) => p.id === t.completed_by)?.display_name || 'Unknown'}</div>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>対応者: {getCompleterName(t)}</div>
                                                 </div>
                                                 <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--danger)' }}>{formatDuration(t.durationMs)}</div>
                                             </div>
@@ -964,7 +1010,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             {selectedUser && (
                 <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000 }} onClick={() => setSelectedUser(null)}>
-                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%', animation: 'modalFadeIn 0.3s ease-out', padding: '30px', border: '1px solid var(--glass-border)', boxShadow: '0 15px 50px rgba(0,0,0,0.6)', position: 'relative', zIndex: 100001 }}>
+                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', width: '90%', animation: 'modalFadeIn 0.3s ease-out', padding: '30px', maxHeight: '85vh', overflowY: 'auto', border: '1px solid var(--glass-border)', boxShadow: '0 15px 50px rgba(0,0,0,0.6)', position: 'relative', zIndex: 100001 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
                             <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{selectedUser} の詳細統計</h3>
                             <button className="btn btn-sm btn-outline" onClick={() => setSelectedUser(null)} style={{ padding: '0 8px', height: '32px' }}>✕</button>
@@ -997,9 +1043,95 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 </div>
                             </div>
                         )}
+                        {(() => {
+                            const byDateDesc = (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                            const posted = displayThreads.filter(t => normalizeUserName(t.author_name || t.author || 'Unknown') === selectedUser).sort(byDateDesc);
+                            const replied = displayThreads.filter(t => (t.replies || []).some((r: any) => normalizeUserName(r.author || 'Unknown') === selectedUser)).sort(byDateDesc);
+                            const completedList = displayThreads.filter(t => t.status === 'completed' && getCompleterName(t) === selectedUser).sort(byDateDesc);
+
+                            const renderSection = (title: string, items: any[]) => (
+                                <div style={{ marginTop: '15px' }}>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>{title} ({items.length})</div>
+                                    {items.length === 0 ? (
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '4px 10px' }}>なし</div>
+                                    ) : (
+                                        <div className="custom-scrollbar" style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            {items.map(t => (
+                                                <div
+                                                    key={t.id}
+                                                    onClick={() => setSelectedThread(t)}
+                                                    style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', alignItems: 'center' }}
+                                                >
+                                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                                                    <span style={{ color: 'var(--text-muted)', flexShrink: 0, fontSize: '0.7rem' }}>{new Date(t.created_at).toLocaleDateString()}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+
+                            return (
+                                <>
+                                    {renderSection('投稿したスレッド', posted)}
+                                    {renderSection('返信したスレッド', replied)}
+                                    {renderSection('完了したスレッド', completedList)}
+                                </>
+                            );
+                        })()}
                         <div style={{ marginTop: '20px', fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                             ※稼働時間は、各日の最初の活動から最後の活動までの間隔の平均です。
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {selectedThread && (
+                <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100002 }} onClick={() => setSelectedThread(null)}>
+                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px', width: '90%', animation: 'modalFadeIn 0.3s ease-out', padding: '30px', maxHeight: '85vh', overflowY: 'auto', border: '1px solid var(--glass-border)', boxShadow: '0 15px 50px rgba(0,0,0,0.6)', position: 'relative', zIndex: 100003 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px', gap: '10px' }}>
+                            <div style={{ minWidth: 0 }}>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{selectedThread.title}</h3>
+                                <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                    <span>投稿: {normalizeUserName(selectedThread.author_name || selectedThread.author || 'Unknown')} ({new Date(selectedThread.created_at).toLocaleString()})</span>
+                                    {selectedThread.status === 'completed' && selectedThread.completed_at && (
+                                        <span style={{ color: 'var(--success)' }}>完了: {getCompleterName(selectedThread)} ({new Date(selectedThread.completed_at).toLocaleString()})</span>
+                                    )}
+                                </div>
+                            </div>
+                            <button className="btn btn-sm btn-outline" onClick={() => setSelectedThread(null)} style={{ padding: '0 8px', height: '32px', flexShrink: 0 }}>✕</button>
+                        </div>
+                        <div
+                            style={{ background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '10px', fontSize: '0.9rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                            dangerouslySetInnerHTML={{ __html: selectedThread.content || '' }}
+                        />
+                        {(selectedThread.replies || []).length > 0 && (
+                            <div style={{ marginTop: '15px' }}>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px' }}>返信 ({selectedThread.replies.length})</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {[...selectedThread.replies]
+                                        .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                                        .map((r: any) => (
+                                            <div key={r.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px' }}>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                                    {normalizeUserName(r.author || 'Unknown')} ・ {new Date(r.created_at).toLocaleString()}
+                                                </div>
+                                                <div
+                                                    style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                                                    dangerouslySetInnerHTML={{ __html: r.content || '' }}
+                                                />
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
+                        {onThreadClick && (
+                            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                                <button className="btn btn-sm btn-outline" onClick={() => { onThreadClick(selectedThread.id); setSelectedThread(null); }}>
+                                    フィードで開く
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
