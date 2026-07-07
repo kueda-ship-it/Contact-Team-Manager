@@ -101,9 +101,9 @@ export function useThreads(
 
     const fetchThreads = useCallback(async (silent = false) => {
         try {
-            // Override limit if filtering for pending or mentions OR SEARCHING to ensure good results
+            // 未完了/メンション/検索は取りこぼしが出ないよう全件対象(0 = ページングで全件)
             const isSearching = searchQuery.trim().length > 0;
-            const effectiveLimit = (filter === 'pending' || filter === 'waiting' || filter === 'mentions' || isSearching) ? 2000 : limit;
+            const effectiveLimit = (filter === 'pending' || filter === 'waiting' || filter === 'mentions' || isSearching) ? 0 : limit;
 
             console.log(`[useThreads] Fetching. Team: ${teamId}, Filter: ${filter}, Search: ${searchQuery}, Silent: ${silent}`);
 
@@ -112,51 +112,63 @@ export function useThreads(
             if (!silent && (threads.length === 0 || isDifferentTeam)) setLoading(true);
             setError(null);
             
-            // ... (rest of query construction) ...
-            let query = supabase
-                .from('threads')
-                .select(`
-                  *,
-                  replies:replies(*),
-                  reminders:thread_reminders(id, remind_at, reminder_sent)
-                `);
-
-            if (isSearching) {
-                const term = `%${searchQuery.trim()}%`;
-                query = query.or(`title.ilike.${term},content.ilike.${term}`);
-            }
-
-            query = query.order('created_at', { ascending: false }).limit(effectiveLimit);
-
-            if (filter === 'pending') {
-                query = query.eq('status', 'pending');
-            } else if (filter === 'waiting') {
-                query = query.eq('status', 'pending').eq('waiting_contact', true);
-            } else if (filter === 'completed') {
-                query = query.eq('status', 'completed');
-            } else if (filter === 'myposts') {
-                query = query.eq('user_id', user?.id);
-            }
-
             const isAdmin = profile?.role === 'Admin';
-
-            if (teamId !== null && teamId !== '') {
-                query = query.eq('team_id', teamId);
-            } else if (!isAdmin) {
-                const memberTeamIds = memberships.map(m => m.team_id);
-                if (memberTeamIds.length > 0) {
-                    query = query.in('team_id', memberTeamIds);
-                } else {
-                    setThreads([]);
-                    setLoading(false);
-                    return;
-                }
+            const memberTeamIds = memberships.map(m => m.team_id);
+            if ((teamId === null || teamId === '') && !isAdmin && memberTeamIds.length === 0) {
+                setThreads([]);
+                setLoading(false);
+                return;
             }
 
-            const { data, error } = await query;
-            if (error) throw error;
+            // ページごとに query builder を作り直す(builder は破壊的に更新されるため使い回せない)
+            const buildQuery = () => {
+                let q = supabase
+                    .from('threads')
+                    .select(`
+                      *,
+                      replies:replies(*),
+                      reminders:thread_reminders(id, remind_at, reminder_sent)
+                    `);
 
-            let result = data || [];
+                if (isSearching) {
+                    const term = `%${searchQuery.trim()}%`;
+                    q = q.or(`title.ilike.${term},content.ilike.${term}`);
+                }
+
+                if (filter === 'pending') {
+                    q = q.eq('status', 'pending');
+                } else if (filter === 'waiting') {
+                    q = q.eq('status', 'pending').eq('waiting_contact', true);
+                } else if (filter === 'completed') {
+                    q = q.eq('status', 'completed');
+                } else if (filter === 'myposts') {
+                    q = q.eq('user_id', user?.id);
+                }
+
+                if (teamId !== null && teamId !== '') {
+                    q = q.eq('team_id', teamId);
+                } else if (!isAdmin) {
+                    q = q.in('team_id', memberTeamIds);
+                }
+                return q;
+            };
+
+            // Supabase(PostgREST) は 1 リクエスト最大 1000 行に切り詰めるため、
+            // limit がそれを超える場合(0 以下 = 全件)は range() でページングして結合する。
+            const PAGE_SIZE = 1000;
+            const unlimited = effectiveLimit <= 0;
+            let rows: any[] = [];
+            for (let from = 0; unlimited || from < effectiveLimit; from += PAGE_SIZE) {
+                const to = (unlimited ? from + PAGE_SIZE : Math.min(from + PAGE_SIZE, effectiveLimit)) - 1;
+                const { data, error } = await buildQuery()
+                    .order('created_at', { ascending: false })
+                    .range(from, to);
+                if (error) throw error;
+                rows = rows.concat(data || []);
+                if (!data || data.length < to - from + 1) break;
+            }
+
+            let result = rows;
             if (ascending) {
                 result = [...result].reverse();
             }
