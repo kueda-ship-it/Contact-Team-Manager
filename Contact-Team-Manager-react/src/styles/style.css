@@ -1504,12 +1504,10 @@ body:not(.light-mode) .rich-editor * {
 }
 
 /* --- Main Feed Area --- */
+/* Teams風: エリア自体は全幅にしてスクロールバーを右端に出す。
+   コンテンツ幅の制限(1000px)は .feed-list の子要素側で行う。 */
 .main-feed-area {
     width: 100%;
-    max-width: 1000px;
-    /* Limit main content width */
-    margin: 0 auto;
-    /* Center it */
     padding-top: 10px;
     padding-bottom: 0;
     /* Form is now inside, no padding needed */
@@ -1532,6 +1530,20 @@ body:not(.light-mode) .rich-editor * {
     padding-bottom: 20px;
     scrollbar-width: thin;
     scrollbar-gutter: stable;
+}
+
+/* スクロールコンテナは全幅のまま、カード列・ヘッダーだけ中央寄せ。
+   カード外の余白でもホイールが効き、スクロールバーはエリア右端に出る */
+.feed-list > * {
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.desktop-only-postform {
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
 }
 
 /* Compact Reply Form - Show only on hover or focus */
