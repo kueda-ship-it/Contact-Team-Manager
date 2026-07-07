@@ -73,6 +73,8 @@ interface Thread {
     team_id: number;
     status: 'pending' | 'completed';
     waiting_contact?: boolean;
+    waiting_by?: string | null;
+    waiting_at?: string | null;
     is_pinned: boolean;
     completed_by?: string;
     completed_at?: string;

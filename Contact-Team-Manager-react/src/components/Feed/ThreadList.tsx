@@ -464,6 +464,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             payload.completed_by = user.id;
             payload.completed_at = new Date().toISOString();
             payload.waiting_contact = false;
+            payload.waiting_by = null;
+            payload.waiting_at = null;
         } else {
             payload.completed_by = null;
             payload.completed_at = null;
@@ -483,8 +485,13 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             const timeout = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
             );
+            const next = !current;
             const { error } = await Promise.race([
-                supabase.from('threads').update({ waiting_contact: !current }).eq('id', threadId),
+                supabase.from('threads').update({
+                    waiting_contact: next,
+                    waiting_by: next ? user.id : null,
+                    waiting_at: next ? new Date().toISOString() : null,
+                }).eq('id', threadId),
                 timeout
             ]) as any;
             if (error) throw error;
@@ -1677,10 +1684,41 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                         <polyline points="20 6 9 17 4 12"></polyline>
                                                     </svg>
+                                                    {completerProfile?.avatar_url && (
+                                                        <img src={completerProfile.avatar_url} alt="" style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} />
+                                                    )}
                                                     <span style={{ fontWeight: 600 }}>完了者: {completerName}</span>
                                                     <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.completed_at)}</span>
                                                 </div>
                                             )}
+                                            {thread.status !== 'completed' && thread.waiting_contact && thread.waiting_at && (() => {
+                                                const waitingProfile = thread.waiting_by ? profiles.find(p => p.id === thread.waiting_by) : null;
+                                                const waitingName = waitingProfile?.display_name || waitingProfile?.email || '不明';
+                                                return (
+                                                    <div style={{
+                                                        fontSize: '0.75rem',
+                                                        color: '#EAB308',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '5px',
+                                                        background: 'rgba(234, 179, 8, 0.1)',
+                                                        padding: '4px 12px',
+                                                        borderRadius: '20px',
+                                                        border: '1px solid rgba(234, 179, 8, 0.25)',
+                                                        animation: 'fadeIn 0.3s ease-out',
+                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                                                    }}>
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                                        </svg>
+                                                        {waitingProfile?.avatar_url && (
+                                                            <img src={waitingProfile.avatar_url} alt="" style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} />
+                                                        )}
+                                                        <span style={{ fontWeight: 600 }}>連絡待ち: {waitingName}</span>
+                                                        <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.waiting_at)}</span>
+                                                    </div>
+                                                );
+                                            })()}
                                             {thread.status !== 'completed' && (
                                                 <button
                                                     className={`btn btn-sm btn-status btn-waiting ${thread.waiting_contact ? 'active' : ''}`}
