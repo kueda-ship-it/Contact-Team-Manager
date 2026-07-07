@@ -1533,16 +1533,17 @@ body:not(.light-mode) .rich-editor * {
 }
 
 /* スクロールコンテナは全幅のまま、カード列・ヘッダーだけ中央寄せ。
-   カード外の余白でもホイールが効き、スクロールバーはエリア右端に出る */
+   カード外の余白でもホイールが効き、スクロールバーはエリア右端に出る。
+   880px は従来 .feed-list に掛かっていた幅と同じ(見た目のカード幅は不変) */
 .feed-list > * {
-    max-width: 1000px;
+    max-width: 880px;
     margin-left: auto;
     margin-right: auto;
 }
 
 .desktop-only-postform {
     width: 100%;
-    max-width: 1000px;
+    max-width: 880px;
     margin: 0 auto;
 }
 
@@ -3178,11 +3179,11 @@ body.light-mode .theme-toggle-btn:hover svg {
 }
 
 /* --- Content Visibility Fixes --- */
+/* max-width/margin はここに置かない（スクロールコンテナが縮み、バーがカード脇に
+   出て余白でホイールが効かなくなる）。幅制限は .feed-list > * 側で行う */
 .feed-list {
     padding-bottom: 10px;
     /* Reduced to move content closer to static form */
-    max-width: 880px;
-    margin: 0 auto;
     width: 100%;
 }
 
