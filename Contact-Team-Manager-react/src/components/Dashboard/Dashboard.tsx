@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CustomSelect } from '../common/CustomSelect';
 import { useProfiles, useUserMemberships, useTeams, useThreads } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
+import { CATEGORY_ORDER, CATEGORY_COLORS, classifyCategory, detectDirection, stripHtml, medianMs, type ContactCategory } from '../../utils/contactTrends';
 
 interface DashboardProps {
     currentTeamId: number | string | null;
@@ -190,6 +191,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
         if (hours > 0) return `${hours}時間 ${mins}分`;
         return `${mins}分`;
     };
+
+    // 連絡内容の傾向（title + content の文言からルールベースで推定。追加フェッチなし）
+    const contactTrend = (() => {
+        const catStats = new Map<ContactCategory, { count: number; durations: number[] }>();
+        CATEGORY_ORDER.forEach(c => catStats.set(c, { count: 0, durations: [] }));
+        let inbound = 0, outboundRequest = 0, both = 0;
+
+        displayThreads.forEach(t => {
+            const text = stripHtml(`${t.title || ''} ${t.content || ''}`);
+            const entry = catStats.get(classifyCategory(text))!;
+            entry.count++;
+            if (t.status === 'completed' && t.completed_at && t.created_at) {
+                const dur = new Date(t.completed_at).getTime() - new Date(t.created_at).getTime();
+                if (!isNaN(dur) && dur > 0) entry.durations.push(dur);
+            }
+            const dir = detectDirection(text);
+            if (dir.inbound) inbound++;
+            if (dir.outboundRequest) outboundRequest++;
+            if (dir.inbound && dir.outboundRequest) both++;
+        });
+
+        const rows = CATEGORY_ORDER
+            .map(cat => {
+                const s = catStats.get(cat)!;
+                return { category: cat, count: s.count, medianDurationMs: medianMs(s.durations) };
+            })
+            .filter(r => r.count > 0)
+            .sort((a, b) => b.count - a.count);
+
+        return { rows, inbound, outboundRequest, both };
+    })();
+    const maxCategoryCount = Math.max(...contactTrend.rows.map(r => r.count), 1);
 
     Object.keys(userStats).forEach(userName => {
         const stats = userStats[userName];
@@ -468,6 +501,72 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(220, 38, 38, 0.05), rgba(220, 38, 38, 0.02))' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>返信ありの割合</div>
                             <div style={{ fontSize: '2.8rem', fontWeight: 800, color: 'var(--danger)' }}>{replyRate}%</div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+                        <div className="task-card" style={{ padding: '25px' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-muted)' }}>連絡内容の傾向</h3>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '0 0 18px 0' }}>※本文の文言からの自動分類（推定）です</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 70px 90px', gap: '10px', fontSize: '0.7rem', color: 'var(--text-muted)', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontWeight: 600 }}>
+                                    <div>カテゴリ</div>
+                                    <div></div>
+                                    <div style={{ textAlign: 'center' }}>件数</div>
+                                    <div style={{ textAlign: 'center' }}>完了(中央値)</div>
+                                </div>
+                                {contactTrend.rows.map(row => (
+                                    <div key={row.category} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 70px 90px', gap: '10px', alignItems: 'center', fontSize: '0.85rem' }}>
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', lineHeight: 1 }}>
+                                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: CATEGORY_COLORS[row.category], flexShrink: 0 }}></span>
+                                            <span style={{ fontWeight: 600 }}>{row.category}</span>
+                                        </div>
+                                        <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                                            <div style={{ height: '100%', width: `${(row.count / maxCategoryCount) * 100}%`, background: CATEGORY_COLORS[row.category], borderRadius: '4px', transition: 'width 1s ease-out' }} />
+                                        </div>
+                                        <div style={{ textAlign: 'center', fontWeight: 700 }}>
+                                            {row.count}<span style={{ fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-muted)' }}> ({Math.round((row.count / totalThreads) * 100)}%)</span>
+                                        </div>
+                                        <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            {row.medianDurationMs != null ? formatDuration(row.medianDurationMs) : '—'}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="task-card" style={{ padding: '25px' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-muted)' }}>受電・架電の内訳（推定）</h3>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '0 0 18px 0' }}>※「〜より連絡あり」「〜お願いします」等の文言から推定。1件が両方に該当する場合があります</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', justifyContent: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ width: '12px', height: '40px', background: 'var(--accent)', borderRadius: '6px' }}></div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>受電起点あり（先方から連絡を受けた記載）</div>
+                                        <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>
+                                            {contactTrend.inbound} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>件 ({totalThreads > 0 ? Math.round((contactTrend.inbound / totalThreads) * 100) : 0}%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ width: '12px', height: '40px', background: 'var(--primary)', borderRadius: '6px' }}></div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>架電・対応依頼あり（こちらから連絡する記載）</div>
+                                        <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>
+                                            {contactTrend.outboundRequest} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>件 ({totalThreads > 0 ? Math.round((contactTrend.outboundRequest / totalThreads) * 100) : 0}%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ width: '12px', height: '40px', background: 'var(--text-muted)', borderRadius: '6px' }}></div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>両方を含む（受電内容＋対応依頼）</div>
+                                        <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>
+                                            {contactTrend.both} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>件</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
