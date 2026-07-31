@@ -1504,12 +1504,10 @@ body:not(.light-mode) .rich-editor * {
 }
 
 /* --- Main Feed Area --- */
+/* Teams風: エリア自体は全幅にしてスクロールバーを右端に出す。
+   コンテンツ幅の制限(1000px)は .feed-list の子要素側で行う。 */
 .main-feed-area {
     width: 100%;
-    max-width: 1000px;
-    /* Limit main content width */
-    margin: 0 auto;
-    /* Center it */
     padding-top: 10px;
     padding-bottom: 0;
     /* Form is now inside, no padding needed */
@@ -1532,6 +1530,32 @@ body:not(.light-mode) .rich-editor * {
     padding-bottom: 20px;
     scrollbar-width: thin;
     scrollbar-gutter: stable;
+    /* 非スクロール時はサム・トラックとも透明(白い帯を出さない)。
+       スクロール中のみ .is-scrolling (ThreadList.tsx が付与) で表示 */
+    scrollbar-color: transparent transparent;
+}
+
+.feed-list.is-scrolling {
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+body.light-mode .feed-list.is-scrolling {
+    scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
+}
+
+/* スクロールコンテナは全幅のまま、カード列・ヘッダーだけ中央寄せ。
+   カード外の余白でもホイールが効き、スクロールバーはエリア右端に出る。
+   880px は従来 .feed-list に掛かっていた幅と同じ(見た目のカード幅は不変) */
+.feed-list > * {
+    max-width: 880px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.desktop-only-postform {
+    width: 100%;
+    max-width: 880px;
+    margin: 0 auto;
 }
 
 /* Compact Reply Form - Show only on hover or focus */
@@ -3166,11 +3190,11 @@ body.light-mode .theme-toggle-btn:hover svg {
 }
 
 /* --- Content Visibility Fixes --- */
+/* max-width/margin はここに置かない（スクロールコンテナが縮み、バーがカード脇に
+   出て余白でホイールが効かなくなる）。幅制限は .feed-list > * 側で行う */
 .feed-list {
     padding-bottom: 10px;
     /* Reduced to move content closer to static form */
-    max-width: 880px;
-    margin: 0 auto;
     width: 100%;
 }
 

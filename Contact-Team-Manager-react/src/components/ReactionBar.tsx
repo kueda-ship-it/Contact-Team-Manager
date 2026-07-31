@@ -1,27 +1,75 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ReactionPickerProps {
+    anchorRef: React.RefObject<HTMLElement | null>;
     onSelect: (emoji: string) => void;
     onClose: () => void;
 }
 
-const COMMON_EMOJIS = ['👍', '❤️', '🎉', '🔥'];
+const COMMON_EMOJIS = ['👍', '❤️', '🎉', '🔥', '😂', '😢', '😮', '🙏', '💪', '✅', '👀', '🫡'];
 
-export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, onClose }) => {
-    return (
+// 返信は overflow-y:auto の .reply-scroll-area 内にあり、絶対配置だと
+// スクロール枠でピッカーが切れるため、DotMenu と同じ Portal + fixed で描画する。
+export const ReactionPicker: React.FC<ReactionPickerProps> = ({ anchorRef, onSelect, onClose }) => {
+    const pickerRef = useRef<HTMLDivElement | null>(null);
+    const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+    const calcPosition = useCallback(() => {
+        const anchor = anchorRef.current;
+        if (!anchor) return;
+        const rect = anchor.getBoundingClientRect();
+        const w = pickerRef.current?.offsetWidth || 250;
+        const h = pickerRef.current?.offsetHeight || 100;
+        const openDown = rect.top < h + 12;
+        const top = openDown ? rect.bottom + 6 : rect.top - h - 6;
+        const left = Math.max(8, Math.min(window.innerWidth - w - 8, rect.left));
+        setPos(prev => (prev && prev.top === top && prev.left === left) ? prev : { top, left });
+    }, [anchorRef]);
+
+    useLayoutEffect(() => {
+        calcPosition();
+    }, [calcPosition]);
+
+    useEffect(() => {
+        const onPointerDown = (e: PointerEvent | MouseEvent) => {
+            const target = e.target as Node | null;
+            if (!target) return;
+            if (pickerRef.current?.contains(target)) return;
+            if (anchorRef.current?.contains(target)) return;
+            onClose();
+        };
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        const onReposition = () => calcPosition();
+
+        document.addEventListener('pointerdown', onPointerDown, true);
+        document.addEventListener('keydown', onKey);
+        window.addEventListener('resize', onReposition);
+        window.addEventListener('scroll', onReposition, true);
+        return () => {
+            document.removeEventListener('pointerdown', onPointerDown, true);
+            document.removeEventListener('keydown', onKey);
+            window.removeEventListener('resize', onReposition);
+            window.removeEventListener('scroll', onReposition, true);
+        };
+    }, [calcPosition, onClose, anchorRef]);
+
+    return createPortal(
         <div
+            ref={pickerRef}
             className="reaction-picker"
             style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: 0,
+                position: 'fixed',
+                top: pos?.top ?? -9999,
+                left: pos?.left ?? -9999,
                 background: '#1F1E1D',
                 border: '1px solid rgba(232, 81, 255, 0.3)',
                 borderRadius: '8px',
                 padding: '6px',
-                display: 'flex',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(6, 1fr)',
                 gap: '4px',
-                zIndex: 1000,
+                zIndex: 100000,
                 boxShadow: '0 4px 15px rgba(232, 81, 255, 0.2)'
             }}
             onClick={(e) => e.stopPropagation()}
@@ -58,7 +106,8 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, onClos
                     <span style={{ fontSize: '20px' }}>{emoji}</span>
                 </button>
             ))}
-        </div>
+        </div>,
+        document.body
     );
 };
 
@@ -87,6 +136,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
         style
     } = props;
     const [showPicker, setShowPicker] = useState(false);
+    const plusBtnRef = useRef<HTMLButtonElement | null>(null);
 
     const groupedReactions = reactions.reduce((acc, reaction) => {
         if (!acc[reaction.emoji]) {
@@ -120,7 +170,6 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
         <div
             className="reaction-bar"
             style={Object.assign({ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', position: 'relative' }, style || {})}
-            onMouseLeave={() => setShowPicker(false)}
         >
             {Object.entries(groupedReactions).map(([emoji, reactionList]) => {
                 const hasUserReacted = reactionList.some(r => r.profile_id === currentUserId);
@@ -155,33 +204,33 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
                 );
             })}
 
-            <div style={{ position: 'relative' }}>
-                <button
-                    className="reaction-bubble"
-                    style={{
-                        borderRadius: '20px',
-                        width: '32px',
-                        height: '24px',
-                        cursor: 'pointer',
-                        display: 'grid',
-                        placeItems: 'center',
-                        padding: '0',
-                        opacity: 0.8
-                    }}
-                    onClick={() => setShowPicker(!showPicker)}
-                >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                </button>
-                {showPicker && (
-                    <ReactionPicker
-                        onSelect={onAdd}
-                        onClose={() => setShowPicker(false)}
-                    />
-                )}
-            </div>
+            <button
+                ref={plusBtnRef}
+                className="reaction-bubble"
+                style={{
+                    borderRadius: '20px',
+                    width: '32px',
+                    height: '24px',
+                    cursor: 'pointer',
+                    display: 'grid',
+                    placeItems: 'center',
+                    padding: '0',
+                    opacity: 0.8
+                }}
+                onClick={() => setShowPicker(!showPicker)}
+            >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </button>
+            {showPicker && (
+                <ReactionPicker
+                    anchorRef={plusBtnRef}
+                    onSelect={onAdd}
+                    onClose={() => setShowPicker(false)}
+                />
+            )}
         </div>
     );
 };

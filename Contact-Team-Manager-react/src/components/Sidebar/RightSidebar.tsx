@@ -159,6 +159,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
             payload.completed_by = user.id;
             payload.completed_at = new Date().toISOString();
             payload.waiting_contact = false;
+            payload.waiting_by = null;
+            payload.waiting_at = null;
         } else {
             payload.completed_by = null;
             payload.completed_at = null;
@@ -180,8 +182,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
             const timeout = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
             );
+            const next = !current;
             const { error } = await Promise.race([
-                supabase.from('threads').update({ waiting_contact: !current }).eq('id', threadId),
+                supabase.from('threads').update({
+                    waiting_contact: next,
+                    waiting_by: next ? user.id : null,
+                    waiting_at: next ? new Date().toISOString() : null,
+                }).eq('id', threadId),
                 timeout
             ]) as any;
             if (error) throw error;

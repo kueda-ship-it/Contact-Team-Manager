@@ -300,9 +300,18 @@ function App() {
     if (thread) {
       targetTeamId = thread.team_id;
     } else {
-      // If not in current rawThreads, fetch from DB
-      const { data } = await supabase.from('threads').select('team_id').eq('id', threadId).single();
-      if (data) targetTeamId = data.team_id;
+      // フィード未読み込みのスレッド(古い投稿など)。チームと作成日時を取得し、
+      // そのスレッドが読み込み範囲に入る件数までフィードの limit を広げる
+      const { data } = await supabase.from('threads').select('team_id, created_at').eq('id', threadId).single();
+      if (data) {
+        targetTeamId = data.team_id;
+        const { count } = await supabase
+          .from('threads')
+          .select('id', { count: 'exact', head: true })
+          .eq('team_id', data.team_id)
+          .gte('created_at', data.created_at);
+        if (count && count > threadsLimit) setThreadsLimit(count + 10);
+      }
     }
 
     // 2. Ensure we are in feed mode
