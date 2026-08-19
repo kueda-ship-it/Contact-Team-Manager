@@ -6,6 +6,15 @@ import { useNotificationContext } from '../context/NotificationContext';
 
 const RECONNECT_DELAY_MS = 5000;
 
+/** チャネルごとの通知モード。DB は team_members.notify_mode（既定 'all'） */
+export type NotifyMode = 'all' | 'mention' | 'none';
+export const MODES: NotifyMode[] = ['all', 'mention', 'none'];
+export const MODE_LABEL: Record<NotifyMode, string> = {
+    all: 'すべて通知',
+    mention: 'メンションのみ',
+    none: '通知しない',
+};
+
 // 通知アイコンのパス（GitHub Pages のサブパス対応のため import.meta.env.BASE_URL を使用）
 const NOTIFICATION_ICON = `${import.meta.env.BASE_URL}favicon-v3.png`;
 
@@ -67,8 +76,13 @@ export function useNotifications() {
     const { addNotification } = useNotificationContext();
     const tagsRef = useRef<any[]>([]);
     const tagMembersRef = useRef<any[]>([]);
-    // チームIDと通知有効フラグのマップ { teamId: boolean }
-    const teamNotifSettingsRef = useRef<Map<string, boolean>>(new Map());
+    // チャネルIDと通知モードのマップ { teamId: 'all' | 'mention' | 'none' }
+    //   all     … そのチャネルの投稿・返信をすべて通知
+    //   mention … 自分宛のメンションが当たったときだけ通知
+    //   none    … 通知しない
+    const teamNotifSettingsRef = useRef<Map<string, NotifyMode>>(new Map());
+    // 返信の親スレッド（team_id / title）のキャッシュ。返信のたびに引かないため
+    const threadMetaRef = useRef<Map<string, { teamId: string | null; title: string }>>(new Map());
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
     const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -91,12 +105,16 @@ export function useNotifications() {
         try {
             const { data } = await supabase
                 .from('team_members')
-                .select('team_id, notifications_enabled')
+                .select('team_id, notify_mode, notifications_enabled')
                 .eq('user_id', user.id);
             if (data) {
-                const map = new Map<string, boolean>();
+                const map = new Map<string, NotifyMode>();
                 data.forEach((m: any) => {
-                    map.set(String(m.team_id), m.notifications_enabled !== false);
+                    // notify_mode が主。古い行や旧クライアント由来は notifications_enabled から補う
+                    const mode: NotifyMode = MODES.includes(m.notify_mode)
+                        ? m.notify_mode
+                        : (m.notifications_enabled === false ? 'none' : 'all');
+                    map.set(String(m.team_id), mode);
                 });
                 teamNotifSettingsRef.current = map;
             }
@@ -106,11 +124,35 @@ export function useNotifications() {
     }, [user]);
 
     // チームの通知が有効かチェック（設定がない場合は有効とみなす）
-    const isTeamNotifEnabled = useCallback((teamId: string | number | null): boolean => {
-        if (!teamId) return true;
-        const map = teamNotifSettingsRef.current;
-        if (!map.has(String(teamId))) return true;
-        return map.get(String(teamId)) === true;
+    /** そのチャネルの通知モード。未設定（＝行が無い）のときは 'all' 扱い */
+    const teamNotifMode = useCallback((teamId: string | number | null | undefined): NotifyMode => {
+        if (!teamId) return 'all';
+        return teamNotifSettingsRef.current.get(String(teamId)) ?? 'all';
+    }, []);
+
+    const isTeamNotifEnabled = useCallback((teamId: string | number | null): boolean =>
+        teamNotifMode(teamId) !== 'none', [teamNotifMode]);
+
+    /** 返信は team_id を持たないことがある。親スレッドから引いて覚える */
+    const threadMeta = useCallback(async (threadId: string) => {
+        if (!threadId) return { teamId: null as string | null, title: '' };
+        const hit = threadMetaRef.current.get(threadId);
+        if (hit) return hit;
+        try {
+            const { data } = await supabase
+                .from('threads').select('title, team_id').eq('id', threadId).single();
+            const meta = { teamId: (data?.team_id ?? null) as string | null, title: data?.title || '' };
+            threadMetaRef.current.set(threadId, meta);
+            if (threadMetaRef.current.size > 500) {
+                // 際限なく持たない。古いものから落とす
+                const first = threadMetaRef.current.keys().next().value;
+                if (first) threadMetaRef.current.delete(first);
+            }
+            return meta;
+        } catch (e) {
+            console.warn('[useNotifications] Failed to fetch parent thread:', e);
+            return { teamId: null as string | null, title: '' };
+        }
     }, []);
 
     const checkReminders = useCallback(async () => {
@@ -236,10 +278,19 @@ export function useNotifications() {
                 return;
             }
 
-            // チームの通知設定を確認
-            const teamId = newRecord.team_id ?? newRecord.thread_team_id;
-            if (!isTeamNotifEnabled(teamId)) {
-                console.log('[useNotifications] Skipping: Team notifications disabled for team:', teamId);
+            // ★返信は team_id が入っていないことがある（アプリ側の insert が付けていない）。
+            //   そのまま判定するとチャネル設定を素通りしてしまうので、親スレッドから解決する。
+            let parentTitle = '';
+            let teamId = newRecord.team_id ?? newRecord.thread_team_id ?? null;
+            if (table === 'replies') {
+                const meta = await threadMeta(newRecord.thread_id);
+                parentTitle = meta.title;
+                if (!teamId) teamId = meta.teamId;
+            }
+
+            const mode = teamNotifMode(teamId);
+            if (mode === 'none') {
+                console.log('[useNotifications] Skipping: notify_mode=none', teamId);
                 return;
             }
 
@@ -269,6 +320,12 @@ export function useNotifications() {
             let body = '';
             let url = '/';
             const isMentioned = isMentionedByName || isMentionedByAll || isMentionedByTag;
+
+            // 'mention' は自分宛のときだけ鳴らす。'all' は素通し
+            if (mode === 'mention' && !isMentioned) {
+                console.log('[useNotifications] Skipping: notify_mode=mention (not mentioned)', teamId);
+                return;
+            }
 
             // 通知本文用にテキストを整形（メンション記号や改行を整理して短縮）
             // 通知本文用にテキストを整形（HTMLタグ・エンティティ・改行を除去して短縮）
@@ -307,18 +364,8 @@ export function useNotifications() {
                 body = `${authorLabel}${formatBody(content)}`;
                 url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.id}`;
             } else if (table === 'replies') {
-                // 返信: 親スレッドのタイトルを取得して通知に表示
-                let threadTitle = '新しい返信';
-                try {
-                    const { data: parentThread } = await supabase
-                        .from('threads')
-                        .select('title')
-                        .eq('id', newRecord.thread_id)
-                        .single();
-                    if (parentThread?.title) threadTitle = parentThread.title;
-                } catch (e) {
-                    console.warn('[useNotifications] Failed to fetch parent thread title:', e);
-                }
+                // 返信: 親スレッドのタイトルを見出しにする（上の threadMeta で取得済み）
+                const threadTitle = parentTitle || '新しい返信';
                 title = `${mentionPrefix}${threadTitle}`;
                 body = `${authorLabel}${formatBody(content)}`;
                 url = `${window.location.origin}/Contact-Team-Manager/?thread=${newRecord.thread_id}`;
@@ -385,19 +432,24 @@ export function useNotifications() {
                 channelRef.current = null;
             }
         };
-    }, [user, profile, fetchTagData, isTeamNotifEnabled]);
+    }, [user, profile, fetchTagData, teamNotifMode, threadMeta]);
 
-    // チームの通知設定を更新する関数を返す
-    const updateTeamNotifSetting = useCallback(async (teamId: string, enabled: boolean): Promise<void> => {
+    /** チャネルごとの通知モードを更新する。
+     *  ★notifications_enabled も併せて更新する（旧クライアントが読んでいるため）。 */
+    const updateTeamNotifMode = useCallback(async (teamId: string, mode: NotifyMode): Promise<void> => {
         if (!user) return;
-        await supabase
+        const { error } = await supabase
             .from('team_members')
-            .update({ notifications_enabled: enabled })
+            .update({ notify_mode: mode, notifications_enabled: mode !== 'none' })
             .eq('user_id', user.id)
             .eq('team_id', teamId);
-        // ローカルのキャッシュも即時更新
-        teamNotifSettingsRef.current.set(String(teamId), enabled);
+        if (error) throw error;
+        teamNotifSettingsRef.current.set(String(teamId), mode);   // 即時反映
     }, [user]);
 
-    return { updateTeamNotifSetting };
+    /** 現在のモードを読む（設定画面の初期表示用） */
+    const getTeamNotifMode = useCallback((teamId: string): NotifyMode =>
+        teamNotifMode(teamId), [teamNotifMode]);
+
+    return { updateTeamNotifMode, getTeamNotifMode, fetchTeamNotifSettings };
 }

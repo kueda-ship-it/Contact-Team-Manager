@@ -9,6 +9,7 @@ import { CHANGELOG } from '../../data/changelog';
 import { TagMemberEditor } from './TagMemberEditor';
 import { ImageCropModal } from '../common/ImageCropModal';
 import { OutlookWatchSettings } from './OutlookWatchSettings';
+import { NotificationSettings } from './NotificationSettings';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -21,7 +22,7 @@ interface SettingsModalProps {
 }
 
 type SettingsSection =
-    | 'profile' | 'integrations'
+    | 'profile' | 'integrations' | 'notifications'
     | 'team-basic' | 'team-channels' | 'team-members' | 'team-tags'
     | 'admin-users' | 'admin-teams'
     | 'history';
@@ -33,6 +34,7 @@ const TAB_TO_SECTION: Record<string, SettingsSection> = {
     'team-mgmt': 'admin-teams',
     history: 'history',
     outlook: 'integrations',
+    notifications: 'notifications',
 };
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId: currentTeamIdProp, currentTeamName: currentTeamNameProp, initialTab = 'profile', createChannelParentId = null }) => {
@@ -727,6 +729,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         <div className="settings-nav-group">アカウント</div>
                         <button className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>プロフィール</button>
                         <button className={`settings-nav-item ${activeTab === 'integrations' ? 'active' : ''}`} onClick={() => setActiveTab('integrations')}>外部サービス連携</button>
+                        <button className={`settings-nav-item ${activeTab === 'notifications' ? 'active' : ''}`} onClick={() => setActiveTab('notifications')}>通知</button>
 
                         <div className="settings-nav-group">チーム</div>
                         <button className={`settings-nav-item ${activeTab === 'team-basic' ? 'active' : ''}`} onClick={() => setActiveTab('team-basic')}>基本情報</button>
@@ -761,6 +764,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                             />
                         </div>
                     )}
+
+                    {activeTab === 'notifications' && <NotificationSettings />}
 
                     {activeTab === 'profile' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
