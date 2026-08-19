@@ -464,9 +464,45 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         return profiles.find(p => p.display_name === name || p.email === name);
     };
 
+    /** FC追記スレッドを手で完了にするとき、FC 側がまだ終わっていなければ確認する。
+     *
+     *  タイトルは「FC追記 12608190123 562513 物件名」の形。11桁が依頼番号。
+     *  FC 側の状況は巡回担当の端末が `fc_watch_case` に運んでくる
+     *  （Contact はクラウドなので FC を直接は見られない）。
+     *  状況が取れないときは黙って通す。**確認できないことを理由に操作を止めない。**
+     */
+    const confirmIfFcNotDone = async (thread: any): Promise<boolean> => {
+        const m = /(\d{11})/.exec(thread?.title || '');
+        if (!m || !/FC追記/.test(thread?.title || '')) return true;
+        const refno = m[1];
+        try {
+            const { data } = await supabase
+                .from('fc_watch_case').select('status, updated_at').eq('refno', refno).maybeSingle();
+            const st = (data?.status || '').trim();
+            if (!st) return true;                                   // 状況不明なら通す
+            if (st.includes('対応完了') || st.includes('対応報告済み')) return true;
+            const when = data?.updated_at
+                ? new Date(data.updated_at).toLocaleString('ja-JP', { hour12: false })
+                : '';
+            return window.confirm(
+                'FC 側はまだ完了していません。\n\n'
+                + `　依頼番号: ${refno}\n`
+                + `　FC の状況: ${st}${when ? `（${when} 時点）` : ''}\n\n`
+                + '対応報告済み / 対応完了 になると自動で完了になります。\n'
+                + 'それでも今ここで完了にしますか？'
+            );
+        } catch {
+            return true;                                            // 引けなくても止めない
+        }
+    };
+
     const handleToggleStatus = async (threadId: string, currentStatus: string) => {
         if (!user) return;
         const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+        if (newStatus === 'completed') {
+            const t = threads.find((x: any) => String(x.id) === String(threadId));
+            if (t && !(await confirmIfFcNotDone(t))) return;
+        }
         const payload: any = { status: newStatus };
         if (newStatus === 'completed') {
             payload.completed_by = user.id;
