@@ -81,6 +81,10 @@ function App() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts'>('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history'>('profile');
+  // 設定モーダルが対象とするチーム。サイドバーの歯車 / ＋ から開いたときは
+  // 表示中のチームではなくクリックしたチームを対象にする
+  const [settingsTeamId, setSettingsTeamId] = useState<string | null>(null);
+  const [settingsChannelParentId, setSettingsChannelParentId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [threadsLimit, setThreadsLimit] = useState(50);
   const [sortAscending, setSortAscending] = useState(true);
@@ -440,11 +444,21 @@ function App() {
             setViewMode('feed');
             setActiveMobileTab('feed');
           }}
-          onEditTeam={() => {
+          onEditTeam={(teamId) => {
+            setSettingsTeamId(teamId != null ? String(teamId) : null);
+            setSettingsChannelParentId(null);
             setSettingsInitialTab('team');
             setIsSettingsOpen(true);
           }}
+          onAddChannel={(teamId) => {
+            setSettingsTeamId(teamId != null ? String(teamId) : null);
+            setSettingsChannelParentId(teamId != null ? String(teamId) : null);
+            setSettingsInitialTab('team-mgmt');
+            setIsSettingsOpen(true);
+          }}
           onAddTeam={() => {
+            setSettingsTeamId(null);
+            setSettingsChannelParentId(null);
             setSettingsInitialTab('team-mgmt');
             setIsSettingsOpen(true);
           }}
@@ -553,9 +567,18 @@ function App() {
           <SettingsModal
             isOpen={isSettingsOpen}
             initialTab={settingsInitialTab}
-            onClose={() => setIsSettingsOpen(false)}
-            currentTeamId={currentTeamId ? String(currentTeamId) : null}
-            currentTeamName={currentTeamName}
+            onClose={() => {
+              setIsSettingsOpen(false);
+              setSettingsTeamId(null);
+              setSettingsChannelParentId(null);
+            }}
+            currentTeamId={settingsTeamId ?? (currentTeamId ? String(currentTeamId) : null)}
+            currentTeamName={
+              (settingsTeamId
+                ? teams.find(t => String(t.id) === settingsTeamId)?.name
+                : currentTeamName) || currentTeamName
+            }
+            createChannelParentId={settingsChannelParentId}
           />
         </>
       )}

@@ -16,9 +16,11 @@ interface SettingsModalProps {
     currentTeamId: string | null;
     currentTeamName: string;
     initialTab?: 'profile' | 'team' | 'admin' | 'team-mgmt' | 'history' | 'outlook';
+    /** 指定するとチーム管理タブが「このチームにチャネルを追加」状態で開く */
+    createChannelParentId?: string | null;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId, currentTeamName, initialTab = 'profile' }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId, currentTeamName, initialTab = 'profile', createChannelParentId = null }) => {
     const { user, profile } = useAuth();
     const { profiles } = useProfiles();
     const { teams } = useTeams();
@@ -254,6 +256,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         }
     }, [selectedTeamId, teams]);
 
+    // 表示中のチームが属する「トップ階層のチーム」= チャネルの追加先の既定値
+    const rootTeamIdForCurrent = (() => {
+        const t = teams.find(x => String(x.id) === String(currentTeamId));
+        if (!t) return null;
+        return String(t.parent_id || t.id);
+    })();
+
+    const startCreateTeam = () => {
+        setActiveTab('team-mgmt');
+        setSelectedTeamId('new');
+        setIsCreatingTeam(true);
+        setMgmtTeamName('');
+        setMgmtTeamIconUrl('');
+        setMgmtEmailAddress('');
+        setMgmtParentId(null);
+    };
+
+    const startCreateChannel = (parentTeamId?: string | null) => {
+        const rootTeams = teams.filter(t => !t.parent_id);
+        const parent = parentTeamId || rootTeamIdForCurrent || (rootTeams[0] ? String(rootTeams[0].id) : null);
+        if (!parent) {
+            alert('チャネルの追加先となるチームがありません。先に「新しいチームを作る」を実行してください。');
+            return;
+        }
+        setActiveTab('team-mgmt');
+        setSelectedTeamId('new');
+        setIsCreatingTeam(true);
+        setMgmtTeamName('');
+        setMgmtTeamIconUrl('');
+        setMgmtEmailAddress('');
+        setMgmtParentId(String(parent));
+    };
+
+    useEffect(() => {
+        if (isOpen && createChannelParentId) {
+            startCreateChannel(String(createChannelParentId));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, createChannelParentId]);
+
     const handleSaveProfile = async () => {
         if (!user) return;
         const updates = {
@@ -360,6 +402,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     };
 
     const handleSaveMgmtTeam = async () => {
+        if (!mgmtTeamName.trim()) {
+            alert(mgmtParentId ? 'チャネル名を入力してください。' : 'チーム名を入力してください。');
+            return;
+        }
         if (isCreatingTeam) {
             const insertData = {
                 name: mgmtTeamName,
@@ -770,7 +816,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         </div>
                     )}
 
-                    {activeTab === 'team' && (
+                    {activeTab === 'team' && !currentTeamId && (
+                        <div style={{ padding: '25px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
+                            <p style={{ margin: '0 0 8px 0', fontSize: '0.95rem' }}>チームが選択されていません</p>
+                            <p style={{ margin: '0 0 18px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                左のサイドバーでチームを選ぶか、チーム名の歯車アイコンから設定したいチームを開いてください。
+                            </p>
+                            <button className="btn btn-sm btn-primary" onClick={() => setActiveTab('team-mgmt')}>
+                                チーム / チャネルを作る
+                            </button>
+                        </div>
+                    )}
+
+                    {activeTab === 'team' && currentTeamId && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
                             <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <h4 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>基本情報</h4>
@@ -830,25 +888,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                             </div>
 
                             <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                <h4 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>階層設定 (Team / Channel)</h4>
+                                <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>このチームの所属先</h4>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 15px 0', lineHeight: 1.6 }}>
+                                    ここは<strong>「{teamName || currentTeamName}」自身</strong>の置き場所を変える欄です。<br />
+                                    新しいチャネルを作りたいときは、下の「＋ このチームにチャネルを作る」から作成してください。
+                                </p>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>親チーム (これを設定すると Channel になります)</label>
+                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>親チーム</label>
                                         <CustomSelect
                                             placeholder="親チームを選択..."
                                             options={[
-                                                { value: '', label: 'なし (上位 Team)' },
+                                                { value: '', label: 'なし（トップ階層のチーム）' },
                                                 ...teams
-                                                    .filter(t => t.id !== currentTeamId && !t.parent_id)
-                                                    .map(t => ({ value: t.id, label: t.name })),
+                                                    .filter(t => String(t.id) !== String(currentTeamId) && !t.parent_id)
+                                                    .map(t => ({ value: t.id, label: `${t.name} の中のチャネルにする` })),
                                             ]}
                                             value={parentId || ''}
                                             onChange={(val) => setParentId(val ? String(val) : null)}
                                             style={{ height: '36px' }}
                                         />
-                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '5px' }}>
-                                            ※親チームを設定すると、そのチームの「Channel」として表示されます。
-                                        </p>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         {/* Only show "Add Channel" if current team is NOT a channel itself */}
@@ -856,19 +915,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                             <button
                                                 className="btn btn-sm"
                                                 style={{ padding: '6px 12px', background: 'rgba(0,183,189,0.1)', color: 'var(--accent)', border: '1px solid rgba(0,183,189,0.2)' }}
-                                                onClick={() => {
-                                                    setActiveTab('team-mgmt');
-                                                    setSelectedTeamId('new');
-                                                    setIsCreatingTeam(true);
-                                                    setMgmtTeamName('');
-                                                    setMgmtTeamIconUrl('');
-                                                    setMgmtParentId(String(currentTeamId));
-                                                }}
+                                                onClick={() => startCreateChannel(String(currentTeamId))}
                                             >
-                                                + このチームにチャネルを追加
+                                                ＋ このチームにチャネルを作る
                                             </button>
                                         )}
-                                        <button className="btn btn-sm btn-primary" onClick={handleSaveTeam}>階層設定を保存</button>
+                                        <button className="btn btn-sm btn-primary" onClick={handleSaveTeam}>所属先を保存</button>
                                     </div>
                                 </div>
                             </div>
@@ -1479,16 +1531,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
                     {activeTab === 'team-mgmt' && (isAdmin || canManageTeam || profile?.role !== 'Viewer') && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            {(isAdmin || canManageTeam) && (
+                                <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(0,183,189,0.06)', border: '1px solid rgba(0,183,189,0.2)' }}>
+                                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>新しく作る</h4>
+                                    <p style={{ margin: '0 0 14px 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                                        <strong>チーム</strong>＝一番上のくくり（例:「連絡」）。<br />
+                                        <strong>チャネル</strong>＝チームの中の話題ごとの部屋（例:「連絡 &gt; # 一般」）。<br />
+                                        チャネルは必ずどれか 1 つのチームの中に作ります。
+                                    </p>
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                        <button
+                                            className="btn btn-sm btn-outline"
+                                            style={{ height: '32px' }}
+                                            onClick={startCreateTeam}
+                                        >
+                                            ＋ 新しいチームを作る
+                                        </button>
+                                        <button
+                                            className="btn btn-sm btn-primary"
+                                            style={{ height: '32px' }}
+                                            onClick={() => startCreateChannel()}
+                                        >
+                                            ＋ チャネルを追加する
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <h4 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>チーム管理</h4>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>チームを選択</label>
+                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>既存のチーム / チャネルを編集</label>
                                         <CustomSelect
-                                            placeholder="チームを選択..."
+                                            placeholder="チーム / チャネルを選択..."
                                             options={[
                                                 { value: '', label: '選択してください...' },
-                                                ...((isAdmin || canManageTeam) ? [{ value: 'new', label: '+ 新規チーム作成' }] : []),
                                                 ...teams.filter(t => {
                                                     if (isAdmin) return true;
                                                     const isDirectManager = memberships.some(m => String(m.team_id) === String(t.id) && m.role === 'Manager');
@@ -1498,15 +1576,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                         return memberships.some(m => String(m.team_id) === String(t.parent_id) && m.role === 'Manager');
                                                     }
                                                     return false;
-                                                }).map(t => ({ value: t.id, label: t.name }))
+                                                }).map(t => {
+                                                    const parent = t.parent_id ? teams.find(p => String(p.id) === String(t.parent_id)) : null;
+                                                    return { value: t.id, label: parent ? `${parent.name} ＞ # ${t.name}` : t.name };
+                                                })
                                             ]}
-                                            value={selectedTeamId}
+                                            value={isCreatingTeam ? '' : selectedTeamId}
                                             onChange={(val) => {
                                                 setSelectedTeamId(String(val));
-                                                // If user manually selects "new team" from dropdown, clear parent ID
-                                                if (val === 'new') {
-                                                    setMgmtParentId(null);
-                                                }
+                                                setIsCreatingTeam(false);
                                             }}
                                             style={{ height: '36px' }}
                                         />
@@ -1516,17 +1594,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                         <>
                                             <div style={{ padding: '15px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 <h5 style={{ margin: '0 0 12px 0', fontSize: '0.85rem' }}>
-                                                    {isCreatingTeam ? (mgmtParentId ? '新規チャネル作成' : '新規チーム作成') : 'チーム編集'}
+                                                    {isCreatingTeam
+                                                        ? (mgmtParentId
+                                                            ? `新規チャネル作成（${teams.find(t => String(t.id) === String(mgmtParentId))?.name || ''} の中）`
+                                                            : '新規チーム作成')
+                                                        : (mgmtParentId ? 'チャネル編集' : 'チーム編集')}
                                                 </h5>
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                                     <div>
-                                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>名称</label>
+                                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                            {mgmtParentId ? 'チャネル名' : 'チーム名'}
+                                                        </label>
                                                         <input
                                                             type="text"
                                                             className="input-field"
                                                             value={mgmtTeamName}
                                                             onChange={(e) => setMgmtTeamName(e.target.value)}
-                                                            placeholder="チーム名を入力..."
+                                                            placeholder={mgmtParentId ? '例: 一般 / 障害連絡 ...' : 'チーム名を入力...'}
                                                         />
                                                     </div>
                                                     <div>
@@ -1558,12 +1642,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                         </div>
                                                     </div>
                                                     <div>
-                                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>親チーム (Channel 設定)</label>
+                                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                            所属するチーム{mgmtParentId ? '（この中のチャネルになります）' : '（未選択ならトップ階層のチーム）'}
+                                                        </label>
                                                         <CustomSelect
                                                             options={[
-                                                                { value: '', label: 'なし (上位 Team)' },
+                                                                { value: '', label: 'なし（トップ階層のチーム）' },
                                                                 ...teams
-                                                                    .filter(t => t.id !== selectedTeamId && !t.parent_id)
+                                                                    .filter(t => String(t.id) !== String(selectedTeamId) && !t.parent_id)
                                                                     .map(t => ({ value: t.id, label: t.name }))
                                                             ]}
                                                             value={mgmtParentId || ''}
@@ -1588,7 +1674,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                                         )}
                                                         <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
                                                             <button className="btn btn-sm btn-primary" onClick={handleSaveMgmtTeam}>
-                                                                {isCreatingTeam ? '作成' : '保存'}
+                                                                {isCreatingTeam ? (mgmtParentId ? 'チャネルを作成' : 'チームを作成') : '保存'}
                                                             </button>
                                                         </div>
                                                     </div>

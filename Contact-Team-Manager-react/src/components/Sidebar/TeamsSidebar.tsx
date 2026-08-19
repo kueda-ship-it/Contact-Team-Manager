@@ -12,6 +12,7 @@ export interface TeamsSidebarProps {
     onSelectStatus: (status: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts') => void;
     onEditTeam: (teamId: number) => void;
     onAddTeam?: () => void;
+    onAddChannel?: (teamId: number | string) => void;
     unreadTeams?: Set<string>;
 }
 
@@ -24,6 +25,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
     onSelectStatus,
     onEditTeam,
     onAddTeam,
+    onAddChannel,
     unreadTeams = new Set()
 }) => {
     const { profile } = useAuth();
@@ -368,6 +370,22 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                                         </div>
                                     )}
 
+                                    {isManagerOrAdmin && !isChannel && onAddChannel && (
+                                        <div
+                                            className="team-settings-icon team-add-channel-icon"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onAddChannel(team.id);
+                                            }}
+                                            title={`「${team.name}」にチャネルを追加`}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                        </div>
+                                    )}
+
                                     {isManagerOrAdmin && (
                                         <div
                                             className="team-settings-icon"
@@ -430,9 +448,22 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                                             </div>
                                         )}
 
-                                        {childrenMap[String(team.id)] && (
+                                        {!isChannel && (childrenMap[String(team.id)] || (isManagerOrAdmin && onAddChannel)) && (
                                             <div className="sidebar-submenu children-list">
-                                                {childrenMap[String(team.id)].map(child => renderTeamItem(child, true))}
+                                                {(childrenMap[String(team.id)] || []).map(child => renderTeamItem(child, true))}
+                                                {isManagerOrAdmin && onAddChannel && (
+                                                    <div
+                                                        className="sidebar-submenu-item"
+                                                        style={{ color: 'var(--accent)' }}
+                                                        title={`「${team.name}」にチャネルを追加`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onAddChannel(team.id);
+                                                        }}
+                                                    >
+                                                        <span>＋ チャネルを追加</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>

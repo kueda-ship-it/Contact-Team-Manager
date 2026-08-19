@@ -1008,6 +1008,10 @@ body {
     /* Sharp 1px glow/border expansion */
 }
 
+.team-add-channel-icon {
+    margin-right: 6px;
+}
+
 .teams-sidebar:hover .team-settings-icon {
     display: flex;
     opacity: 0.4;
