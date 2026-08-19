@@ -669,7 +669,18 @@ body.light-mode .btn-revert:hover svg {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     z-index: 10000;
     margin-top: 4px;
-    overflow: hidden;
+    /* 選択肢が多くても枠は固定し、中でスクロールさせる */
+    max-height: 260px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+}
+
+.custom-select-dropdown.drop-up {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: 4px;
 }
 
 body.light-mode .custom-select-dropdown {
@@ -1608,6 +1619,145 @@ body.light-mode .feed-list.is-scrolling {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+/* --- Settings modal: 2-pane (left nav + content) --- */
+.modal.settings-modal {
+    width: 880px;
+    max-width: 95vw;
+    /* セクションを切り替えても枠の大きさを変えない */
+    height: 620px;
+    max-height: 85vh;
+}
+
+.settings-body {
+    display: flex;
+    gap: 18px;
+    flex: 1;
+    min-height: 0;
+}
+
+.settings-nav {
+    width: 186px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-right: 12px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-nav-group {
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin: 16px 0 6px 10px;
+    font-weight: 700;
+}
+
+.settings-nav-group:first-child {
+    margin-top: 0;
+}
+
+.settings-nav-item {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: none;
+    color: var(--text-main);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+    font-family: inherit;
+}
+
+.settings-nav-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.settings-nav-item.active {
+    background: rgba(0, 183, 189, 0.12);
+    border-color: rgba(0, 183, 189, 0.3);
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.settings-content {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding-right: 12px;
+}
+
+.settings-scope {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 親チーム配下のチャネルは一覧の中だけ字下げする（選択後の表示はずらさない） */
+.custom-select-dropdown .opt-channel {
+    display: inline-block;
+    padding-left: 14px;
+}
+
+.settings-scope .custom-select-trigger {
+    padding-left: 6px;
+}
+
+body.light-mode .settings-nav {
+    border-right-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-mode .settings-scope {
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-mode .settings-nav-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 768px) {
+    .modal.settings-modal {
+        height: 85vh;
+    }
+
+    .settings-body {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .settings-nav {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 0 0 10px 0;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .settings-nav-group {
+        display: none;
+    }
+
+    .settings-nav-item {
+        width: auto;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
 }
 
 /* User card hover in admin tab */

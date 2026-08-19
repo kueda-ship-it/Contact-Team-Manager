@@ -23,7 +23,19 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     className
 }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [dropUp, setDropUp] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLDivElement>(null);
+
+    // 下に 280px の余白が無ければ上向きに開く（モーダル下端で切れるのを防ぐ）
+    const toggleOpen = () => {
+        const next = !isOpen;
+        if (next && triggerRef.current) {
+            const r = triggerRef.current.getBoundingClientRect();
+            setDropUp(window.innerHeight - r.bottom < 280 && r.top > 280);
+        }
+        setIsOpen(next);
+    };
 
     const selectedOption = options.find(o => String(o.value).toLowerCase() === String(value).toLowerCase());
 
@@ -44,8 +56,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
             style={{ position: 'relative', width: '200px', ...style }}
         >
             <div
+                ref={triggerRef}
                 className="input-field custom-select-trigger"
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={toggleOpen}
                 style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -70,7 +83,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
             </div>
 
             {isOpen && (
-                <div className="custom-select-dropdown">
+                <div className={`custom-select-dropdown ${dropUp ? 'drop-up' : ''}`}>
                     {options.map((option) => (
                         <div
                             key={option.value}

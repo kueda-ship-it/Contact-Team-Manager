@@ -20,11 +20,36 @@ interface SettingsModalProps {
     createChannelParentId?: string | null;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId, currentTeamName, initialTab = 'profile', createChannelParentId = null }) => {
+type SettingsSection =
+    | 'profile' | 'integrations'
+    | 'team-basic' | 'team-channels' | 'team-members' | 'team-tags'
+    | 'admin-users' | 'admin-teams'
+    | 'history';
+
+const TAB_TO_SECTION: Record<string, SettingsSection> = {
+    profile: 'profile',
+    team: 'team-basic',
+    admin: 'admin-users',
+    'team-mgmt': 'admin-teams',
+    history: 'history',
+    outlook: 'integrations',
+};
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId: currentTeamIdProp, currentTeamName: currentTeamNameProp, initialTab = 'profile', createChannelParentId = null }) => {
     const { user, profile } = useAuth();
     const { profiles } = useProfiles();
     const { teams } = useTeams();
+    // 設定内で対象チームを切り替えられるようにする（親から渡された値を初期値にする）
+    const [teamScopeId, setTeamScopeId] = useState<string | null>(currentTeamIdProp);
+    useEffect(() => { setTeamScopeId(currentTeamIdProp); }, [currentTeamIdProp]);
+    const currentTeamId = teamScopeId;
+    const scopedTeam = teams.find(t => String(t.id) === String(currentTeamId));
+    const currentTeamName = scopedTeam?.name || currentTeamNameProp;
     const { members, loading: membersLoading, addMember, updateMemberRole, removeMember } = useTeamMembers(currentTeamId);
+    // チャネルの場合、追加できるのは親チームのメンバーだけ
+    const parentTeamId = scopedTeam?.parent_id ? String(scopedTeam.parent_id) : null;
+    const parentTeamName = parentTeamId ? (teams.find(t => String(t.id) === parentTeamId)?.name || '') : '';
+    const { members: parentTeamMembers } = useTeamMembers(parentTeamId);
     const { memberships } = useUserMemberships(user?.id);
     const { tags, addTag, deleteTag } = useTags();
 
@@ -32,13 +57,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
     // Permission checks
     const { canEdit: canEditCurrentTeam, isAdmin: isGlobalAdmin } = usePermissions(currentTeamId);
-    const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history' | 'outlook'>(initialTab as any);
+    const [activeTab, setActiveTab] = useState<SettingsSection>(TAB_TO_SECTION[initialTab] || 'profile');
     const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
     const [newTagName, setNewTagName] = useState('');
 
     useEffect(() => {
         if (isOpen) {
-            setActiveTab(initialTab as any);
+            setActiveTab(TAB_TO_SECTION[initialTab] || 'profile');
         }
     }, [isOpen, initialTab]);
 
@@ -264,7 +289,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     })();
 
     const startCreateTeam = () => {
-        setActiveTab('team-mgmt');
+        setActiveTab('admin-teams');
         setSelectedTeamId('new');
         setIsCreatingTeam(true);
         setMgmtTeamName('');
@@ -280,7 +305,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
             alert('チャネルの追加先となるチームがありません。先に「新しいチームを作る」を実行してください。');
             return;
         }
-        setActiveTab('team-mgmt');
+        setActiveTab('admin-teams');
         setSelectedTeamId('new');
         setIsCreatingTeam(true);
         setMgmtTeamName('');
@@ -646,12 +671,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         });
     };
 
+    // メンバー追加の候補。チャネルなら親チームに所属している人だけに絞る
+    const memberCandidates = (parentTeamId
+        ? profiles.filter(p => parentTeamMembers.some(pm => String(pm.user_id) === String(p.id)))
+        : profiles
+    ).filter(p => !members.some(m => String(m.user_id) === String(p.id)));
+
+    // 設定の「対象」セレクタに出すチーム / チャネル（親チームの直下にそのチャネルを並べる）
+    const scopeOptions = (() => {
+        const visible = teams.filter(t => isAdmin || memberships.some(m => String(m.team_id) === String(t.id)) ||
+            (t.parent_id ? memberships.some(m => String(m.team_id) === String(t.parent_id)) : false));
+        const roots = visible.filter(t => !t.parent_id);
+        const out: { value: string | number; label: React.ReactNode }[] = [];
+        roots.forEach(r => {
+            out.push({ value: r.id, label: r.name });
+            visible
+                .filter(c => String(c.parent_id || '') === String(r.id))
+                .forEach(c => out.push({ value: c.id, label: <span className="opt-channel"># {c.name}</span> }));
+        });
+        visible
+            .filter(t => t.parent_id && !roots.some(r => String(r.id) === String(t.parent_id)))
+            .forEach(c => {
+                const p = teams.find(x => String(x.id) === String(c.parent_id));
+                out.push({ value: c.id, label: p ? `${p.name} ＞ # ${c.name}` : `# ${c.name}` });
+            });
+        return out;
+    })();
+
     if (!isOpen) return null;
 
     return (
         <>
         <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }} onMouseDown={(e) => { if (filePickerActiveRef.current) return; if (e.target === e.currentTarget) onClose(); }}>
-            <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="modal settings-modal" onMouseDown={(e) => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h2 style={{
                         margin: 0,
@@ -670,57 +722,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                     >✕</button>
                 </div>
 
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(8px)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <button
-                        className={`btn btn-sm ${activeTab === 'profile' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderRadius: '8px', border: 'none' }}
-                        onClick={() => setActiveTab('profile')}
-                    >
-                        個人設定
-                    </button>
-                    <button
-                        className={`btn btn-sm ${activeTab === 'team' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderRadius: '8px', border: 'none' }}
-                        onClick={() => setActiveTab('team')}
-                        disabled={!currentTeamId}
-                    >
-                        チーム設定
-                    </button>
-                    {isAdmin && (
-                        <button
-                            className={`btn btn-sm ${activeTab === 'admin' ? 'btn-primary' : 'btn-outline'}`}
-                            style={{ borderRadius: '8px', border: 'none' }}
-                            onClick={() => setActiveTab('admin')}
-                        >
-                            ユーザー管理
-                        </button>
-                    )}
-                    {(isAdmin || canManageTeam || (profile?.role !== 'Viewer')) && (
-                        <button
-                            className={`btn btn-sm ${activeTab === 'team-mgmt' ? 'btn-primary' : 'btn-outline'}`}
-                            style={{ borderRadius: '8px', border: 'none' }}
-                            onClick={() => setActiveTab('team-mgmt')}
-                        >
-                            チーム管理
-                        </button>
-                    )}
-                    <button
-                        className={`btn btn-sm ${activeTab === 'history' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderRadius: '8px', border: 'none' }}
-                        onClick={() => setActiveTab('history')}
-                    >
-                        更新履歴
-                    </button>
-                    <button
-                        className={`btn btn-sm ${activeTab === 'outlook' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ borderRadius: '8px', border: 'none' }}
-                        onClick={() => setActiveTab('outlook')}
-                    >
-                        Outlook連携
-                    </button>
-                </div>
+                <div className="settings-body">
+                    <nav className="settings-nav">
+                        <div className="settings-nav-group">アカウント</div>
+                        <button className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>プロフィール</button>
+                        <button className={`settings-nav-item ${activeTab === 'integrations' ? 'active' : ''}`} onClick={() => setActiveTab('integrations')}>外部サービス連携</button>
 
-                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '12px', minHeight: 0 }}>
+                        <div className="settings-nav-group">チーム</div>
+                        <button className={`settings-nav-item ${activeTab === 'team-basic' ? 'active' : ''}`} onClick={() => setActiveTab('team-basic')}>基本情報</button>
+                        <button className={`settings-nav-item ${activeTab === 'team-channels' ? 'active' : ''}`} onClick={() => setActiveTab('team-channels')}>チャネル</button>
+                        <button className={`settings-nav-item ${activeTab === 'team-members' ? 'active' : ''}`} onClick={() => setActiveTab('team-members')}>メンバー</button>
+                        <button className={`settings-nav-item ${activeTab === 'team-tags' ? 'active' : ''}`} onClick={() => setActiveTab('team-tags')}>タグ</button>
+
+                        {(isAdmin || canManageTeam || profile?.role !== 'Viewer') && (
+                            <>
+                                <div className="settings-nav-group">管理</div>
+                                {isAdmin && (
+                                    <button className={`settings-nav-item ${activeTab === 'admin-users' ? 'active' : ''}`} onClick={() => setActiveTab('admin-users')}>ユーザー管理</button>
+                                )}
+                                <button className={`settings-nav-item ${activeTab === 'admin-teams' ? 'active' : ''}`} onClick={() => setActiveTab('admin-teams')}>チーム / チャネル作成</button>
+                            </>
+                        )}
+
+                        <div className="settings-nav-group">その他</div>
+                        <button className={`settings-nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>更新履歴</button>
+                    </nav>
+
+                    <div className="settings-content">
+                    {activeTab.startsWith('team-') && (
+                        <div className="settings-scope">
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>対象</span>
+                            <CustomSelect
+                                placeholder="チーム / チャネルを選択..."
+                                options={scopeOptions}
+                                value={currentTeamId || ''}
+                                onChange={(val) => setTeamScopeId(val ? String(val) : null)}
+                                style={{ height: '32px', width: '100%' }}
+                            />
+                        </div>
+                    )}
+
                     {activeTab === 'profile' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             <div>
@@ -734,11 +775,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                             </div>
                             <div>
                                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>アイコン画像</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                {avatarUrl ? (
+                                    <img src={avatarUrl} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                                ) : (
+                                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', flexShrink: 0, border: '1px dashed rgba(255,255,255,0.25)' }}></div>
+                                )}
                                 <input
                                     type="file"
                                     accept="image/*"
                                     className="input-field"
-                                    style={{ paddingTop: '10px' }}
+                                    style={{ paddingTop: '10px', flex: 1, minWidth: 0, margin: 0 }}
                                     onMouseDown={() => { filePickerActiveRef.current = true; setTimeout(() => { filePickerActiveRef.current = false; }, 2000); }}
                                     onChange={(e) => {
                                         const file = e.target.files?.[0];
@@ -757,78 +804,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                         e.target.value = '';
                                     }}
                                 />
-                                {avatarUrl && (
-                                    <div style={{ marginTop: '10px' }}>
-                                        <img src={avatarUrl} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
-                                    </div>
-                                )}
+                                </div>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                 <button className="btn btn-primary" onClick={handleSaveProfile}>保存</button>
                             </div>
 
-                            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '10px 0' }} />
-
-                            <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <svg width="18" height="18" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <rect width="11" height="11" fill="#F25022" />
-                                        <rect x="12" width="11" height="11" fill="#7FBA00" />
-                                        <rect y="12" width="11" height="11" fill="#00A4EF" />
-                                        <rect x="12" y="12" width="11" height="11" fill="#FFB900" />
-                                    </svg>
-                                    Microsoft Graph (OneDrive) 連携
-                                </h4>
-                                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
-                                    ファイルを OneDrive にアップロードしたり、添付ファイルをダウンロードしたりするために必要です。
-                                </p>
-
-                                {(msAccount || hasExternalToken) ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '10px 15px', borderRadius: '8px' }}>
-                                        <div>
-                                            <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{msAccount?.name || msAccount?.username || profile?.display_name || profile?.email || '連携済み'}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{msAccount?.username || profile?.email}</div>
-                                        </div>
-                                        {msAccount && (
-                                            <button
-                                                className="btn btn-sm"
-                                                style={{ color: 'var(--danger)', background: 'rgba(196, 49, 75, 0.1)', border: '1px solid rgba(196, 49, 75, 0.2)' }}
-                                                onClick={handleMsLogout}
-                                                disabled={msLoading}
-                                            >
-                                                連携解除
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div style={{ textAlign: 'center', padding: '10px' }}>
-                                        <button
-                                            className="btn btn-primary"
-                                            style={{ background: '#2F2F2F', color: 'white', border: '1px solid #444' }}
-                                            onClick={handleMsLogin}
-                                            disabled={msLoading}
-                                        >
-                                            {msLoading ? '接続中...' : 'Microsoft 連携を開始する'}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     )}
 
-                    {activeTab === 'team' && !currentTeamId && (
+                    {activeTab.startsWith('team-') && !currentTeamId && (
                         <div style={{ padding: '25px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
                             <p style={{ margin: '0 0 8px 0', fontSize: '0.95rem' }}>チームが選択されていません</p>
                             <p style={{ margin: '0 0 18px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                左のサイドバーでチームを選ぶか、チーム名の歯車アイコンから設定したいチームを開いてください。
+                                上の「対象」から設定したいチーム / チャネルを選んでください。
                             </p>
-                            <button className="btn btn-sm btn-primary" onClick={() => setActiveTab('team-mgmt')}>
+                            <button className="btn btn-sm btn-primary" onClick={() => setActiveTab('admin-teams')}>
                                 チーム / チャネルを作る
                             </button>
                         </div>
                     )}
 
-                    {activeTab === 'team' && currentTeamId && (
+                    {activeTab === 'team-basic' && currentTeamId && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
                             <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <h4 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>基本情報</h4>
@@ -925,14 +922,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 </div>
                             </div>
 
+                        </div>
+                    )}
+
+                    {activeTab === 'team-members' && currentTeamId && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
                             <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <h4 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>メンバー管理</h4>
                                 <div style={{ marginBottom: '15px' }}>
                                     <CustomSelect
-                                        placeholder="メンバーを追加..."
+                                        placeholder={memberCandidates.length === 0 ? '追加できる人がいません' : 'メンバーを追加...'}
                                         options={[
                                             { value: '', label: 'メンバーを追加...' },
-                                            ...profiles.filter(p => !members.some(m => m.user_id === p.id)).map(p => ({ value: p.id, label: p.display_name }))
+                                            ...memberCandidates.map(p => ({ value: p.id, label: p.display_name }))
                                         ]}
                                         value=""
                                         onChange={async (val: string | number) => {
@@ -942,6 +944,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                         }}
                                         style={{ height: '36px' }}
                                     />
+                                    {parentTeamId && (
+                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.6 }}>
+                                            ※チャネルには親チーム「{parentTeamName}」のメンバーだけを追加できます。
+                                            {memberCandidates.length === 0 && '（親チームのメンバーは全員参加済みです）'}
+                                            <br />まだ「{parentTeamName}」にいない人は、対象を「{parentTeamName}」に切り替えて先にチームへ追加してください。
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -989,6 +998,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 </div>
                             </div>
 
+                            {/* チームを退出 */}
+                            {(() => {
+                                const isMemberOfTeam = members.some(m => m.user_id === user?.id);
+                                if (!isMemberOfTeam) return null;
+                                const managerCount = members.filter(m => m.role === 'Manager' || m.role === 'manager').length;
+                                const isSoleManager = (members.find(m => m.user_id === user?.id)?.role ?? '').toLowerCase() === 'manager' && managerCount <= 1;
+                                return (
+                                    <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(196,49,75,0.05)', border: '1px solid rgba(196,49,75,0.15)' }}>
+                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--danger)' }}>退出</h4>
+                                        {isSoleManager && (
+                                            <p style={{ fontSize: '0.75rem', color: 'rgba(196,49,75,0.8)', marginBottom: '10px' }}>
+                                                あなたはこのチームの唯一の管理者です。退出する前に他のメンバーを管理者に変更してください。
+                                            </p>
+                                        )}
+                                        <button
+                                            className="btn btn-sm"
+                                            style={{ color: 'var(--danger)', background: 'rgba(196,49,75,0.1)', border: '1px solid rgba(196,49,75,0.3)' }}
+                                            disabled={isSoleManager}
+                                            onClick={async () => {
+                                                if (!user?.id) return;
+                                                if (!window.confirm(`「${currentTeamName}」を退出しますか？`)) return;
+                                                try {
+                                                    await removeMember(user.id);
+                                                    onClose();
+                                                } catch (err: any) {
+                                                    alert('退出に失敗しました: ' + err.message);
+                                                }
+                                            }}
+                                        >
+                                            チームを退出
+                                        </button>
+                                    </div>
+                                );
+                            })()}
+
+                        </div>
+                    )}
+
+                    {activeTab === 'team-tags' && currentTeamId && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
                             <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <h4 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>タグ管理</h4>
                                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
@@ -1059,47 +1108,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                     })()}
                                 </div>
                             </div>
-                            {/* チームを退出 */}
-                            {(() => {
-                                const isMemberOfTeam = members.some(m => m.user_id === user?.id);
-                                if (!isMemberOfTeam) return null;
-                                const managerCount = members.filter(m => m.role === 'Manager' || m.role === 'manager').length;
-                                const isSoleManager = (members.find(m => m.user_id === user?.id)?.role ?? '').toLowerCase() === 'manager' && managerCount <= 1;
-                                return (
-                                    <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(196,49,75,0.05)', border: '1px solid rgba(196,49,75,0.15)' }}>
-                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--danger)' }}>退出</h4>
-                                        {isSoleManager && (
-                                            <p style={{ fontSize: '0.75rem', color: 'rgba(196,49,75,0.8)', marginBottom: '10px' }}>
-                                                あなたはこのチームの唯一の管理者です。退出する前に他のメンバーを管理者に変更してください。
-                                            </p>
-                                        )}
-                                        <button
-                                            className="btn btn-sm"
-                                            style={{ color: 'var(--danger)', background: 'rgba(196,49,75,0.1)', border: '1px solid rgba(196,49,75,0.3)' }}
-                                            disabled={isSoleManager}
-                                            onClick={async () => {
-                                                if (!user?.id) return;
-                                                if (!window.confirm(`「${currentTeamName}」を退出しますか？`)) return;
-                                                try {
-                                                    await removeMember(user.id);
-                                                    onClose();
-                                                } catch (err: any) {
-                                                    alert('退出に失敗しました: ' + err.message);
-                                                }
-                                            }}
-                                        >
-                                            チームを退出
-                                        </button>
-                                    </div>
-                                );
-                            })()}
 
-                            {/* Extra space to ensure dropdowns at the bottom are not clipped by the scroll container */}
-                            <div style={{ height: '180px' }}></div>
                         </div>
                     )}
 
-                    {activeTab === 'admin' && isAdmin && (
+                    {activeTab === 'team-channels' && currentTeamId && (() => {
+                        const rootId = String(scopedTeam?.parent_id || currentTeamId);
+                        const rootTeam = teams.find(t => String(t.id) === rootId);
+                        const channels = teams.filter(t => String(t.parent_id || '') === rootId);
+                        return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'var(--accent)' }}>
+                                        「{rootTeam?.name || currentTeamName}」のチャネル
+                                    </h4>
+                                    <p style={{ margin: '0 0 14px 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                                        チャネルはチームの中の話題ごとの部屋です。投稿はチャネル単位に分かれます。
+                                    </p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
+                                        {channels.length === 0 ? (
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>まだチャネルがありません</span>
+                                        ) : channels.map(c => (
+                                            <div key={c.id} style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'minmax(0, 1fr) 64px',
+                                                alignItems: 'center',
+                                                gap: '10px',
+                                                padding: '8px 10px',
+                                                borderRadius: '8px',
+                                                background: 'rgba(255,255,255,0.03)'
+                                            }}>
+                                                <span style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}># {c.name}</span>
+                                                <button
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{ height: '28px', boxSizing: 'border-box', padding: '0 10px', fontSize: '0.75rem' }}
+                                                    onClick={() => {
+                                                        setIsCreatingTeam(false);
+                                                        setSelectedTeamId(String(c.id));
+                                                        setActiveTab('admin-teams');
+                                                    }}
+                                                >編集</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {(isAdmin || canManageTeam) && (
+                                        <button
+                                            className="btn btn-sm btn-primary"
+                                            style={{ height: '32px' }}
+                                            onClick={() => startCreateChannel(rootId)}
+                                        >＋ チャネルを追加</button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {activeTab === 'admin-users' && isAdmin && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {/* --- User Management Header Stats --- */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
@@ -1529,7 +1593,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         </div>
                     )}
 
-                    {activeTab === 'team-mgmt' && (isAdmin || canManageTeam || profile?.role !== 'Viewer') && (
+                    {activeTab === 'admin-teams' && (isAdmin || canManageTeam || profile?.role !== 'Viewer') && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {(isAdmin || canManageTeam) && (
                                 <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(0,183,189,0.06)', border: '1px solid rgba(0,183,189,0.2)' }}>
@@ -1684,7 +1748,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                     )}
                                 </div>
                             </div>
-                            <div style={{ height: '180px' }}></div>
                         </div>
                     )}
 
@@ -1694,9 +1757,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                         </div>
                     )}
 
-                    {activeTab === 'outlook' && (
-                        <OutlookWatchSettings />
+                    {activeTab === 'integrations' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ padding: '15px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <svg width="18" height="18" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <rect width="11" height="11" fill="#F25022" />
+                                        <rect x="12" width="11" height="11" fill="#7FBA00" />
+                                        <rect y="12" width="11" height="11" fill="#00A4EF" />
+                                        <rect x="12" y="12" width="11" height="11" fill="#FFB900" />
+                                    </svg>
+                                    Microsoft Graph (OneDrive) 連携
+                                </h4>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
+                                    ファイルを OneDrive にアップロードしたり、添付ファイルをダウンロードしたりするために必要です。
+                                </p>
+
+                                {(msAccount || hasExternalToken) ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '10px 15px', borderRadius: '8px' }}>
+                                        <div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{msAccount?.name || msAccount?.username || profile?.display_name || profile?.email || '連携済み'}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{msAccount?.username || profile?.email}</div>
+                                        </div>
+                                        {msAccount && (
+                                            <button
+                                                className="btn btn-sm"
+                                                style={{ color: 'var(--danger)', background: 'rgba(196, 49, 75, 0.1)', border: '1px solid rgba(196, 49, 75, 0.2)' }}
+                                                onClick={handleMsLogout}
+                                                disabled={msLoading}
+                                            >
+                                                連携解除
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ textAlign: 'center', padding: '10px' }}>
+                                        <button
+                                            className="btn btn-primary"
+                                            style={{ background: '#2F2F2F', color: 'white', border: '1px solid #444' }}
+                                            onClick={handleMsLogin}
+                                            disabled={msLoading}
+                                        >
+                                            {msLoading ? '接続中...' : 'Microsoft 連携を開始する'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <OutlookWatchSettings />
+                        </div>
                     )}
+                    </div>
                 </div>
             </div>
         </div >
