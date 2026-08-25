@@ -267,6 +267,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     /** 計測対象の出入り。ref コールバックからそのまま渡す。
      *  ★id ごとに同じ関数を返すこと。毎レンダで新しい関数を渡すと React が
      *    ref(null) → ref(el) を呼び直し、全カードで unobserve/observe が走る。 */
+    const hasRenderedRef = React.useRef(false);
     const measureCbs = React.useRef(new Map<string, (el: HTMLDivElement | null) => void>());
     const measureRef = (id: string) => {
         let cb = measureCbs.current.get(id);
@@ -455,7 +456,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         }
     }, [scrollToThreadId, threadsLoading, threads, onScrollComplete]);
 
-    if (threadsLoading && threads.length === 0) {
+    // 初回起動時だけ何も出さない。以降は枠(フィルタタブ等)を残したまま
+    // 中身だけ差し替える。チャネル切替のたびにパネルごと消えると、
+    // 速くなっていても「一瞬飛ぶ」ぶん遅く見える。
+    if (threads.length > 0) hasRenderedRef.current = true;
+    if (threadsLoading && threads.length === 0 && !hasRenderedRef.current) {
         return null;
     }
 
@@ -1100,7 +1105,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
             {visibleThreads.length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    表示する投稿がありません。
+                    {threadsLoading ? '読み込み中...' : '表示する投稿がありません。'}
                 </div>
             ) : (
                 visibleThreads

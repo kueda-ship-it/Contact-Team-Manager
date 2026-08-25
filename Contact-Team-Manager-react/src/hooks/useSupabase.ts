@@ -88,6 +88,8 @@ interface Thread {
     reminders?: { id: string; remind_at: string; reminder_sent: boolean }[];
 }
 
+const VIEW_CACHE_MAX = 12;
+
 // 検索ヒットの取得上限。号機のような数字は 1〜2 文字で数千件に当たるため、
 // 新しい順にこの件数だけ引く(描画コストの上限を切る)。
 const SEARCH_RESULT_LIMIT = 200;
@@ -144,6 +146,14 @@ export function useThreads(
     // 上書きされる(= 検索が解ける)のを防ぐ。
     const fetchSeqRef = useRef(0);
 
+    // チャネル(＋フィルタ/並び/検索語)単位の表示キャッシュ。
+    // ★hook インスタンスごとに持つこと。モジュール共有にすると、同じ条件で
+    //   件数だけ違う呼び出し(フィード=50件 / ダッシュボード=全件)が同じキーで
+    //   ぶつかる。limit をキーに混ぜる案は、追加読み込みのたびにキャッシュが
+    //   外れて一覧が一瞬消えるので採らない。
+    const viewCacheRef = useRef(new Map<string, Thread[]>());
+    const viewKeyRef = useRef('');
+
     const fetchThreads = useCallback(async (silent = false) => {
         const seq = ++fetchSeqRef.current;
         try {
@@ -158,7 +168,10 @@ export function useThreads(
             console.log(`[useThreads] Fetching. Team: ${teamId}, Filter: ${filter}, Search: ${searchQuery}, Silent: ${silent}`);
 
             // Only show loading if we really have no data for the current team
-            const isDifferentTeam = threads.length > 0 && teamId !== null && threads[0].team_id !== Number(teamId);
+            // ★team_id は uuid。Number(teamId) は必ず NaN になり、この判定は
+            //   「常に別チーム」として成立していた（＝毎回ローディング表示）。文字列で比べる。
+            const isDifferentTeam = threads.length > 0 && teamId !== null
+                && String(threads[0].team_id) !== String(teamId);
             if (!silent && (threads.length === 0 || isDifferentTeam)) setLoading(true);
             setError(null);
             
@@ -224,6 +237,9 @@ export function useThreads(
             if (ascending) {
                 result = [...result].reverse();
             }
+            const cache = viewCacheRef.current;
+            if (cache.size > VIEW_CACHE_MAX) cache.clear();
+            cache.set(viewKeyRef.current, result as Thread[]);
             setThreads(result as Thread[]);
         } catch (error: any) {
             console.error('Error fetching threads:', error);
@@ -233,8 +249,26 @@ export function useThreads(
         }
     }, [teamId, profile?.id, memberships.length, limit, ascending, filter, searchQuery]);
 
+    // チャネル切替を「待たせない」ための表示キャッシュ。
+    // 一度見たチャネルは、往復(実測 約200ms。DB は 3ms で残りは日本〜シンガポール間の
+    // 往復)を待たずに前回の内容を即座に出し、裏で silent に取り直して差し替える。
+    // これが無いと、クリックしてから前のチャネルの内容が出たままになり
+    // 「ワンテンポ遅れて切り替わる」ように見える。
+    const viewKey = `${teamId ?? ''}|${filter}|${ascending}|${searchQuery.trim()}`;
+    viewKeyRef.current = viewKey;
+
     useEffect(() => {
-        fetchThreads();
+        const cached = viewCacheRef.current.get(viewKey);
+        if (cached) {
+            setThreads(cached);
+            setLoading(false);
+            fetchThreads(true);        // 表示は即座。更新は裏で
+        } else {
+            setThreads([]);            // 初見のチャネルは古い内容を残さない
+            fetchThreads();
+        }
+        // viewKey は fetchThreads の依存の部分集合なので、依存は fetchThreads だけでよい
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetchThreads]);
 
     // realtime のコールバックは ref 経由で最新を呼ぶ。fetchThreads を購読の依存に入れると、
