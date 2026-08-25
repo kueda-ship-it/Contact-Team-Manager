@@ -547,7 +547,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             const t = threads.find((x: any) => String(x.id) === String(threadId));
             if (t && !(await confirmIfFcNotDone(t))) return;
         }
-        const payload: any = { status: newStatus };
+        const payload: any = { status: newStatus, completed_auto: false };
         if (newStatus === 'completed') {
             payload.completed_by = user.id;
             payload.completed_at = new Date().toISOString();
@@ -1114,7 +1114,14 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         const authorAvatar = authorProfile?.avatar_url;
 
                         const completerProfile = thread.completed_by ? profiles.find(p => p.id === thread.completed_by) : null;
-                        const completerName = completerProfile?.display_name || completerProfile?.email || 'Unknown';
+                        // FC 連動などで自動完了したものは「誰が押したか」が存在しない。
+                        // completed_by が空なだけで判定すると、昔の手動完了（completed_by が
+                        // 入っていない古いデータ）まで「自動」と偽ってしまうので、
+                        // completed_auto を見る。
+                        const isAutoCompleted = !!thread.completed_auto;
+                        const completerName = isAutoCompleted
+                            ? '自動完了'
+                            : (completerProfile?.display_name || completerProfile?.email || 'Unknown');
 
                         return (
                             <div
@@ -1734,10 +1741,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                         <polyline points="20 6 9 17 4 12"></polyline>
                                                     </svg>
-                                                    {completerProfile?.avatar_url && (
+                                                    {!isAutoCompleted && completerProfile?.avatar_url && (
                                                         <img src={completerProfile.avatar_url} alt="" style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} />
                                                     )}
-                                                    <span style={{ fontWeight: 600 }}>完了者: {completerName}</span>
+                                                    <span style={{ fontWeight: 600 }}>
+                                                        {isAutoCompleted ? '自動完了（FC連動）' : `完了者: ${completerName}`}
+                                                    </span>
                                                     <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.completed_at)}</span>
                                                 </div>
                                             )}

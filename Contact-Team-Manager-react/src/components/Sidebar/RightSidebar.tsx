@@ -168,7 +168,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         if (!thread) return;
 
         const newStatus = thread.status === 'completed' ? 'pending' : 'completed';
-        const payload: any = { status: newStatus };
+        const payload: any = { status: newStatus, completed_auto: false };
         if (newStatus === 'completed') {
             payload.completed_by = user.id;
             payload.completed_at = new Date().toISOString();

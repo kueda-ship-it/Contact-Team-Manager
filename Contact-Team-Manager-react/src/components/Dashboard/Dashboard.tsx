@@ -152,6 +152,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     // 完了者の表示名(統合済み)を返す
     const getCompleterName = (t: any) => {
+        // 自動完了は誰の実績でもない。投稿者にフォールバックすると
+        // その人の「完了件数」に自動完了ぶんが乗ってしまう。
+        if (t.completed_auto) return '自動完了';
         const completerProfile = t.completed_by ? (profiles.find((p: any) => p.id === t.completed_by)) : null;
         return normalizeUserName(completerProfile?.display_name || completerProfile?.email || t.author_name || t.author || 'Unknown');
     };
