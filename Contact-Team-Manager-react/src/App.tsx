@@ -86,6 +86,13 @@ function App() {
   const [settingsTeamId, setSettingsTeamId] = useState<string | null>(null);
   const [settingsChannelParentId, setSettingsChannelParentId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // 実際に投げる検索語。1 打鍵ごとに全件 ilike を投げると、短い語ほど巨大な
+  // 結果が返り(「1」で 2500 件超)、後着で絞り込み結果を潰してしまう。
+  const [searchTerm, setSearchTerm] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(searchQuery.trim()), 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const [threadsLimit, setThreadsLimit] = useState(50);
   const [sortAscending, setSortAscending] = useState(true);
   const [scrollToThreadId, setScrollToThreadId] = useState<string | null>(null);
@@ -103,9 +110,9 @@ function App() {
 
   const { teams } = useTeams();
   // Ensure we fetch ALL pending items if that filter is active, regardless of default limit
-  const fetchLimit = (statusFilter === 'pending' || statusFilter === 'waiting' || statusFilter === 'mentions' || searchQuery) ? 2000 : threadsLimit;
-  // Pass searchQuery to useThreads for server-side filtering
-  const threadsData = useThreads(currentTeamId, fetchLimit, sortAscending, statusFilter, searchQuery);
+  const fetchLimit = (statusFilter === 'pending' || statusFilter === 'waiting' || statusFilter === 'mentions' || searchTerm) ? 2000 : threadsLimit;
+  // Pass searchTerm (debounced) to useThreads for server-side filtering
+  const threadsData = useThreads(currentTeamId, fetchLimit, sortAscending, statusFilter, searchTerm);
   const { threads: rawThreads, loading: threadsLoading, error: threadsError, refetch } = threadsData;
   const { memberships, loading: membershipsLoading, updateLastRead } = useUserMemberships(user?.id);
   const { unreadTeams } = useUnreadCounts(user?.id, memberships);

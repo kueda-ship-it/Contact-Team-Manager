@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import { useRefetchOnFocus } from './useRefetchOnFocus';
@@ -88,6 +88,46 @@ interface Thread {
     reminders?: { id: string; remind_at: string; reminder_sent: boolean }[];
 }
 
+// 検索ヒットの取得上限。号機のような数字は 1〜2 文字で数千件に当たるため、
+// 新しい順にこの件数だけ引く(描画コストの上限を切る)。
+const SEARCH_RESULT_LIMIT = 200;
+
+
+// ---------------------------------------------------------------------------
+// 参照系テーブル(profiles / teams / tags)の共有フェッチ。
+// これらの hook は ThreadList / PostForm / RightSidebar / TeamsSidebar など
+// 複数コンポーネントで個別に呼ばれており(useTeams は常時 5 インスタンス)、
+// それぞれが 60 秒 polling + フォーカス refetch を持っている。素直に投げると
+// 同じ select が毎分 10 本以上飛ぶ。直近 STALE_MS 以内は共有結果を返し、
+// 同時に走ったものは 1 本に束ねる。
+//
+// 窓を 3 秒と短くしているのは意図的。狙いは「同時多発の重複」を潰すことで
+// あって、キャッシュを効かせて鮮度を落とすことではない(マウント時・フォーカス時・
+// 60秒 polling は各インスタンスでほぼ同時に発火する)。書き込み直後は
+// invalidateShared() で明示的に捨てる。
+// ---------------------------------------------------------------------------
+const SHARED_STALE_MS = 3_000;
+const sharedCache = new Map<string, { at: number; data: any }>();
+const sharedInflight = new Map<string, Promise<any>>();
+
+async function sharedFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    const hit = sharedCache.get(key);
+    if (hit && Date.now() - hit.at < SHARED_STALE_MS) return hit.data as T;
+
+    const running = sharedInflight.get(key);
+    if (running) return running as Promise<T>;
+
+    const p = fetcher()
+        .then(data => { sharedCache.set(key, { at: Date.now(), data }); return data; })
+        .finally(() => { sharedInflight.delete(key); });
+    sharedInflight.set(key, p);
+    return p;
+}
+
+function invalidateShared(key: string) {
+    sharedCache.delete(key);
+}
+
 export function useThreads(
     teamId: number | string | null,
     limit: number = 50,
@@ -100,12 +140,20 @@ export function useThreads(
     const [threads, setThreads] = useState<Thread[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
+    // 発行順を持つカウンタ。後から投げた fetch が先に返った古い fetch に
+    // 上書きされる(= 検索が解ける)のを防ぐ。
+    const fetchSeqRef = useRef(0);
 
     const fetchThreads = useCallback(async (silent = false) => {
+        const seq = ++fetchSeqRef.current;
         try {
-            // 未完了/メンション/検索は取りこぼしが出ないよう全件対象(0 = ページングで全件)
+            // 未完了/メンションは取りこぼしが出ないよう全件対象(0 = ページングで全件)。
+            // 検索は上限付き: 「1」のような短い語は全体の 9 割 (2500件超) にヒットし、
+            // replies 込みで全件引くと数秒〜十数秒フリーズして入力を受け付けなくなる。
             const isSearching = searchQuery.trim().length > 0;
-            const effectiveLimit = (filter === 'pending' || filter === 'waiting' || filter === 'mentions' || isSearching) ? 0 : limit;
+            const effectiveLimit = isSearching
+                ? SEARCH_RESULT_LIMIT
+                : ((filter === 'pending' || filter === 'waiting' || filter === 'mentions') ? 0 : limit);
 
             console.log(`[useThreads] Fetching. Team: ${teamId}, Filter: ${filter}, Search: ${searchQuery}, Silent: ${silent}`);
 
@@ -170,6 +218,8 @@ export function useThreads(
                 if (!data || data.length < to - from + 1) break;
             }
 
+            if (seq !== fetchSeqRef.current) return;   // 追い越された古いレスポンスは捨てる
+
             let result = rows;
             if (ascending) {
                 result = [...result].reverse();
@@ -177,15 +227,27 @@ export function useThreads(
             setThreads(result as Thread[]);
         } catch (error: any) {
             console.error('Error fetching threads:', error);
-            setError(error);
+            if (seq === fetchSeqRef.current) setError(error);
         } finally {
-            setLoading(false);
+            if (seq === fetchSeqRef.current) setLoading(false);
         }
     }, [teamId, profile?.id, memberships.length, limit, ascending, filter, searchQuery]);
 
     useEffect(() => {
         fetchThreads();
+    }, [fetchThreads]);
 
+    // realtime のコールバックは ref 経由で最新を呼ぶ。fetchThreads を購読の依存に入れると、
+    // 検索語・フィルタ・並び順を変えるたびにチャネルを張り直すことになる。
+    const fetchRef = useRef(fetchThreads);
+    fetchRef.current = fetchThreads;
+
+    // memberships は updateLastRead（チャネル切替のたびに走る）で毎回新しい配列になる。
+    // 参照をそのまま依存にすると、切替のたびに購読を張り直したうえ fetch がもう1本走る。
+    // 中身（team_id の集合）が同じなら張り直さない。
+    const membershipKey = memberships.map((m: any) => String(m.team_id)).join(',');
+
+    useEffect(() => {
         // filter 用の team_id 集合を組み立てる。
         // - 単一チーム表示 (teamId 指定): その team のみ
         // - 全件表示 (teamId=null): Admin は購読しない (filter 不可で Egress 暴走 #33)、
@@ -195,7 +257,7 @@ export function useThreads(
         if (teamId !== null && teamId !== '') {
             filterIds = [String(teamId)];
         } else if (!isAdmin) {
-            filterIds = memberships.map(m => String(m.team_id));
+            filterIds = membershipKey ? membershipKey.split(',') : [];
         }
         if (filterIds.length === 0) return; // Admin 全件表示など → realtime 諦め
 
@@ -211,7 +273,7 @@ export function useThreads(
                 table: 'threads',
                 filter: filterExpr,
             }, () => {
-                fetchThreads(true);
+                fetchRef.current(true);
             })
             .subscribe();
 
@@ -226,7 +288,7 @@ export function useThreads(
                 table: 'replies',
                 filter: filterExpr,
             }, () => {
-                fetchThreads(true);
+                fetchRef.current(true);
             })
             .subscribe();
 
@@ -234,7 +296,7 @@ export function useThreads(
             supabase.removeChannel(threadsChannel);
             supabase.removeChannel(repliesChannel);
         };
-    }, [fetchThreads, teamId, profile?.role, memberships]);
+    }, [teamId, profile?.role, membershipKey]);
 
     // Admin の全件表示時は filter 不可 (memberships に無い team も見る)
     // で realtime 諦め → 60秒 polling で代替する。
@@ -254,12 +316,14 @@ export function useTeams() {
     const fetchTeams = useCallback(async (silent = false) => {
         try {
             if (!silent) setLoading(true);
-            const { data, error } = await supabase
-                .from('teams')
-                .select('*')
-                .order('name', { ascending: true });
-
-            if (error) throw error;
+            const data = await sharedFetch('teams', async () => {
+                const { data, error } = await supabase
+                    .from('teams')
+                    .select('*')
+                    .order('name', { ascending: true });
+                if (error) throw error;
+                return data || [];
+            });
 
             const isAdmin = profile?.role === 'Admin';
             if (isAdmin) {
@@ -304,11 +368,14 @@ export function useProfiles() {
     const fetchProfiles = useCallback(async (silent = false) => {
         try {
             if (!silent) setLoading(true);
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*');
+            const data = await sharedFetch('profiles', async () => {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*');
+                if (error) throw error;
+                return data || [];
+            });
 
-            if (error) throw error;
             setProfiles((data || []).map((p: any) => ({ ...p, role: normalizeRole(p.role) })));
         } catch (error) {
             console.error('Error fetching profiles:', error);
@@ -335,12 +402,15 @@ export function useTags() {
     const fetchTags = useCallback(async (silent = false) => {
         try {
             if (!silent) setLoading(true);
-            const { data, error } = await supabase
-                .from('tags')
-                .select('*')
-                .order('name', { ascending: true });
+            const data = await sharedFetch('tags', async () => {
+                const { data, error } = await supabase
+                    .from('tags')
+                    .select('*')
+                    .order('name', { ascending: true });
+                if (error) throw error;
+                return data || [];
+            });
 
-            if (error) throw error;
             setTags(data || []);
         } catch (error) {
             console.error('Error fetching tags:', error);
@@ -363,12 +433,14 @@ export function useTags() {
         if (color) insertData.color = color;
         const { error } = await supabase.from('tags').insert(insertData);
         if (error) throw error;
+        invalidateShared('tags');
         await fetchTags(true);
     }, [fetchTags]);
 
     const deleteTag = useCallback(async (tagId: string | number) => {
         const { error } = await supabase.from('tags').delete().eq('id', tagId);
         if (error) throw error;
+        invalidateShared('tags');
         await fetchTags(true);
     }, [fetchTags]);
 
@@ -709,11 +781,35 @@ export function usePopularTeamId(userId: string | undefined) {
 
 export function useUnreadCounts(userId: string | undefined, memberships: any[]) {
     const [unreadTeams, setUnreadTeams] = useState<Set<string>>(new Set());
+    // チームごとの最終投稿時刻。last_read_at だけが動いたとき(= チャネルを開いた直後)は
+    // これを使い回して再計算するだけにする。毎回 500 件引き直さない。
+    const latestActivityRef = useRef<{ [teamId: string]: string }>({});
+    const membershipsRef = useRef(memberships);
+    membershipsRef.current = memberships;
+
+    const membershipKey = memberships.map(m => String(m.team_id)).join(',');
+    const lastReadKey = memberships.map(m => `${m.team_id}:${m.last_read_at || ''}`).join(',');
+
+    const recompute = useCallback(() => {
+        const latestActivity = latestActivityRef.current;
+        const unread = new Set<string>();
+        membershipsRef.current.forEach(m => {
+            const tid = String(m.team_id);
+            const lastRead = m.last_read_at || '1970-01-01T00:00:00Z';
+            if (latestActivity[tid] && latestActivity[tid] > lastRead) {
+                unread.add(tid);
+            }
+        });
+        setUnreadTeams(unread);
+    }, []);
+
+    // 既読時刻が動いただけなら再取得せずその場で計算し直す
+    useEffect(() => { recompute(); }, [lastReadKey, recompute]);
 
     useEffect(() => {
-        if (!userId || memberships.length === 0) return;
+        if (!userId || !membershipKey) return;
 
-        const memberTeamIds = memberships.map(m => m.team_id);
+        const memberTeamIds = membershipKey.split(',');
 
         const checkUnread = async () => {
             // Fetch only threads belonging to user's teams, selecting minimal fields
@@ -736,16 +832,8 @@ export function useUnreadCounts(userId: string | undefined, memberships: any[]) 
                     latestActivity[tid] = t.created_at;
                 }
             });
-
-            const unread = new Set<string>();
-            memberships.forEach(m => {
-                const tid = String(m.team_id);
-                const lastRead = m.last_read_at || '1970-01-01T00:00:00Z';
-                if (latestActivity[tid] && latestActivity[tid] > lastRead) {
-                    unread.add(tid);
-                }
-            });
-            setUnreadTeams(unread);
+            latestActivityRef.current = latestActivity;
+            recompute();
         };
 
         checkUnread();
@@ -773,7 +861,9 @@ export function useUnreadCounts(userId: string | undefined, memberships: any[]) 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [userId, memberships]);
+        // memberships の参照ではなく所属チームの集合で見る。updateLastRead のたびに
+        // 購読を張り直して 500 件引き直すのを避ける（チャネル切替が遅くなる）。
+    }, [userId, membershipKey, recompute]);
 
     return { unreadTeams };
 }
