@@ -75,13 +75,18 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
 
     const quickReplyRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
 
+    // 件数は ref で見る。state を依存に入れると、取得 → 件数変化 → コールバック再生成
+    // → effect 再実行 → もう1回取得、と1回の切替で2回引くことになる。
+    const pendingCountRef = React.useRef(0);
+    React.useEffect(() => { pendingCountRef.current = pendingThreads.length; }, [pendingThreads.length]);
+
     // Fetch all pending threads separately
     const fetchPendingThreads = React.useCallback(async (silent = false) => {
         if (!user) return;
-        
+
         // Only show loading if we really have nothing to show
-        if (!silent && pendingThreads.length === 0) setPendingLoading(true);
-        
+        if (!silent && pendingCountRef.current === 0) setPendingLoading(true);
+
         try {
             // Fetch pending threads regardless of limit (up to 2000 safe limit)
             // Filter by currentTeamId if selected, or all if not.
@@ -113,17 +118,26 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         } finally {
             setPendingLoading(false);
         }
-    }, [currentTeamId, user, currentProfile, pendingThreads.length]);
+    }, [currentTeamId, user, currentProfile]);
 
     // Initial fetch and on team change
     React.useEffect(() => {
         fetchPendingThreads();
     }, [fetchPendingThreads]);
 
-    // Re-fetch when main threads update - use silent mode to avoid Loading flash
+    // メインフィードが「中身として」変わったときだけ引き直す。
+    // threads は fetch のたびに新しい配列になるので、配列の参照を依存にすると
+    // 同じ内容が返ってきただけでも未完了リストを引き直してしまう（60秒 polling や
+    // realtime のたびに 2000件クエリが走っていた）。
+    const mainSig = React.useMemo(
+        () => (mainThreads || [])
+            .map((t: any) => `${t.id}:${t.status}:${t.waiting_contact ? 1 : 0}:${(t.replies || []).length}`)
+            .join(','),
+        [mainThreads]
+    );
     React.useEffect(() => {
         fetchPendingThreads(true);
-    }, [threadsData.threads, fetchPendingThreads]);
+    }, [mainSig]);   // eslint-disable-line react-hooks/exhaustive-deps
 
     const {
         isOpen,

@@ -1074,3 +1074,27 @@ body.light-mode .reply-content .mention:hover {
     transform: none !important;
 }
 
+
+/* ────────────────────────────────────────────────────────────────
+   画面外カードの描画スキップ（2026-08-25）
+   ★.task-card は 1枚ごとに backdrop-filter: blur(24px) を持つ。フィードには
+     50〜200枚、右の未完了リストにも100枚超が並ぶので、そのまま描くと
+     チャネル切替・スクロール・再描画のたびに全枚数ぶんの背景ぼかしが走る。
+     これがチャネル切替の「もっさり」の主因。
+   ★content-visibility: auto は「画面に入っていない要素はレイアウト/描画ごと
+     スキップする」指定。見た目は一切変えずに、実際に描くカードだけに絞れる。
+   ★contain-intrinsic-size の auto は「最後に描画したときの実寸」を覚えるので、
+     スクロールバーの長さが暴れない。数値はまだ一度も描いていないカードの仮の高さ。
+   ★カード内の fixed 配置ポップアップ（DotMenu / メンション候補 / 日時ピッカー）は
+     いずれも document.body への portal なので、封じ込めの影響を受けない。
+     **カード内に portal しない fixed 要素を足すときはここを見直すこと。**
+   ──────────────────────────────────────────────────────────────── */
+.feed-list .task-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 240px;
+}
+
+.side-panel .task-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 150px;
+}

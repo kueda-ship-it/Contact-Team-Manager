@@ -10,7 +10,6 @@ import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { CustomSelect } from '../common/CustomSelect';
-import { LinkPreview } from '../common/LinkPreview';
 import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
 import { DotMenu } from '../common/DotMenu';
 
@@ -88,14 +87,6 @@ const ThreadImage: React.FC<{
             style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}
         />
     );
-};
-
-// Helper to extract URLs from text
-const extractUrls = (text: string | null): string[] => {
-    if (!text) return [];
-    const urlRegex = /((?:https?|file):\/\/[^\s<]+[^<.,:;"')\s])/g;
-    const matches = text.match(urlRegex);
-    return matches ? Array.from(new Set(matches)) : [];
 };
 
 interface ThreadListProps {
@@ -244,8 +235,14 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     }, [openMenuId]);
 
     // Measure heights to detect if they exceed thresholds (200px for threads, 100px for replies)
-    React.useLayoutEffect(() => {
-        const observer = new ResizeObserver((entries) => {
+    //
+    // ★ObserverはコンポーネントにつきResizeObserver 1個だけ作り、要素の出入りは
+    //   ref コールバックで observe/unobserve する。以前は threads が変わるたびに
+    //   （60秒 polling や realtime の取り直しでも）Observer を作り直して
+    //   150〜200要素を observe し直しており、そのたびにレイアウトを強制していた。
+    const observerRef = React.useRef<ResizeObserver | null>(null);
+    if (observerRef.current === null && typeof ResizeObserver !== 'undefined') {
+        observerRef.current = new ResizeObserver((entries) => {
             setNeedsExpandMap(prev => {
                 const next = { ...prev };
                 let changed = false;
@@ -264,13 +261,28 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 return changed ? next : prev;
             });
         });
+    }
+    React.useEffect(() => () => { observerRef.current?.disconnect(); observerRef.current = null; }, []);
 
-        Object.values(measureRefs.current).forEach(el => {
-            if (el) observer.observe(el);
-        });
-
-        return () => observer.disconnect();
-    }, [threads]); // Re-observe when threads change (new items added)
+    /** 計測対象の出入り。ref コールバックからそのまま渡す。
+     *  ★id ごとに同じ関数を返すこと。毎レンダで新しい関数を渡すと React が
+     *    ref(null) → ref(el) を呼び直し、全カードで unobserve/observe が走る。 */
+    const measureCbs = React.useRef(new Map<string, (el: HTMLDivElement | null) => void>());
+    const measureRef = (id: string) => {
+        let cb = measureCbs.current.get(id);
+        if (!cb) {
+            cb = (el: HTMLDivElement | null) => {
+                const prev = measureRefs.current[id];
+                if (prev === el) return;
+                if (prev) observerRef.current?.unobserve(prev);
+                measureRefs.current[id] = el;
+                if (el) observerRef.current?.observe(el);
+            };
+            if (measureCbs.current.size > 5000) measureCbs.current.clear();
+            measureCbs.current.set(id, cb);
+        }
+        return cb;
+    };
 
     const toggleExpand = (id: string) => {
         setExpandedThreads(prev => {
@@ -394,6 +406,20 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         });
     }, [threads, sortAscending]);
 
+    // 表示対象。以前は同じ filter を「0件判定用」と「描画用」で2回まわしていた。
+    // mentions フィルタは本文＋全返信を走査するので、素直に2回やると効く。
+    const visibleThreads = React.useMemo(() => displayThreads.filter(thread => {
+        if (statusFilter === 'pending') return thread.status === 'pending';
+        if (statusFilter === 'waiting') return thread.status === 'pending' && thread.waiting_contact;
+        if (statusFilter === 'completed') return thread.status === 'completed';
+        if (statusFilter === 'mentions') {
+            return hasMention(thread.content, currentProfile, user?.email || null) ||
+                (thread.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
+        }
+        if (statusFilter === 'myposts') return thread.user_id === user?.id;
+        return true;
+    }), [displayThreads, statusFilter, currentProfile, user?.email, user?.id]);
+
     // Handle scroll to specific thread (from sidebar navigation)
     React.useEffect(() => {
         if (scrollToThreadId && !threadsLoading && threads.length > 0) {
@@ -476,19 +502,32 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         if (!m || !/FC追記/.test(thread?.title || '')) return true;
         const refno = m[1];
         try {
+            // select('*') なのは memo_read 列が無い環境でも 400 にしないため
             const { data } = await supabase
-                .from('fc_watch_case').select('status, updated_at').eq('refno', refno).maybeSingle();
+                .from('fc_watch_case').select('*').eq('refno', refno).maybeSingle();
             const st = (data?.status || '').trim();
             if (!st) return true;                                   // 状況不明なら通す
+
+            // 自動完了と同じ条件を見る（放っておいても閉じるものは黙って通す）。
+            //   (1) 対応完了 / 対応報告済み            … 既読は問わない
+            //   (2) 対応中 / 引継済 以外 かつ 追記が既読 … 2026-08-25 追加
             if (st.includes('対応完了') || st.includes('対応報告済み')) return true;
+            const inProgress = st.includes('対応中') || st.includes('引継');
+            const memoRead = !!(data as any)?.memo_read;
+            if (!inProgress && memoRead) return true;
+
             const when = data?.updated_at
                 ? new Date(data.updated_at).toLocaleString('ja-JP', { hour12: false })
                 : '';
             return window.confirm(
                 'FC 側はまだ完了していません。\n\n'
                 + `　依頼番号: ${refno}\n`
-                + `　FC の状況: ${st}${when ? `（${when} 時点）` : ''}\n\n`
-                + '対応報告済み / 対応完了 になると自動で完了になります。\n'
+                + `　FC の状況: ${st}${when ? `（${when} 時点）` : ''}\n`
+                + `　追記の既読: ${memoRead ? '確認済み' : '未確認'}\n\n`
+                + (inProgress
+                    ? '「対応中 / 引継済」の間は、追記が既読でも自動完了しません。\n'
+                    : '追記が FC 側で確認済みになれば自動で完了になります。\n')
+                + '（対応報告済み / 対応完了 になった場合も自動で完了します）\n'
                 + 'それでも今ここで完了にしますか？'
             );
         } catch {
@@ -1059,39 +1098,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 </div>
             )}
 
-            {displayThreads
-                .filter(thread => {
-                    if (statusFilter === 'pending') return thread.status === 'pending';
-                    if (statusFilter === 'waiting') return thread.status === 'pending' && thread.waiting_contact;
-                    if (statusFilter === 'completed') return thread.status === 'completed';
-                    if (statusFilter === 'mentions') {
-                        return hasMention(thread.content, currentProfile, user?.email || null) ||
-                            (thread.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
-                    }
-                    if (statusFilter === 'myposts') {
-                        return thread.user_id === user?.id;
-                    }
-                    return true;
-                })
-                .length === 0 ? (
+            {visibleThreads.length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     表示する投稿がありません。
                 </div>
             ) : (
-                displayThreads
-                    .filter(thread => {
-                        if (statusFilter === 'pending') return thread.status === 'pending';
-                        if (statusFilter === 'waiting') return thread.status === 'pending' && thread.waiting_contact;
-                        if (statusFilter === 'completed') return thread.status === 'completed';
-                        if (statusFilter === 'mentions') {
-                            return hasMention(thread.content, currentProfile, user?.email || null) ||
-                                (thread.replies || []).some((r: any) => hasMention(r.content, currentProfile, user?.email || null));
-                        }
-                        if (statusFilter === 'myposts') {
-                            return thread.user_id === user?.id;
-                        }
-                        return true;
-                    })
+                visibleThreads
                     .map(thread => {
                         const authorProfile = getProfile(thread.author);
                         const authorAvatar = authorProfile?.avatar_url;
@@ -1362,18 +1374,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     <>
                                         <div className={`thread-expandable-wrapper ${expandedThreads.has(thread.id) ? 'expanded' : (needsExpandMap[thread.id] ? 'collapsed' : 'none')}`}>
                                             <div
-                                                ref={(el) => { if (el) measureRefs.current[thread.id] = el; }}
+                                                ref={measureRef(thread.id)}
                                                 data-measure-id={thread.id}
                                                 className="task-content"
                                                 dangerouslySetInnerHTML={{ __html: highlightMentions(thread.content, mentionOptions) }}
                                                 style={{ whiteSpace: 'pre-wrap' }}
                                             />
-
-                                            <div className="link-previews">
-                                                {extractUrls(thread.content).map((url, idx) => (
-                                                    <LinkPreview key={idx} url={url} />
-                                                ))}
-                                            </div>
 
                                             {renderAttachments(thread.attachments)}
 
@@ -1494,17 +1500,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                         <div className="reply-body-container">
                                                                             <div className={`reply-expandable-wrapper ${(needsReplyExpand && !expandedThreads.has(reply.id)) ? 'collapsed' : 'expanded'}`}>
                                                                                 <div
-                                                                                    ref={(el) => { if (el) measureRefs.current[`reply-${reply.id}`] = el; }}
+                                                                                    ref={measureRef(`reply-${reply.id}`)}
                                                                                     data-measure-id={`reply-${reply.id}`}
                                                                                     className="reply-content"
                                                                                     dangerouslySetInnerHTML={{ __html: highlightMentions(reply.content, mentionOptions) }}
-                                                                                />
-                                                                                <div className="link-previews">
-                                                                                    {extractUrls(reply.content).map((url, idx) => (
-                                                                                        <LinkPreview key={idx} url={url} />
-                                                                                    ))}
-                                                                                </div>
-                                                                                {renderAttachments(reply.attachments)}
+                                                                                />                                                                                {renderAttachments(reply.attachments)}
                                                                             </div>
 
                                                                             {needsReplyExpand && (
@@ -1567,7 +1567,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                     return;
                                                                 }
                                                             }
-                                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                            // IME 変換確定の Enter で送信しない(サイドバーの簡易返信と同じ扱い)
+                                                            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                                                 e.preventDefault();
                                                                 handleAddReply(thread.id);
                                                             }
