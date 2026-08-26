@@ -212,6 +212,9 @@ export function WaterDateTimePicker({
     const handleOpen = () => {
         if (disabled) return;
         if (!open) {
+            // 値が無いときは今日を選択状態にしておく。カレンダー上で今日が
+            // 選択されて見えるのに内部では未選択、という食い違いをなくす。
+            if (!selDate) setSelDate(today);
             calcPosition();
             setOpen(true);
         } else {
@@ -234,16 +237,31 @@ export function WaterDateTimePicker({
         onChange(toLocalDateTimeString(d, hour, minute));
     };
 
+    // 日付が未選択でも時刻の変更を捨てない。
+    // ★以前は `if (selDate)` で握りつぶしていたため、カレンダーの日付セルを
+    //   クリックせずに時刻だけ合わせて「確定」すると、何も入らないまま閉じた。
     const handleHour = (v: number) => {
         const h = Math.max(0, Math.min(23, v));
         setHour(h);
-        if (selDate) onChange(toLocalDateTimeString(selDate, h, minute));
+        const d = selDate ?? today;
+        if (!selDate) setSelDate(d);
+        onChange(toLocalDateTimeString(d, h, minute));
     };
 
     const handleMinute = (v: number) => {
         const min = Math.max(0, Math.min(59, v));
         setMinute(min);
-        if (selDate) onChange(toLocalDateTimeString(selDate, hour, min));
+        const d = selDate ?? today;
+        if (!selDate) setSelDate(d);
+        onChange(toLocalDateTimeString(d, hour, min));
+    };
+
+    // 「確定」は閉じるだけではなく、**表示されている選択をそのまま確定する**。
+    // 画面には日付が選択済みに見えている（既定で今日）のに、押しても何も
+    // 入らないのは意図と違う。
+    const confirm = () => {
+        onChange(toLocalDateTimeString(selDate ?? today, hour, minute));
+        setOpen(false);
     };
 
     const goToday = () => {
@@ -363,7 +381,7 @@ export function WaterDateTimePicker({
                         <button type="button" className="water-dtp-btn-clear" onClick={clear}>削除</button>
                         <div style={{ display: 'flex', gap: '6px' }}>
                             <button type="button" className="water-dtp-btn-today" onClick={goToday}>今日</button>
-                            <button type="button" className="water-dtp-btn-confirm" onClick={() => setOpen(false)}>確定</button>
+                            <button type="button" className="water-dtp-btn-confirm" onClick={confirm}>確定</button>
                         </div>
                     </div>
                 </div>,
