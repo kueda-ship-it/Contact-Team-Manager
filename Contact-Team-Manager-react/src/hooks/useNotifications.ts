@@ -197,9 +197,13 @@ export function useNotifications() {
                     if (!isTeamNotifEnabled(thread.team_id)) continue;
 
                     const isCreator = thread.user_id === user.id;
-                    let isTarget = isCreator;
+                    // ★リマインドを設定した本人。これを見ないと、他人のスレッドや
+                    //   FC追記ウォッチが立てたスレッド(user_id が NULL)に付けた
+                    //   リマインドが、設定した当人にすら通知されない。
+                    const isSetter = !!reminder.created_by && reminder.created_by === user.id;
+                    let isTarget = isCreator || isSetter;
 
-                    if (!isCreator) {
+                    if (!isTarget) {
                         const content = thread.content || '';
                         const myDisplayName = profile?.display_name || '';
                         const isMentionedByName = myDisplayName && content.includes(`@${myDisplayName}`);
@@ -225,7 +229,7 @@ export function useNotifications() {
 
                     if (isTarget) {
                         const title = `⏰ リマインド: ${thread.title}`;
-                        const body = isCreator
+                        const body = (isSetter || isCreator)
                             ? 'あなたが設定したリマインドです'
                             : 'メンションされたリマインドです';
                         const url = `${window.location.origin}/Contact-Team-Manager/?thread=${thread.id}`;
@@ -238,7 +242,7 @@ export function useNotifications() {
 
                     // グローバルな reminder_sent は創作者のみが更新（クリーンアップ用）
                     // メンション対象者が更新すると他ユーザーが通知を受け取れなくなるため
-                    if (isCreator) {
+                    if (isCreator || isSetter) {
                         await supabase.from('thread_reminders').update({ reminder_sent: true }).eq('id', reminder.id);
                     }
                 }

@@ -124,6 +124,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const { reactions, refetch: refetchReactions } = useReactions();
     const { user, profile: currentProfile } = useAuth();
     const [editingThreadId, setEditingThreadId] = React.useState<string | null>(null);
+    // 編集中の件名。開いたときの値を入れておき、空にして保存しても件名は消さない
+    const [editTitles, setEditTitles] = React.useState<{ [key: string]: string }>({});
     const [editingReplyId, setEditingReplyId] = React.useState<string | null>(null);
     const {
         uploadFile,
@@ -653,6 +655,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         thread_id: threadId,
                         remind_at: new Date(r.value).toISOString(),
                         reminder_sent: false,
+                        // 設定者。これが無いと通知の宛先がスレッド作成者と
+                        // メンション先しか分からず、設定した本人に届かない
+                        created_by: user?.id ?? null,
                     }))
                 );
                 if (insertError) throw insertError;
@@ -817,7 +822,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         }
         const content = el.innerHTML;
         const pasted = editAttachments[threadId] || [];
-        const payload: { content: string; attachments?: any[] } = { content };
+        const payload: { content: string; title?: string; attachments?: any[] } = { content };
+        const newTitle = (editTitles[threadId] ?? '').trim();
+        if (newTitle) payload.title = newTitle;
         if (pasted.length > 0) {
             payload.attachments = [...(existingAttachments || []), ...pasted];
         }
@@ -830,6 +837,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         } else {
             setEditingThreadId(null);
             setEditAttachments(prev => { const n = { ...prev }; delete n[threadId]; return n; });
+            setEditTitles(prev => { const n = { ...prev }; delete n[threadId]; return n; });
             refetch(true);
         }
     };
@@ -1152,6 +1160,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                             {user?.id === thread.user_id && (
                                                 <div className="menu-item" onClick={() => {
                                                     setOpenMenuId(null);
+                                                    setEditTitles(prev => ({ ...prev, [thread.id]: thread.title || '' }));
                                                     setEditingThreadId(thread.id);
                                                 }}>
                                                     <span className="menu-icon">
@@ -1339,6 +1348,14 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                 <div className="task-title-line" id={`title-${thread.id}`}>{thread.title}</div>
                                 {editingThreadId === thread.id ? (
                                     <div className="edit-form" style={{ marginBottom: '10px' }}>
+                                        <input
+                                            type="text"
+                                            className="input-field"
+                                            value={editTitles[thread.id] ?? thread.title ?? ''}
+                                            onChange={(e) => setEditTitles(prev => ({ ...prev, [thread.id]: e.target.value }))}
+                                            placeholder="件名"
+                                            style={{ marginBottom: '8px', fontWeight: 600 }}
+                                        />
                                         <div
                                             ref={(el) => {
                                                 if (el) {
