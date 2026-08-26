@@ -16,6 +16,10 @@ export const MODE_LABEL: Record<NotifyMode, string> = {
 };
 
 // 通知アイコンのパス（GitHub Pages のサブパス対応のため import.meta.env.BASE_URL を使用）
+// 何日前までのリマインドを鳴らすか。全員がアプリを閉じていた間の分は
+// 次に開いた人に出るが、何週間も前のものを今さら鳴らしても邪魔なので窓を切る。
+const REMINDER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 const NOTIFICATION_ICON = `${import.meta.env.BASE_URL}favicon-v3.png`;
 
 async function showNotification(title: string, body: string, url: string, tag: string) {
@@ -176,11 +180,17 @@ export function useNotifications() {
 
         try {
             const now = new Date().toISOString();
+            // ★取得条件に reminder_sent を使わない。全体で1つのフラグなので、
+            //   作成者や設定者のブラウザが先に立てると、メンションされた人の
+            //   ブラウザがそのリマインドを取得すらできず取りこぼす（最大60秒差）。
+            //   配信済みかどうかは thread_reminder_deliveries（受信者ごと）で見る。
+            // ★代わりに期間で絞る。何日も前のリマインドを今さら鳴らさない。
+            const since = new Date(Date.now() - REMINDER_WINDOW_MS).toISOString();
             const { data: reminders, error } = await supabase
                 .from('thread_reminders')
-                .select('*, thread:threads(*)')
+                .select('*, thread:threads(*), deliveries:thread_reminder_deliveries(user_id)')
                 .lte('remind_at', now)
-                .eq('reminder_sent', false);
+                .gte('remind_at', since);
 
             if (error) {
                 console.error('Failed to fetch reminders:', error);
@@ -190,6 +200,11 @@ export function useNotifications() {
             if (reminders && reminders.length > 0) {
                 for (const reminder of reminders) {
                     if (seenIds.has(reminder.id)) continue;
+                    // 自分がもう受け取っているか（他端末で受け取った場合もここで分かる）
+                    if ((reminder.deliveries || []).some((d: any) => d.user_id === user.id)) {
+                        seenIds.add(reminder.id);
+                        continue;
+                    }
 
                     const thread = reminder.thread;
                     if (!thread) continue;
@@ -237,11 +252,16 @@ export function useNotifications() {
                         await showNotification(title, body, url, `reminder-${reminder.id}`);
                     }
 
-                    // 評価済みとして自分の localStorage に記録（対象外でも記録して再評価を防ぐ）
+                    // 評価済みとして記録する。対象外でも記録して再評価を防ぐ。
+                    // localStorage は同一端末の高速化、DB は端末をまたいだ重複防止。
                     seenIds.add(reminder.id);
+                    await supabase
+                        .from('thread_reminder_deliveries')
+                        .upsert({ reminder_id: reminder.id, user_id: user.id },
+                                { onConflict: 'reminder_id,user_id', ignoreDuplicates: true });
 
-                    // グローバルな reminder_sent は創作者のみが更新（クリーンアップ用）
-                    // メンション対象者が更新すると他ユーザーが通知を受け取れなくなるため
+                    // reminder_sent は「一度は誰かに配信された」印として残すだけ。
+                    // ★取得条件には使っていない（使うと他ユーザーが取りこぼす）。
                     if (isCreator || isSetter) {
                         await supabase.from('thread_reminders').update({ reminder_sent: true }).eq('id', reminder.id);
                     }
