@@ -1098,3 +1098,20 @@ body.light-mode .reply-content .mention:hover {
     content-visibility: auto;
     contain-intrinsic-size: auto 150px;
 }
+
+/* ────────────────────────────────────────────────────────────────
+   ホバーの残像対策（2026-08-25）
+   ★`.task-card` は `transition: all 0.3s`（style.css の --transition）だった。
+     ホバーで差し替えるのは 3段の linear-gradient と 4層の box-shadow(24/48px)。
+     `all` なのでグラデーションまで 0.3 秒かけて毎フレーム補間され、しかも
+     カードには backdrop-filter: blur(24px) が乗っているので下地ごと描き直す。
+     → 上のカードから下のカードへカーソルを移すと、離れたカードが 0.3 秒かけて
+       消えていくため、半分光ったカードが尾を引く（＝残像）。
+   ★ホバーで意味があるのはグローと枠線だけ。対象をそこに限定し 0.12 秒に縮める。
+     背景グラデーションの差は微小なので即時切替でも気づかない。
+   ★transform は使わないこと。カード下端でホバー判定が往復して画面が振動する
+     （2026-06-10 の再発防止。translateY(-2px) で実際に起きた）。
+   ──────────────────────────────────────────────────────────────── */
+.task-card {
+    transition: box-shadow 0.12s ease-out, border-color 0.12s ease-out !important;
+}
