@@ -450,7 +450,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                 <div style={{ paddingBottom: '20px' }}>
                     <div className="side-panel-section" style={{ paddingTop: '10px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', marginBottom: '15px' }}>
-                            <h3 className="side-panel-title" style={{ margin: 0, textAlign: 'left' }}>Not Finished</h3>
+                            <h3 className="side-panel-title" style={{ margin: 0, textAlign: 'left' }}>
+                                Not Finished{notFinishedThreads.length > 0 ? ` (${notFinishedThreads.length})` : ''}
+                            </h3>
                         </div>
                     <div id="pending-sidebar-list">
                         {notFinishedThreads.length === 0 ? (
@@ -463,7 +465,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
 
                 <div className="side-panel-section">
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', marginBottom: '15px' }}>
-                        <h3 className="side-panel-title" style={{ margin: 0, textAlign: 'left' }}>Waiting for contact</h3>
+                        <h3 className="side-panel-title" style={{ margin: 0, textAlign: 'left' }}>
+                            Waiting for contact{waitingThreads.length > 0 ? ` (${waitingThreads.length})` : ''}
+                        </h3>
                     </div>
                     <div id="waiting-sidebar-list">
                         {waitingThreads.length === 0 ? (

@@ -199,7 +199,10 @@ export function useThreads(
                 }
 
                 if (filter === 'pending') {
-                    q = q.eq('status', 'pending');
+                    // 「未完了」は連絡待ちを含めない（2026-08-25 決定）。連絡待ちは
+                    // 別枠（waiting フィルタ / 右サイドバー）で数える。
+                    // not.is.true にすると NULL と false の両方が残る（neq だと NULL が落ちる）。
+                    q = q.eq('status', 'pending').not('waiting_contact', 'is', true);
                 } else if (filter === 'waiting') {
                     q = q.eq('status', 'pending').eq('waiting_contact', true);
                 } else if (filter === 'completed') {

@@ -410,7 +410,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     // 表示対象。以前は同じ filter を「0件判定用」と「描画用」で2回まわしていた。
     // mentions フィルタは本文＋全返信を走査するので、素直に2回やると効く。
     const visibleThreads = React.useMemo(() => displayThreads.filter(thread => {
-        if (statusFilter === 'pending') return thread.status === 'pending';
+        // 未完了に連絡待ちは含めない（連絡待ちは専用タブと右サイドバーで数える）
+        if (statusFilter === 'pending') return thread.status === 'pending' && !thread.waiting_contact;
         if (statusFilter === 'waiting') return thread.status === 'pending' && thread.waiting_contact;
         if (statusFilter === 'completed') return thread.status === 'completed';
         if (statusFilter === 'mentions') {

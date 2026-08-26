@@ -40,10 +40,14 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
 
     useEffect(() => {
         if (!user) return;
+        // 「未完了」バッジは連絡待ちを含めない（2026-08-25 決定）。
+        // 右サイドバーの Not Finished と数を一致させる。
+        // not.is.true にすると NULL と false の両方が残る（neq だと NULL が落ちる）。
         let query = supabase
             .from('threads')
             .select('id', { count: 'exact', head: true })
-            .eq('status', 'pending');
+            .eq('status', 'pending')
+            .not('waiting_contact', 'is', true);
         if (currentTeamId) {
             query = query.eq('team_id', currentTeamId);
         }
