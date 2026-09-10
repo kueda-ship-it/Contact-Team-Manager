@@ -14,6 +14,7 @@ interface RightSidebarProps {
         loading: boolean;
         error: Error | null;
         refetch: (silent?: boolean) => void;
+        mutateThread: (threadId: string, patch: Record<string, any> | ((t: any) => any)) => void;
     };
     onThreadClick?: (threadId: string) => void;
 }
@@ -21,7 +22,7 @@ interface RightSidebarProps {
 export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threadsData, onThreadClick }) => {
     // We use main threadsData only for mentions and general structure, but for "Not Finished", 
     // we must fetch ALL pending tasks independently of the main feed's limit/filter.
-    const { threads: mainThreads, loading: mainLoading, refetch: mainRefetch } = threadsData;
+    const { threads: mainThreads, loading: mainLoading, refetch: mainRefetch, mutateThread } = threadsData;
 
     // Independent state for pending items
     const [pendingThreads, setPendingThreads] = React.useState<any[]>([]);
@@ -180,35 +181,74 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
             payload.completed_at = null;
         }
 
-        const { error } = await supabase.from('threads').update(payload).eq('id', threadId);
-        if (error) {
-            alert('更新に失敗しました: ' + error.message);
-        } else {
-            // Refetch both
-            mainRefetch(true);
-            fetchPendingThreads();
-        }
-    };
-
-    const handleToggleWaiting = async (threadId: string, current: boolean) => {
-        if (!user) return;
+        // 楽観更新: サイドバーとメインフィード両方を即書き換える（失敗時は戻す）。
+        // サイドバーは未完了のみのリストなので、完了にしたものは行ごと消す
+        const prevPending = pendingThreads;
+        setPendingThreads(prev => newStatus === 'completed'
+            ? prev.filter(t => String(t.id) !== String(threadId))
+            : prev.map(t => String(t.id) === String(threadId) ? { ...t, ...payload } : t)
+        );
+        mutateThread(threadId, payload);
         try {
             const timeout = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
             );
-            const next = !current;
             const { error } = await Promise.race([
-                supabase.from('threads').update({
-                    waiting_contact: next,
-                    waiting_by: next ? user.id : null,
-                    waiting_at: next ? new Date().toISOString() : null,
-                }).eq('id', threadId),
+                supabase.from('threads').update(payload).eq('id', threadId),
                 timeout
             ]) as any;
             if (error) throw error;
             mainRefetch(true);
             fetchPendingThreads(true);
         } catch (e: any) {
+            setPendingThreads(prevPending);
+            mutateThread(threadId, {
+                status: thread.status,
+                completed_auto: thread.completed_auto,
+                completed_by: thread.completed_by,
+                completed_at: thread.completed_at,
+                waiting_contact: thread.waiting_contact,
+                waiting_by: thread.waiting_by,
+                waiting_at: thread.waiting_at,
+            });
+            alert('更新に失敗しました: ' + e.message);
+        }
+    };
+
+    const handleToggleWaiting = async (threadId: string, current: boolean) => {
+        if (!user) return;
+        const next = !current;
+        const payload = {
+            waiting_contact: next,
+            waiting_by: next ? user.id : null,
+            waiting_at: next ? new Date().toISOString() : null,
+        };
+        // 楽観更新: 未完了⇔連絡待ちの枠移動を即反映（失敗時は戻す）
+        const prevPending = pendingThreads;
+        const before = pendingThreads.find(t => String(t.id) === String(threadId))
+            || mainThreads.find(t => String(t.id) === String(threadId));
+        setPendingThreads(prev => prev.map(t =>
+            String(t.id) === String(threadId) ? { ...t, ...payload } : t
+        ));
+        mutateThread(threadId, payload);
+        try {
+            const timeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
+            );
+            const { error } = await Promise.race([
+                supabase.from('threads').update(payload).eq('id', threadId),
+                timeout
+            ]) as any;
+            if (error) throw error;
+            mainRefetch(true);
+            fetchPendingThreads(true);
+        } catch (e: any) {
+            setPendingThreads(prevPending);
+            mutateThread(threadId, {
+                waiting_contact: current,
+                waiting_by: before?.waiting_by ?? null,
+                waiting_at: before?.waiting_at ?? null,
+            });
             alert('連絡待ちの更新に失敗しました: ' + e.message);
         }
     };
@@ -224,19 +264,55 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
 
         const authorName = currentProfile?.display_name || user.email || 'Unknown';
 
-        const { error } = await supabase.from('replies').insert([{
+        // 楽観更新: 入力欄は即クリアし、返信を仮表示する（失敗時は復元）
+        const tempId = `temp-${Date.now()}`;
+        const nowIso = new Date().toISOString();
+        inputEl.innerHTML = '';
+        const optimisticReply = {
+            id: tempId,
             thread_id: threadId,
             content: content,
             author: authorName,
-            user_id: user.id
-        }]);
+            user_id: user.id,
+            created_at: nowIso,
+        };
+        mutateThread(threadId, (t: any) => ({
+            ...t,
+            replies: [...(t.replies || []), optimisticReply],
+        }));
+        setPendingThreads(prev => prev.map(t =>
+            String(t.id) === String(threadId)
+                ? { ...t, replies: [...(t.replies || []), optimisticReply] }
+                : t
+        ));
 
-        if (error) {
-            alert('返信に失敗しました: ' + error.message);
-        } else {
-            inputEl.innerHTML = '';
+        try {
+            const timeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
+            );
+            const { error } = await Promise.race([
+                supabase.from('replies').insert([{
+                    thread_id: threadId,
+                    content: content,
+                    author: authorName,
+                    user_id: user.id
+                }]),
+                timeout
+            ]) as any;
+            if (error) throw error;
             mainRefetch(true); // Update main feed
-            // fetchPendingThreads(); // Not strictly necessary unless we re-order by update?
+        } catch (e: any) {
+            mutateThread(threadId, (t: any) => ({
+                ...t,
+                replies: (t.replies || []).filter((r: any) => r.id !== tempId),
+            }));
+            setPendingThreads(prev => prev.map(t =>
+                String(t.id) === String(threadId)
+                    ? { ...t, replies: (t.replies || []).filter((r: any) => r.id !== tempId) }
+                    : t
+            ));
+            inputEl.innerHTML = content;
+            alert('返信に失敗しました: ' + e.message);
         }
     };
 

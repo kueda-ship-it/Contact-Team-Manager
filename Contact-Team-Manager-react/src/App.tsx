@@ -113,7 +113,7 @@ function App() {
   const fetchLimit = (statusFilter === 'pending' || statusFilter === 'waiting' || statusFilter === 'mentions' || searchTerm) ? 2000 : threadsLimit;
   // Pass searchTerm (debounced) to useThreads for server-side filtering
   const threadsData = useThreads(currentTeamId, fetchLimit, sortAscending, statusFilter, searchTerm);
-  const { threads: rawThreads, loading: threadsLoading, error: threadsError, refetch } = threadsData;
+  const { threads: rawThreads, loading: threadsLoading, error: threadsError, refetch, mutateThread } = threadsData;
   const { memberships, loading: membershipsLoading, updateLastRead } = useUserMemberships(user?.id);
   const { unreadTeams } = useUnreadCounts(user?.id, memberships);
 
@@ -124,7 +124,8 @@ function App() {
     threads: filteredThreads,
     loading: threadsLoading,
     error: threadsError,
-    refetch
+    refetch,
+    mutateThread
   };
 
   const { popularTeamId, loading: popularLoading } = usePopularTeamId(user?.id);

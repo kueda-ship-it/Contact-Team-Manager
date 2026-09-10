@@ -279,6 +279,37 @@ export function useThreads(
     const fetchRef = useRef(fetchThreads);
     fetchRef.current = fetchThreads;
 
+    // 書き込み1回で threads UPDATE + replies INSERT のイベントが立て続けに届き、
+    // そのたびに全件 fetch していた。800ms 窓で束ねて 1 本にする。
+    const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const scheduleRealtimeRefetch = useCallback(() => {
+        if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current);
+        realtimeTimerRef.current = setTimeout(() => {
+            realtimeTimerRef.current = null;
+            fetchRef.current(true);
+        }, 800);
+    }, []);
+    useEffect(() => () => {
+        if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current);
+    }, []);
+
+    // 楽観更新: サーバー往復や全件 refetch を待たずに、手元の表示だけ先に書き換える。
+    // 直後の silent refetch / realtime でサーバー状態に置き換わる前提の「仮の姿」。
+    const mutateThread = useCallback((
+        threadId: string,
+        patch: Record<string, any> | ((t: Thread) => Thread)
+    ) => {
+        setThreads(prev => {
+            const next = prev.map(t =>
+                String(t.id) === String(threadId)
+                    ? (typeof patch === 'function' ? (patch as (t: Thread) => Thread)(t) : { ...t, ...patch })
+                    : t
+            );
+            viewCacheRef.current.set(viewKeyRef.current, next);
+            return next;
+        });
+    }, []);
+
     // memberships は updateLastRead（チャネル切替のたびに走る）で毎回新しい配列になる。
     // 参照をそのまま依存にすると、切替のたびに購読を張り直したうえ fetch がもう1本走る。
     // 中身（team_id の集合）が同じなら張り直さない。
@@ -310,7 +341,7 @@ export function useThreads(
                 table: 'threads',
                 filter: filterExpr,
             }, () => {
-                fetchRef.current(true);
+                scheduleRealtimeRefetch();
             })
             .subscribe();
 
@@ -325,7 +356,7 @@ export function useThreads(
                 table: 'replies',
                 filter: filterExpr,
             }, () => {
-                fetchRef.current(true);
+                scheduleRealtimeRefetch();
             })
             .subscribe();
 
@@ -333,7 +364,7 @@ export function useThreads(
             supabase.removeChannel(threadsChannel);
             supabase.removeChannel(repliesChannel);
         };
-    }, [teamId, profile?.role, membershipKey]);
+    }, [teamId, profile?.role, membershipKey, scheduleRealtimeRefetch]);
 
     // Admin の全件表示時は filter 不可 (memberships に無い team も見る)
     // で realtime 諦め → 60秒 polling で代替する。
@@ -341,7 +372,7 @@ export function useThreads(
     const pollFetch = useCallback(() => { fetchThreads(true); }, [fetchThreads]);
     useRefetchInterval(pollFetch, 60_000, isAdminAllTeamsView);
 
-    return { threads, loading, error, refetch: fetchThreads };
+    return { threads, loading, error, refetch: fetchThreads, mutateThread };
 }
 
 export function useTeams() {

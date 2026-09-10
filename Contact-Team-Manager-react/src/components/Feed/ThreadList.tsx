@@ -96,6 +96,7 @@ interface ThreadListProps {
         loading: boolean;
         error: Error | null;
         refetch: (silent?: boolean) => void;
+        mutateThread: (threadId: string, patch: Record<string, any> | ((t: any) => any)) => void;
     };
     statusFilter: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts';
     onStatusChange: (status: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts') => void;
@@ -117,7 +118,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     scrollToThreadId,
     onScrollComplete
 }) => {
-    const { threads, loading: threadsLoading, error, refetch } = threadsData;
+    const { threads, loading: threadsLoading, error, refetch, mutateThread } = threadsData;
     const { teams } = useTeams();
     const { profiles } = useProfiles();
     const { tags } = useTags();
@@ -546,9 +547,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     const handleToggleStatus = async (threadId: string, currentStatus: string) => {
         if (!user) return;
         const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+        const before = threads.find((x: any) => String(x.id) === String(threadId));
         if (newStatus === 'completed') {
-            const t = threads.find((x: any) => String(x.id) === String(threadId));
-            if (t && !(await confirmIfFcNotDone(t))) return;
+            if (before && !(await confirmIfFcNotDone(before))) return;
         }
         const payload: any = { status: newStatus, completed_auto: false };
         if (newStatus === 'completed') {
@@ -562,32 +563,63 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             payload.completed_at = null;
         }
 
-        const { error } = await supabase.from('threads').update(payload).eq('id', threadId);
-        if (error) {
-            alert('更新に失敗しました: ' + error.message);
-        } else {
-            refetch(true);
-        }
-    };
-
-    const handleToggleWaiting = async (threadId: string, current: boolean) => {
-        if (!user) return;
+        // 楽観更新: 全件 refetch を待たずに表示を即切り替える（失敗時は戻す）
+        mutateThread(threadId, payload);
         try {
             const timeout = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
             );
-            const next = !current;
             const { error } = await Promise.race([
-                supabase.from('threads').update({
-                    waiting_contact: next,
-                    waiting_by: next ? user.id : null,
-                    waiting_at: next ? new Date().toISOString() : null,
-                }).eq('id', threadId),
+                supabase.from('threads').update(payload).eq('id', threadId),
                 timeout
             ]) as any;
             if (error) throw error;
             refetch(true);
         } catch (e: any) {
+            if (before) {
+                mutateThread(threadId, {
+                    status: before.status,
+                    completed_auto: before.completed_auto,
+                    completed_by: before.completed_by,
+                    completed_at: before.completed_at,
+                    waiting_contact: before.waiting_contact,
+                    waiting_by: before.waiting_by,
+                    waiting_at: before.waiting_at,
+                });
+            }
+            alert('更新に失敗しました: ' + e.message);
+        }
+    };
+
+    const handleToggleWaiting = async (threadId: string, current: boolean) => {
+        if (!user) return;
+        const next = !current;
+        const payload = {
+            waiting_contact: next,
+            waiting_by: next ? user.id : null,
+            waiting_at: next ? new Date().toISOString() : null,
+        };
+        const before = threads.find((x: any) => String(x.id) === String(threadId));
+        // 楽観更新: 表示は即切り替え、失敗時は戻す
+        mutateThread(threadId, payload);
+        try {
+            const timeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
+            );
+            const { error } = await Promise.race([
+                supabase.from('threads').update(payload).eq('id', threadId),
+                timeout
+            ]) as any;
+            if (error) throw error;
+            refetch(true);
+        } catch (e: any) {
+            if (before) {
+                mutateThread(threadId, {
+                    waiting_contact: before.waiting_contact,
+                    waiting_by: before.waiting_by,
+                    waiting_at: before.waiting_at,
+                });
+            }
             alert('連絡待ちの更新に失敗しました: ' + e.message);
         }
     };
@@ -684,23 +716,53 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         const authorName = currentProfile?.display_name || user.email || 'Unknown';
         const atts = replyAttachments[threadId] || [];
 
-        const { error } = await supabase.from('replies').insert([{
-            thread_id: threadId,
-            content: content,
-            author: authorName,
-            user_id: user.id,
-            attachments: atts.length > 0 ? atts : null
-        }]);
+        // 楽観更新: 入力欄は即クリアし、返信を仮表示する（失敗時は復元）
+        const tempId = `temp-${Date.now()}`;
+        const nowIso = new Date().toISOString();
+        inputEl.innerHTML = '';
+        setReplyAttachments(prev => ({ ...prev, [threadId]: [] }));
+        mutateThread(threadId, (t: any) => ({
+            ...t,
+            updated_at: nowIso,
+            replies: [...(t.replies || []), {
+                id: tempId,
+                thread_id: threadId,
+                content: content,
+                author: authorName,
+                user_id: user.id,
+                created_at: nowIso,
+                attachments: atts.length > 0 ? atts : null
+            }],
+        }));
 
-        if (error) {
-            alert('返信に失敗しました: ' + error.message);
-        } else {
-            // Update parent thread updated_at to bump it to top
-            await supabase.from('threads').update({ updated_at: new Date().toISOString() }).eq('id', threadId);
+        try {
+            const timeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
+            );
+            const { error } = await Promise.race([
+                supabase.from('replies').insert([{
+                    thread_id: threadId,
+                    content: content,
+                    author: authorName,
+                    user_id: user.id,
+                    attachments: atts.length > 0 ? atts : null
+                }]),
+                timeout
+            ]) as any;
+            if (error) throw error;
 
-            inputEl.innerHTML = '';
-            setReplyAttachments(prev => ({ ...prev, [threadId]: [] }));
+            // 親スレッドの updated_at 更新は表示に必須ではないので待たない
+            supabase.from('threads').update({ updated_at: nowIso }).eq('id', threadId)
+                .then(() => { }, () => { });
             refetch(true);
+        } catch (e: any) {
+            mutateThread(threadId, (t: any) => ({
+                ...t,
+                replies: (t.replies || []).filter((r: any) => r.id !== tempId),
+            }));
+            inputEl.innerHTML = content;
+            setReplyAttachments(prev => ({ ...prev, [threadId]: atts }));
+            alert('返信に失敗しました: ' + e.message);
         }
     };
 
