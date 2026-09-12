@@ -424,7 +424,7 @@ export const TeamsSidebar: React.FC<TeamsSidebarProps> = ({
                                                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                         # 未完了
                                                         {pendingCount > 0 && (
-                                                            <span style={{
+                                                            <span className="num" style={{
                                                                 display: 'inline-flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',

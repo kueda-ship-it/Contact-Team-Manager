@@ -396,9 +396,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                     </button>
                 </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                <span>by {t.author}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', rowGap: '2px', marginTop: '4px', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                <span style={{ overflowWrap: 'anywhere' }}>by {t.author}</span>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', whiteSpace: 'nowrap' }}>
                     {(() => {
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
@@ -457,7 +457,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                             </span>
                         );
                     })()}
-                    <span>{formatDate(t.created_at)}</span>
+                    <span className="num">{formatDate(t.created_at)}</span>
                 </span>
             </div>
 
@@ -569,9 +569,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                                         className="task-content"
                                         dangerouslySetInnerHTML={{ __html: highlightMentions(getPlainTextForSidebar(t.content), mentionOptions) }}
                                     />
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                                        <span>by {t.author}</span>
-                                        <span>{formatDate(t.created_at)}</span>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', columnGap: '6px', marginTop: '4px', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                        <span style={{ overflowWrap: 'anywhere' }}>by {t.author}</span>
+                                        <span className="num" style={{ whiteSpace: 'nowrap' }}>{formatDate(t.created_at)}</span>
                                     </div>
                                 </div>
                             ))

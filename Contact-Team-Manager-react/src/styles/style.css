@@ -15,6 +15,9 @@
     --glass-highlight: rgba(255, 255, 255, 0.15);
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --img-rendering: -webkit-optimize-contrast;
+    --font-body: "BIZ UDPGothic", "BIZ UDPゴシック", sans-serif;
+    /* BIZ UDPゴシックは「1」だけ幅が狭く tnum も無いため、数値は等幅版で揃える */
+    --font-num: "BIZ UDGothic", "BIZ UDゴシック", sans-serif;
 }
 
 .glass-panel {
@@ -480,7 +483,39 @@ body.light-mode .sidebar-submenu-item.active {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Segoe UI', sans-serif;
+}
+
+html,
+body {
+    font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
+    /* BIZ UDPゴシックの line-height:normal は約1.0で詰まるため、旧Segoe UI+和文フォールバック相当に固定 */
+    line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea,
+optgroup,
+code,
+pre,
+kbd,
+samp {
+    font-family: inherit;
+}
+
+/* UA 既定の line-height:normal のままだと BIZ UDPゴシックで 5〜8px 低くなる。1.4 で旧 Segoe UI 時の ±2px に収まる */
+button,
+input,
+select,
+textarea {
+    line-height: 1.4;
+}
+
+.num {
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
 }
 
 body {
@@ -1879,10 +1914,11 @@ body.light-mode .settings-nav-item:hover {
 }
 
 .team-badge {
-    position: absolute;
-    top: 10px;
-    right: 40px;
-    /* Positioned to the left of the dot menu */
+    flex-shrink: 0;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     background: rgba(255, 255, 255, 0.1);
     color: var(--text-muted);
     font-size: 0.7rem;
@@ -1902,6 +1938,8 @@ body.light-mode .settings-nav-item:hover {
     align-items: center;
     gap: 12px;
     margin-bottom: 8px;
+    /* 右上の DotMenu（right:10px + 28px）と重ならない幅を確保 */
+    padding-right: 22px;
 }
 
 .task-header-meta .avatar {
@@ -2319,6 +2357,31 @@ body.light-mode .btn-download-orange:hover {
     margin-bottom: 4px;
     color: var(--text-muted);
     font-size: 0.75rem;
+}
+
+/* 氏名は省略しない。入らなければ日時を次の行へ回し、それでも長い名前は折り返して全部見せる */
+.reply-header {
+    flex-wrap: wrap;
+    row-gap: 2px;
+}
+
+.reply-header > span {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.reply-header > span:first-of-type {
+    white-space: normal;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: calc(100% - 32px);
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+    .reply-header {
+        gap: 8px;
+    }
 }
 
 .reply-form {

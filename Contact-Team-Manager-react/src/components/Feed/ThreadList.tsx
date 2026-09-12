@@ -1112,7 +1112,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 <div className="feed-header-center">
                     <h2 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                         {currentTeamName}
-                        <span style={{ color: 'var(--primary-light)', fontSize: '0.9rem', fontWeight: 'normal' }}>{threads.length} 件</span>
+                        <span className="num" style={{ color: 'var(--primary-light)', fontSize: '0.9rem', fontWeight: 'normal' }}>{threads.length} 件</span>
                     </h2>
                 </div>
                 <div className="feed-header-right">
@@ -1143,7 +1143,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         </svg>
                         {sortAscending ? '昇' : '降'}
                     </button>
-                    <div className="mobile-thread-count">
+                    <div className="mobile-thread-count num">
                         {threads.length}件
                     </div>
                 </div>
@@ -1202,11 +1202,6 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                 style={{ position: 'relative', paddingBottom: '50px' }}
                             >
                                 {thread.is_pinned && <div className="pinned-badge">重要</div>}
-                                {currentTeamId === null && (
-                                    <div className="team-badge">
-                                        {teams.find(t => t.id === thread.team_id)?.name || 'Unknown'}
-                                    </div>
-                                )}
 
                                 <DotMenu
                                     open={openMenuId === thread.id}
@@ -1303,7 +1298,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                 </DotMenu>
 
                                 <div className="task-header-meta">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
                                         <div className="avatar-container">
                                             <div className="avatar">
                                                 {authorAvatar ? (
@@ -1314,9 +1309,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                             </div>
                                             <div className="status-dot active"></div>
                                         </div>
-                                        <div className="task-author-info" style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: '8px' }}>
+                                        <div className="task-author-info" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: '0 8px', minWidth: 0 }}>
                                             <span className="author-name">{thread.author}</span>
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            <span className="num" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                                 {formatDate(thread.created_at)}
                                             </span>
                                             {(() => {
@@ -1325,7 +1320,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     .filter((r: any) => r.remind_at > now)
                                                     .sort((a: any, b: any) => a.remind_at.localeCompare(b.remind_at));
                                                 return upcoming.map((r: any) => (
-                                                    <span key={r.id} style={{ fontSize: '0.72rem', color: 'var(--accent)', background: 'rgba(0,210,255,0.07)', border: '1px solid rgba(0,210,255,0.2)', borderRadius: '4px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                    <span key={r.id} className="num" style={{ fontSize: '0.72rem', color: 'var(--accent)', background: 'rgba(0,210,255,0.07)', border: '1px solid rgba(0,210,255,0.2)', borderRadius: '4px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                                                         </svg>
@@ -1335,6 +1330,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                             })()}
                                         </div>
                                     </div>
+                                    {currentTeamId === null && (
+                                        <div className="team-badge">
+                                            {teams.find(t => t.id === thread.team_id)?.name || 'Unknown'}
+                                        </div>
+                                    )}
                                 </div>
 
 
@@ -1541,7 +1541,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                             )}
                                                                         </div>
                                                                         <span>{reply.author}</span>
-                                                                        <span>{formatDate(reply.created_at)}</span>
+                                                                        <span className="num">{formatDate(reply.created_at)}</span>
                                                                     </div>
                                                                     {editingReplyId === reply.id ? (
                                                                         <div className="edit-form" style={{ marginTop: '5px' }}>
@@ -1809,8 +1809,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     fontSize: '0.75rem',
                                                     color: 'var(--success)',
                                                     display: 'flex',
+                                                    flexWrap: 'wrap',
                                                     alignItems: 'center',
-                                                    gap: '5px',
+                                                    gap: '0 5px',
                                                     background: 'rgba(67, 181, 129, 0.1)',
                                                     padding: '4px 12px',
                                                     borderRadius: '20px',
@@ -1824,10 +1825,10 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                     {!isAutoCompleted && completerProfile?.avatar_url && (
                                                         <img src={completerProfile.avatar_url} alt="" style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} />
                                                     )}
-                                                    <span style={{ fontWeight: 600 }}>
+                                                    <span style={{ fontWeight: 600, minWidth: 0, maxWidth: 'calc(100% - 40px)', overflowWrap: 'anywhere' }}>
                                                         {isAutoCompleted ? '自動完了（FC連動）' : `完了者: ${completerName}`}
                                                     </span>
-                                                    <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.completed_at)}</span>
+                                                    <span className="num" style={{ opacity: 0.7, marginLeft: '4px', whiteSpace: 'nowrap' }}>{formatDate(thread.completed_at)}</span>
                                                 </div>
                                             )}
                                             {thread.status !== 'completed' && thread.waiting_contact && thread.waiting_at && (() => {
@@ -1838,8 +1839,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                         fontSize: '0.75rem',
                                                         color: '#EAB308',
                                                         display: 'flex',
+                                                        flexWrap: 'wrap',
                                                         alignItems: 'center',
-                                                        gap: '5px',
+                                                        gap: '0 5px',
                                                         background: 'rgba(234, 179, 8, 0.1)',
                                                         padding: '4px 12px',
                                                         borderRadius: '20px',
@@ -1853,8 +1855,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                         {waitingProfile?.avatar_url && (
                                                             <img src={waitingProfile.avatar_url} alt="" style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} />
                                                         )}
-                                                        <span style={{ fontWeight: 600 }}>連絡待ち: {waitingName}</span>
-                                                        <span style={{ opacity: 0.7, marginLeft: '4px' }}>{formatDate(thread.waiting_at)}</span>
+                                                        <span style={{ fontWeight: 600, minWidth: 0, maxWidth: 'calc(100% - 40px)', overflowWrap: 'anywhere' }}>連絡待ち: {waitingName}</span>
+                                                        <span className="num" style={{ opacity: 0.7, marginLeft: '4px', whiteSpace: 'nowrap' }}>{formatDate(thread.waiting_at)}</span>
                                                     </div>
                                                 );
                                             })()}

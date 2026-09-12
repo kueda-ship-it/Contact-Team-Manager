@@ -194,7 +194,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
                         <span style={{ display: 'flex', alignItems: 'center', fontSize: '14px' }}>
                             {emoji}
                         </span>
-                        <span style={{
+                        <span className="num" style={{
                             fontSize: '11px',
                             fontWeight: '700'
                         }}>

@@ -390,6 +390,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 value={selectedYear}
                                 onChange={(e) => setSelectedYear(Number(e.target.value))}
                                 style={{
+                                    minHeight: 'calc(1.4em + 10px)',
                                     padding: '4px 8px',
                                     borderRadius: '4px',
                                     border: '1px solid rgba(255,255,255,0.2)',
@@ -409,6 +410,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     value={selectedYear}
                                     onChange={(e) => setSelectedYear(Number(e.target.value))}
                                     style={{
+                                        minHeight: 'calc(1.4em + 10px)',
                                         padding: '4px 8px',
                                         borderRadius: '4px',
                                         border: '1px solid rgba(255,255,255,0.2)',
@@ -423,6 +425,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     value={selectedMonth}
                                     onChange={(e) => setSelectedMonth(Number(e.target.value))}
                                     style={{
+                                        minHeight: 'calc(1.4em + 10px)',
                                         padding: '4px 8px',
                                         borderRadius: '4px',
                                         border: '1px solid rgba(255,255,255,0.2)',
@@ -573,19 +576,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px' }}>
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>総投稿数</div>
-                            <div style={{ fontSize: '2.8rem', fontWeight: 800 }}>{totalThreads}</div>
+                            <div className="num" style={{ fontSize: '2.8rem', fontWeight: 800 }}>{totalThreads}</div>
                         </div>
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(67, 181, 129, 0.1), rgba(67, 181, 129, 0.05))' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>完了数</div>
-                            <div style={{ fontSize: '2.8rem', fontWeight: 800, color: 'var(--success)' }}>{completedThreads}</div>
+                            <div className="num" style={{ fontSize: '2.8rem', fontWeight: 800, color: 'var(--success)' }}>{completedThreads}</div>
                         </div>
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>平均完了時間</div>
-                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)', textAlign: 'center' }}>{overallAvgTime}</div>
+                            <div className="num" style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)', textAlign: 'center' }}>{overallAvgTime}</div>
                         </div>
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(220, 38, 38, 0.05), rgba(220, 38, 38, 0.02))' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>返信ありの割合</div>
-                            <div style={{ fontSize: '2.8rem', fontWeight: 800, color: 'var(--danger)' }}>{replyRate}%</div>
+                            <div className="num" style={{ fontSize: '2.8rem', fontWeight: 800, color: 'var(--danger)' }}>{replyRate}%</div>
                         </div>
                     </div>
 
@@ -609,10 +612,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                         <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
                                             <div style={{ height: '100%', width: `${(row.count / maxCategoryCount) * 100}%`, background: CATEGORY_COLORS[row.category], borderRadius: '4px', transition: 'width 1s ease-out' }} />
                                         </div>
-                                        <div style={{ textAlign: 'center', fontWeight: 700 }}>
+                                        <div className="num" style={{ textAlign: 'center', fontWeight: 700 }}>
                                             {row.count}<span style={{ fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-muted)' }}> ({Math.round((row.count / totalThreads) * 100)}%)</span>
                                         </div>
-                                        <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                        <div className="num" style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                             {row.medianDurationMs != null ? formatDuration(row.medianDurationMs) : '—'}
                                         </div>
                                     </div>
@@ -814,7 +817,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.85rem' }}>
                                             <span style={{ fontWeight: 600 }}>{stat.name}</span>
                                             <div style={{ display: 'flex', gap: '10px' }}>
-                                                <span style={{ fontWeight: 700, width: '40px', textAlign: 'right' }}>{stat.completedCount}件</span>
+                                                <span className="num" style={{ fontWeight: 700, width: '40px', textAlign: 'right' }}>{stat.completedCount}件</span>
                                                 <span style={{ color: stat.avgReplies > 2.5 ? 'var(--danger)' : 'var(--text-main)', fontWeight: 700, width: '60px', textAlign: 'right' }}>{stat.avgReplies}件</span>
                                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '70px', textAlign: 'right' }}>{stat.avgTime}</span>
                                             </div>
@@ -862,7 +865,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                         />
                                     </svg>
                                     <div style={{ position: 'absolute', top: '0', left: '0', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                                        <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{completionRate}%</div>
+                                        <div className="num" style={{ fontSize: '1.8rem', fontWeight: 800 }}>{completionRate}%</div>
                                         <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>全体完了率</div>
                                     </div>
                                 </div>
@@ -874,7 +877,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                             <div key={String(stat.id)}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.9rem' }}>
                                                     <span style={{ fontWeight: 600 }}>{stat.name}</span>
-                                                    <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{stat.completedCount}件</span>
+                                                    <span className="num" style={{ color: 'var(--accent)', fontWeight: 700 }}>{stat.completedCount}件</span>
                                                 </div>
                                                 <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
                                                     <div
@@ -930,7 +933,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                             </div>
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
-                                            <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{stat.count + stat.replyCount + stat.completedCount} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>件</span></div>
+                                            <div className="num" style={{ fontSize: '0.95rem', fontWeight: 700 }}>{stat.count + stat.replyCount + stat.completedCount} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>件</span></div>
                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>投稿{stat.count}・返信{stat.replyCount}・完了{stat.completedCount}</div>
                                         </div>
                                     </div>
@@ -976,7 +979,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 </td>
                                                 <td style={{ padding: '12px 10px', textAlign: 'right' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                        <span>{stat.count} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>/ {postQuota.toFixed(1)}</span></span>
+                                                        <span className="num">{stat.count} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>/ {postQuota.toFixed(1)}</span></span>
                                                         <span style={{ fontSize: '0.75rem', color: postDiff >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                                             {postDiff > 0 ? '+' : ''}{postDiff.toFixed(1)}
                                                         </span>
@@ -984,7 +987,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 </td>
                                                 <td style={{ padding: '12px 10px', textAlign: 'right' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                        <span>{stat.completedCount} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>/ {completionQuota.toFixed(1)}</span></span>
+                                                        <span className="num">{stat.completedCount} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>/ {completionQuota.toFixed(1)}</span></span>
                                                         <span style={{ fontSize: '0.75rem', color: completionDiff >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                                             {completionDiff > 0 ? '+' : ''}{completionDiff.toFixed(1)}
                                                         </span>
@@ -1268,7 +1271,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 <div key={l.name} onClick={() => setGraphUser(l.name)} title="クリックで個人表示に切替" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', cursor: 'pointer', padding: '3px 10px', borderRadius: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                                     <span style={{ width: '10px', height: '3px', borderRadius: '2px', background: COLORS[li % COLORS.length], display: 'inline-block' }}></span>
                                                     {l.name}
-                                                    <span style={{ color: 'var(--text-muted)' }}>{l.total}</span>
+                                                    <span className="num" style={{ color: 'var(--text-muted)' }}>{l.total}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -1418,11 +1421,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 </div>
                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '5px' }}>総投稿数</div>
-                                    <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{userStats[selectedUser].count}</div>
+                                    <div className="num" style={{ fontSize: '1.8rem', fontWeight: 800 }}>{userStats[selectedUser].count}</div>
                                 </div>
                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '5px' }}>完了数 / 完了率</div>
-                                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--success)' }}>
+                                    <div className="num" style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--success)' }}>
                                         {userStats[selectedUser].completedCount} <span style={{ fontSize: '1rem', fontWeight: 400, color: 'var(--text-muted)' }}>({userStats[selectedUser].completionRate}%)</span>
                                     </div>
                                 </div>
@@ -1452,7 +1455,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                     style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', alignItems: 'center' }}
                                                 >
                                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
-                                                    <span style={{ color: 'var(--text-muted)', flexShrink: 0, fontSize: '0.7rem' }}>{new Date(t.created_at).toLocaleDateString()}</span>
+                                                    <span className="num" style={{ color: 'var(--text-muted)', flexShrink: 0, fontSize: '0.7rem' }}>{new Date(t.created_at).toLocaleDateString()}</span>
                                                 </div>
                                             ))}
                                         </div>
