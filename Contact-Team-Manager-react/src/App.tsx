@@ -113,7 +113,7 @@ function App() {
   const fetchLimit = (statusFilter === 'pending' || statusFilter === 'waiting' || statusFilter === 'mentions' || searchTerm) ? 2000 : threadsLimit;
   // Pass searchTerm (debounced) to useThreads for server-side filtering
   const threadsData = useThreads(currentTeamId, fetchLimit, sortAscending, statusFilter, searchTerm);
-  const { threads: rawThreads, loading: threadsLoading, error: threadsError, refetch, mutateThread } = threadsData;
+  const { threads: rawThreads, loading: threadsLoading, error: threadsError, refetch, mutateThread, addThreadOptimistic, resolveThreadOptimistic } = threadsData;
   const { memberships, loading: membershipsLoading, updateLastRead } = useUserMemberships(user?.id);
   const { unreadTeams } = useUnreadCounts(user?.id, memberships);
 
@@ -502,7 +502,8 @@ function App() {
                 <div className="desktop-only-postform" style={{ flexShrink: 0 }}>
                   <PostForm
                     teamId={currentTeamId}
-                    onSuccess={() => refetch(true)}
+                    onOptimisticInsert={addThreadOptimistic}
+                    onInsertSettled={resolveThreadOptimistic}
                   />
                 </div>
               </div>
@@ -559,10 +560,9 @@ function App() {
           <div className="mobile-post-modal-content">
             <PostForm
               teamId={currentTeamId}
-              onSuccess={() => {
-                refetch(true);
-                setIsMobilePostFormOpen(false);
-              }}
+              onOptimisticInsert={addThreadOptimistic}
+              onInsertSettled={resolveThreadOptimistic}
+              onSuccess={() => setIsMobilePostFormOpen(false)}
               onCancel={() => setIsMobilePostFormOpen(false)}
             />
           </div>

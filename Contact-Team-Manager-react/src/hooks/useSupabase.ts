@@ -240,6 +240,16 @@ export function useThreads(
             if (ascending) {
                 result = [...result].reverse();
             }
+            // サーバー未確定の楽観 insert 行は fetch 結果に合成する。
+            // これが無いと、確定前に silent refetch が着地した瞬間に投稿が消える。
+            if (optimisticRef.current.size > 0) {
+                const have = new Set(result.map((r: any) => String(r.id)));
+                const pending = Array.from(optimisticRef.current.values())
+                    .filter(t => !have.has(String(t.id)));
+                if (pending.length > 0) {
+                    result = ascending ? [...result, ...pending] : [...pending, ...result];
+                }
+            }
             const cache = viewCacheRef.current;
             if (cache.size > VIEW_CACHE_MAX) cache.clear();
             cache.set(viewKeyRef.current, result as Thread[]);
@@ -310,6 +320,32 @@ export function useThreads(
         });
     }, []);
 
+    // 楽観 insert: 投稿クリックの瞬間に仮行を出し、insert の戻り（実行）で差し替える。
+    // realtime は commit 後にしか発火しないので、仮行と実行が二重に見える窓は無い。
+    const optimisticRef = useRef<Map<string, Thread>>(new Map());
+
+    const addThreadOptimistic = useCallback((t: Thread) => {
+        optimisticRef.current.set(String(t.id), t);
+        setThreads(prev => {
+            const next = ascending ? [...prev, t] : [t, ...prev];
+            viewCacheRef.current.set(viewKeyRef.current, next);
+            return next;
+        });
+    }, [ascending]);
+
+    // real=null は insert 失敗（仮行を取り下げるだけ）
+    const resolveThreadOptimistic = useCallback((tempId: string, real: Thread | null) => {
+        optimisticRef.current.delete(String(tempId));
+        setThreads(prev => {
+            let next = prev.filter(t => String(t.id) !== String(tempId));
+            if (real && !next.some(t => String(t.id) === String(real.id))) {
+                next = ascending ? [...next, real] : [real, ...next];
+            }
+            viewCacheRef.current.set(viewKeyRef.current, next);
+            return next;
+        });
+    }, [ascending]);
+
     // memberships は updateLastRead（チャネル切替のたびに走る）で毎回新しい配列になる。
     // 参照をそのまま依存にすると、切替のたびに購読を張り直したうえ fetch がもう1本走る。
     // 中身（team_id の集合）が同じなら張り直さない。
@@ -372,7 +408,7 @@ export function useThreads(
     const pollFetch = useCallback(() => { fetchThreads(true); }, [fetchThreads]);
     useRefetchInterval(pollFetch, 60_000, isAdminAllTeamsView);
 
-    return { threads, loading, error, refetch: fetchThreads, mutateThread };
+    return { threads, loading, error, refetch: fetchThreads, mutateThread, addThreadOptimistic, resolveThreadOptimistic };
 }
 
 export function useTeams() {

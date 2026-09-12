@@ -13,13 +13,15 @@ interface PostFormProps {
     teamId: number | string | null;
     onSuccess?: () => void;
     onCancel?: () => void;
+    // 楽観 insert: クリック瞬間に仮行を一覧へ出す / insert の結果で差し替える
+    onOptimisticInsert?: (thread: any) => void;
+    onInsertSettled?: (tempId: string, real: any | null) => void;
 }
 
-export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel }) => {
+export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel, onOptimisticInsert, onInsertSettled }) => {
     const { user, profile } = useAuth();
     const [title, setTitle] = useState('');
     const [remindAt, setRemindAt] = useState('');
-    const [loading, setLoading] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
 
     const { profiles } = useProfiles();
@@ -34,6 +36,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
         uploadFile,
         removeFile,
         clearFiles,
+        setAttachments,
         isAuthenticated,
         login,
         pendingFiles
@@ -86,35 +89,61 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
         if (!user) return;
         if (uploading) return;
 
-        setLoading(true);
+        const authorName = profile?.display_name || user.email || 'Unknown';
+        // 失敗時にフォームへ書き戻すため退避
+        const savedTitle = title;
+        const savedContent = contentRef.current.innerHTML;
+        const savedRemindAt = remindAt;
+        const savedAttachments = attachments;
+
+        const row = {
+            title: savedTitle,
+            content: savedContent,
+            author: authorName,
+            user_id: user.id,
+            team_id: teamId,
+            status: 'pending' as const,
+            attachments: savedAttachments.length > 0 ? savedAttachments : null,
+            remind_at: savedRemindAt ? new Date(savedRemindAt).toISOString() : null
+        };
+
+        // クリックの瞬間に仮行を一覧へ出してフォームを空にする。保存は裏で実行し、
+        // 失敗したら仮行を取り下げて入力内容を戻す（完了・返信と同じ方式）。
+        const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const now = new Date().toISOString();
+        onOptimisticInsert?.({
+            ...row,
+            id: tempId,
+            created_at: now,
+            updated_at: now,
+            is_pinned: false,
+            replies: [],
+            reminders: []
+        });
+
+        setTitle('');
+        setRemindAt('');
+        contentRef.current.innerHTML = '';
+        clearFiles();
+        if (onSuccess) onSuccess();
+
         try {
-            const authorName = profile?.display_name || user.email || 'Unknown';
-
-            const { error } = await supabase.from('threads').insert([
-                {
-                    title,
-                    content: contentRef.current.innerHTML,
-                    author: authorName,
-                    user_id: user.id,
-                    team_id: teamId,
-                    status: 'pending',
-                    attachments: attachments.length > 0 ? attachments : null,
-                    remind_at: remindAt ? new Date(remindAt).toISOString() : null
-                }
-            ]).select();
-
+            const timeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('タイムアウトしました（15秒）')), 15000)
+            );
+            const { data, error } = await Promise.race([
+                supabase.from('threads').insert([row]).select(),
+                timeout
+            ]) as any;
             if (error) throw error;
-
-            setTitle('');
-            setRemindAt('');
-            if (contentRef.current) contentRef.current.innerHTML = '';
-            clearFiles();
-            if (onSuccess) onSuccess();
-
+            onInsertSettled?.(tempId, data?.[0] ?? null);
         } catch (error: any) {
+            onInsertSettled?.(tempId, null);
+            setTitle(savedTitle);
+            setRemindAt(savedRemindAt);
+            if (contentRef.current) contentRef.current.innerHTML = savedContent;
+            setAttachments(savedAttachments);
             alert('投稿に失敗しました: ' + error.message);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -166,12 +195,10 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                             }}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            disabled={loading}
                         />
                         <WaterDateTimePicker
                             value={remindAt}
                             onChange={setRemindAt}
-                            disabled={loading}
                             title="リマインド日時を設定"
                         />
 
@@ -198,7 +225,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                     cursor: uploading ? 'default' : 'pointer',
                                     borderRadius: '50%'
                                 }}
-                                disabled={loading || uploading}
+                                disabled={uploading}
                                 onClick={handleAttachClick}
                             >
                                 {uploading ? (
@@ -379,14 +406,12 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                                     justifyContent: 'center'
                                 }}
                                 onClick={handleSubmit}
-                                disabled={loading || uploading}
+                                disabled={uploading}
                             >
-                                {loading ? '...' : (
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                    </svg>
-                                )}
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
                             </button>
                         </div>
                     </div>
@@ -407,7 +432,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel 
                     style={{ display: 'none' }}
                     multiple
                     onChange={handleFileChange}
-                    disabled={loading || uploading}
+                    disabled={uploading}
                 />
 
                 {/* Login Overlay */}
