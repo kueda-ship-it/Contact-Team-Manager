@@ -1474,13 +1474,20 @@ body:not(.light-mode) .rich-editor * {
 .feed-header-left {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.feed-header-left h2 {
+/* 縦レールのときは文字をレール側（右）に寄せる。横のときは左にチャネル名、右に操作 */
+:root:not([data-filter-bar="horizontal"]) .feed-header-left,
+:root:not([data-filter-bar="horizontal"]) .feed-header-left h2 {
     justify-content: flex-end;
+}
+
+.feed-header-right {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
 }
 
 
@@ -1596,6 +1603,11 @@ body.light-mode .feed-list.is-scrolling {
         --rail-space: 72px;
     }
 
+    /* 横向き（バーは一覧上の帯の中）のときは右の余白を取らず、一覧は中央寄せのまま */
+    :root[data-filter-bar="horizontal"] .main-feed-area {
+        --rail-space: 0px;
+    }
+
     .feed-list > *,
     .desktop-only-postform {
         width: min(880px, calc(100% - var(--rail-space)));
@@ -1604,8 +1616,8 @@ body.light-mode .feed-list.is-scrolling {
         margin-right: 0;
     }
 
-    /* 帯はレールの右端（一覧の列 + 12px + レール 50px）まで伸ばし、文字はレールの真上に右寄せ */
-    .feed-list > .feed-header-sticky {
+    /* 縦レールのとき: 帯はレールの右端（一覧の列 + 12px + レール 50px）まで伸ばし、文字はレールの真上に右寄せ */
+    :root:not([data-filter-bar="horizontal"]) .feed-list > .feed-header-sticky {
         width: calc(min(880px, calc(100% - var(--rail-space))) + 62px);
     }
 }
@@ -1614,7 +1626,7 @@ body.light-mode .feed-list.is-scrolling {
    チャネル名・件数・今の表示を一覧の列の外（レールの左端から右）に出し、スレッドの上に文字を置かない。
    帯は透明にしてクリックも下のカードへ通す */
 @media (min-width: 1820px) {
-    .feed-list > .feed-header-sticky {
+    :root:not([data-filter-bar="horizontal"]) .feed-list > .feed-header-sticky {
         width: min(880px, calc(100% - var(--rail-space)));
         /* 文字を外に出すと帯が 25px に縮み、28px のバッジが一覧の上端で切れるため、元の高さを保つ */
         min-height: 53px;
@@ -1623,7 +1635,7 @@ body.light-mode .feed-list.is-scrolling {
         pointer-events: none;
     }
 
-    .feed-header-sticky .feed-header-left {
+    :root:not([data-filter-bar="horizontal"]) .feed-header-sticky .feed-header-left {
         position: absolute;
         top: 0;
         bottom: 0;
@@ -1634,7 +1646,7 @@ body.light-mode .feed-list.is-scrolling {
         pointer-events: auto;
     }
 
-    .feed-header-sticky .feed-header-left h2 {
+    :root:not([data-filter-bar="horizontal"]) .feed-header-sticky .feed-header-left h2 {
         justify-content: flex-start;
     }
 }
@@ -4779,6 +4791,25 @@ body.light-mode .status-more-select.active .custom-select-trigger {
 .feed-rail-menu-item.selected {
     color: var(--accent);
     font-weight: 700;
+}
+
+/* 横向き（一覧上の帯の右側）。縦レールと同じ部品を横に並べる */
+.feed-rail.is-horizontal {
+    position: static;
+    flex-direction: row;
+    gap: 6px;
+    padding: 4px 6px;
+}
+
+.feed-rail.is-horizontal .feed-rail-divider {
+    width: 1px;
+    height: 20px;
+}
+
+/* 横向きのときメニューは下に開く */
+.feed-rail.is-horizontal .feed-rail-menu {
+    top: calc(100% + 8px);
+    right: 0;
 }
 
 /* チャネル名の横に出す今の表示（スイッチに文字が無いので色の意味をここで補う） */

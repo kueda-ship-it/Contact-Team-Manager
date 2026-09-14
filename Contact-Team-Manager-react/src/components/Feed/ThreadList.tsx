@@ -17,6 +17,8 @@ import { StatusFilterBar, StatusFilterLabel, StatusFilterRail } from './StatusFi
 const feedScrollMemory = new Map<string, number>();
 // この距離以内なら「最新の端にいる」とみなし、新しい投稿が来ても端に付いていく
 const NEWEST_END_SNAP_PX = 8;
+// デスクトップの表示バーの向き（縦レール / 横＝一覧上の帯）を端末ごとに覚えるキー
+const FILTER_BAR_ORIENTATION_KEY = 'ctm.feedFilterBarOrientation';
 import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
 import { DotMenu } from '../common/DotMenu';
 
@@ -356,6 +358,26 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             }
         }
     }, [threads.length, prevScrollHeight, sortAscending]);
+
+    // デスクトップの表示バーの向き。端末（ブラウザ）ごとに覚える
+    const [filterBarOrientation, setFilterBarOrientation] = React.useState<'vertical' | 'horizontal'>(() => {
+        try {
+            return localStorage.getItem(FILTER_BAR_ORIENTATION_KEY) === 'horizontal' ? 'horizontal' : 'vertical';
+        } catch {
+            return 'vertical';
+        }
+    });
+    React.useLayoutEffect(() => {
+        try {
+            localStorage.setItem(FILTER_BAR_ORIENTATION_KEY, filterBarOrientation);
+        } catch {
+            // 保存できない環境では次回も縦から始まる
+        }
+        // 一覧の右にレール分の余白を取るかを CSS で切り替えるため、ルートに向きを出す（投稿欄の幅も合わせる）
+        document.documentElement.dataset.filterBar = filterBarOrientation;
+    }, [filterBarOrientation]);
+    const toggleFilterBarOrientation = () =>
+        setFilterBarOrientation(o => (o === 'vertical' ? 'horizontal' : 'vertical'));
 
     // 表示が切り替わったら（チャネル・フィルタ・並び順）、前回そこで動かした位置に戻す。
     // 一度も動かしていなければ最新の端（最新が下なら一番下、最新が上なら一番上）から始める。
@@ -1115,17 +1137,33 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         <StatusFilterLabel value={statusFilter} />
                     </h2>
                 </div>
+                {filterBarOrientation === 'horizontal' && (
+                    <div className="feed-header-right">
+                        <StatusFilterRail
+                            value={statusFilter}
+                            onChange={onStatusChange}
+                            sortAscending={sortAscending}
+                            onToggleSort={onToggleSort}
+                            orientation="horizontal"
+                            onToggleOrientation={toggleFilterBarOrientation}
+                        />
+                    </div>
+                )}
             </div>
 
-            {/* デスクトップ: 表示切替と並べ替えは一覧の右隣の縦レール（スクロールしても同じ位置に残る） */}
-            <div className="feed-rail-anchor desktop-only">
-                <StatusFilterRail
-                    value={statusFilter}
-                    onChange={onStatusChange}
-                    sortAscending={sortAscending}
-                    onToggleSort={onToggleSort}
-                />
-            </div>
+            {/* デスクトップ（縦）: 表示切替と並べ替えは一覧の右隣の縦レール（スクロールしても同じ位置に残る） */}
+            {filterBarOrientation === 'vertical' && (
+                <div className="feed-rail-anchor desktop-only">
+                    <StatusFilterRail
+                        value={statusFilter}
+                        onChange={onStatusChange}
+                        sortAscending={sortAscending}
+                        onToggleSort={onToggleSort}
+                        orientation="vertical"
+                        onToggleOrientation={toggleFilterBarOrientation}
+                    />
+                </div>
+            )}
 
             {/* Mobile Header (New Integrated Sticky UI) */}
             <div className="mobile-only mobile-header-fixed">

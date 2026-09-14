@@ -98,10 +98,14 @@ export const StatusFilterBar: React.FC<StatusFilterBarProps> = ({ value, onChang
 interface StatusFilterRailProps extends StatusFilterBarProps {
     sortAscending: boolean;
     onToggleSort: () => void;
+    orientation: 'vertical' | 'horizontal';
+    onToggleOrientation: () => void;
 }
 
 // デスクトップ用: 一覧の右隣に縦に並べる（色スイッチ / その他 / 並べ替え）
-export const StatusFilterRail: React.FC<StatusFilterRailProps> = ({ value, onChange, sortAscending, onToggleSort }) => {
+export const StatusFilterRail: React.FC<StatusFilterRailProps> = ({ value, onChange, sortAscending, onToggleSort, orientation, onToggleOrientation }) => {
+    const isVertical = orientation === 'vertical';
+    const orientationLabel = isVertical ? 'バーを横に並べる（一覧の上）' : 'バーを縦に並べる（一覧の右）';
     const [menuOpen, setMenuOpen] = useState(false);
     const moreRef = useRef<HTMLDivElement>(null);
     const moreActive = MORE_OPTIONS.some(o => o.value === value);
@@ -125,8 +129,8 @@ export const StatusFilterRail: React.FC<StatusFilterRailProps> = ({ value, onCha
     }, [menuOpen]);
 
     return (
-        <div className="feed-rail">
-            <StatusSwitch value={value} onChange={onChange} vertical />
+        <div className={`feed-rail ${isVertical ? '' : 'is-horizontal'}`}>
+            <StatusSwitch value={value} onChange={onChange} vertical={isVertical} />
             <div className="feed-rail-divider" aria-hidden="true" />
             <div className="feed-rail-more" ref={moreRef}>
                 <button
@@ -179,6 +183,25 @@ export const StatusFilterRail: React.FC<StatusFilterRailProps> = ({ value, onCha
                         <path d="m3 8 4-4 4 4" /><path d="M7 4v16" /><path d="M11 12h4" /><path d="M11 16h7" /><path d="M11 20h10" />
                     </svg>
                 )}            </button>
+            <div className="feed-rail-divider" aria-hidden="true" />
+            {/* 向きの切り替え。アイコンは切り替えた後の並び（縦のとき＝横並びの図、横のとき＝縦並びの図） */}
+            <button
+                type="button"
+                className="feed-rail-btn"
+                aria-label={orientationLabel}
+                title={orientationLabel}
+                onClick={onToggleOrientation}
+            >
+                {isVertical ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /><path d="M15 3v18" />
+                    </svg>
+                ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect width="18" height="18" x="3" y="3" rx="2" /><path d="M21 9H3" /><path d="M21 15H3" />
+                    </svg>
+                )}
+            </button>
         </div>
     );
 };
