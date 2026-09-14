@@ -50,7 +50,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const [graphUser, setGraphUser] = useState<string | null>(null);
     const [graphMetric, setGraphMetric] = useState<'posts' | 'completions' | 'replies'>('completions');
 
-    if (threadsLoading && threads.length === 0) return null;
+    if (threadsLoading && threads.length === 0) {
+        return (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                <div style={{ width: '28px', height: '28px', border: '3px solid rgba(128,128,128,0.25)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                <div style={{ fontSize: '0.9rem' }}>全投稿を読み込み中…</div>
+            </div>
+        );
+    }
 
     const getFilteredThreads = () => {
         if (period === 'all') return threads;
@@ -138,6 +145,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
 
     const overallAvgTime = calculateAvgTime(displayThreads);
+
+    // 平均は長期案件に引っぱられるので、実態が伝わる指標を併記する
+    const completionSummary = (() => {
+        const durations = displayThreads
+            .filter(t => t.status === 'completed' && t.completed_at && t.created_at)
+            .map(t => ({
+                ms: completionDurationMs(t.created_at, t.completed_at!),
+                sameDay: new Date(t.created_at).toDateString() === new Date(t.completed_at!).toDateString(),
+            }))
+            .filter(d => !isNaN(d.ms));
+        const FIVE_BUSINESS_DAYS_MS = 5 * 8.5 * 60 * 60 * 1000;
+        return {
+            medianMs: medianMs(durations.map(d => d.ms)),
+            sameDayRate: durations.length > 0 ? Math.round((durations.filter(d => d.sameDay).length / durations.length) * 100) : null,
+            overFiveDays: durations.filter(d => d.ms > FIVE_BUSINESS_DAYS_MS).length,
+        };
+    })();
 
     const userStats: { [key: string]: { name: string; count: number; replyCount: number; completedCount: number; avgTime: string; completionRate: number; dailySpan: string; totalRepliesInCompleted: number; avgReplies: number } } = {};
     const getUserStat = (name: string) => {
@@ -331,10 +355,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const radius = 40;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (completionRate / 100) * circumference;
-
-    if (threadsLoading && threads.length === 0) {
-        return null;
-    }
 
     const currentTeam = teams && Array.isArray(teams) && currentTeamId
         ? teams.find(t => String(t.id) === String(currentTeamId))
@@ -581,6 +601,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>平均完了時間</div>
                             <div className="num" style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)', textAlign: 'center' }}>{overallAvgTime}</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', columnGap: '16px', rowGap: '2px', marginTop: '10px', fontSize: '0.8rem', lineHeight: 1.5 }}>
+                                <span style={{ color: 'var(--text-muted)' }}>中央値</span>
+                                <span className="num" style={{ textAlign: 'right', fontWeight: 700 }}>{completionSummary.medianMs != null ? formatDuration(completionSummary.medianMs) : '—'}</span>
+                                <span style={{ color: 'var(--text-muted)' }}>当日完了率</span>
+                                <span className="num" style={{ textAlign: 'right', fontWeight: 700 }}>{completionSummary.sameDayRate != null ? `${completionSummary.sameDayRate}%` : '—'}</span>
+                                <span style={{ color: 'var(--text-muted)' }}>5営業日超</span>
+                                <span className="num" style={{ textAlign: 'right', fontWeight: 700 }}>{completionSummary.overFiveDays}件</span>
+                            </div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'center', lineHeight: 1.5 }}>日をまたぐものは土日祝・年末年始を除く 9:00〜17:30 で計算</div>
                         </div>
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(220, 38, 38, 0.05), rgba(220, 38, 38, 0.02))' }}>

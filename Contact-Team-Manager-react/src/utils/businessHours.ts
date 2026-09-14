@@ -66,6 +66,23 @@ export const isNonWorkingDay = (date: Date) => {
     return holidaysOf(date.getFullYear()).has(dayKey(month, day));
 };
 
+// start〜end のうち、土日祝・年末年始を除く日の 9:00〜17:30 に重なる時間
+export const businessMsBetween = (start: Date, end: Date) => {
+    const s = start.getTime();
+    const e = end.getTime();
+    if (isNaN(s) || isNaN(e) || e <= s) return 0;
+    let total = 0;
+    const day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    while (day.getTime() <= e) {
+        if (!isNonWorkingDay(day)) {
+            const dayStart = day.getTime();
+            total += Math.max(0, Math.min(dayStart + CLOSE_MS, e) - Math.max(dayStart + OPEN_MS, s));
+        }
+        day.setDate(day.getDate() + 1);
+    }
+    return total;
+};
+
 const durationCache = new Map<string, number>();
 
 // 完了までの時間。当日中に完了したものは実時間（夜間・土日祝でもそのまま）、
@@ -86,15 +103,7 @@ export const completionDurationMs = (createdAt: string, completedAt: string) => 
     } else if (start.toDateString() === end.toDateString()) {
         total = e - s;
     } else {
-        total = 0;
-        const day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-        while (day.getTime() <= e) {
-            if (!isNonWorkingDay(day)) {
-                const dayStart = day.getTime();
-                total += Math.max(0, Math.min(dayStart + CLOSE_MS, e) - Math.max(dayStart + OPEN_MS, s));
-            }
-            day.setDate(day.getDate() + 1);
-        }
+        total = businessMsBetween(start, end);
     }
 
     durationCache.set(cacheKey, total);

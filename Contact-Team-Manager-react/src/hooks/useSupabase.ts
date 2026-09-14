@@ -90,6 +90,12 @@ interface Thread {
 
 const VIEW_CACHE_MAX = 12;
 
+// ダッシュボード(limit<=0 の全件取得)はビューを離れるとアンマウントされ、インスタンス内の
+// キャッシュごと消えて開くたびに全件を待たされていた。全件取得だけはモジュールで持つ。
+const fullFetchCache = new Map<string, Thread[]>();
+const makeViewKey = (teamId: number | string | null, filter: string, ascending: boolean, searchQuery: string) =>
+    `${teamId ?? ''}|${filter}|${ascending}|${searchQuery.trim()}`;
+
 // 検索ヒットの取得上限。号機のような数字は 1〜2 文字で数千件に当たるため、
 // 新しい順にこの件数だけ引く(描画コストの上限を切る)。
 const SEARCH_RESULT_LIMIT = 200;
@@ -139,8 +145,10 @@ export function useThreads(
 ) {
     const { user, profile } = useAuth();
     const { memberships } = useUserMemberships(user?.id);
-    const [threads, setThreads] = useState<Thread[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [threads, setThreads] = useState<Thread[]>(() =>
+        (limit <= 0 && fullFetchCache.get(makeViewKey(teamId, filter, ascending, searchQuery))) || []);
+    const [loading, setLoading] = useState(() =>
+        !(limit <= 0 && fullFetchCache.has(makeViewKey(teamId, filter, ascending, searchQuery))));
     const [error, setError] = useState<Error | null>(null);
     // 発行順を持つカウンタ。後から投げた fetch が先に返った古い fetch に
     // 上書きされる(= 検索が解ける)のを防ぐ。
@@ -151,7 +159,8 @@ export function useThreads(
     //   件数だけ違う呼び出し(フィード=50件 / ダッシュボード=全件)が同じキーで
     //   ぶつかる。limit をキーに混ぜる案は、追加読み込みのたびにキャッシュが
     //   外れて一覧が一瞬消えるので採らない。
-    const viewCacheRef = useRef(new Map<string, Thread[]>());
+    //   例外は全件取得(limit<=0)で、アンマウントをまたいで残すため fullFetchCache を使う。
+    const viewCacheRef = useRef(limit <= 0 ? fullFetchCache : new Map<string, Thread[]>());
     const viewKeyRef = useRef('');
 
     const fetchThreads = useCallback(async (silent = false) => {
@@ -270,7 +279,7 @@ export function useThreads(
     // 往復)を待たずに前回の内容を即座に出し、裏で silent に取り直して差し替える。
     // これが無いと、クリックしてから前のチャネルの内容が出たままになり
     // 「ワンテンポ遅れて切り替わる」ように見える。
-    const viewKey = `${teamId ?? ''}|${filter}|${ascending}|${searchQuery.trim()}`;
+    const viewKey = makeViewKey(teamId, filter, ascending, searchQuery);
     viewKeyRef.current = viewKey;
 
     useEffect(() => {

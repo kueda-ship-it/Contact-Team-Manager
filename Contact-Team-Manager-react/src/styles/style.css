@@ -5111,6 +5111,10 @@ body.light-mode #root a.post-link {
     to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* --- Image Preview Modal --- */
 .image-preview-overlay {
     position: fixed;

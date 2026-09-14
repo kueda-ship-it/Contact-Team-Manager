@@ -3,6 +3,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import { useNotificationContext } from '../context/NotificationContext';
+import { businessMsBetween } from '../utils/businessHours';
 
 const RECONNECT_DELAY_MS = 5000;
 
@@ -19,6 +20,13 @@ export const MODE_LABEL: Record<NotifyMode, string> = {
 // 何日前までのリマインドを鳴らすか。全員がアプリを閉じていた間の分は
 // 次に開いた人に出るが、何週間も前のものを今さら鳴らしても邪魔なので窓を切る。
 const REMINDER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+// 最後の動き（起票 or 返信）から 1営業日（土日祝を除く 9:00〜17:30 で 8.5時間）動きのない
+// 未完了を、起票者と最後に返信した人に知らせる。連絡待ちは先方待ちなので対象外。
+const STALE_AFTER_MS = 8.5 * 60 * 60 * 1000;
+const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+// 一度にこれより多く該当したら1通にまとめる（初回や休み明けに通知が連打されないように）
+const STALE_INDIVIDUAL_MAX = 2;
 
 const NOTIFICATION_ICON = `${import.meta.env.BASE_URL}favicon-v3.png`;
 
@@ -284,6 +292,86 @@ export function useNotifications() {
         }, 60000);
         return () => clearInterval(interval);
     }, [fetchTagData, fetchTeamNotifSettings, checkReminders]);
+
+    const checkStaleThreads = useCallback(async () => {
+        if (!user) return;
+        try {
+            const { data, error } = await supabase
+                .from('threads')
+                .select('id, title, team_id, user_id, created_at, replies:replies(user_id, created_at), notices:thread_stale_notices(user_id, activity_at)')
+                .eq('status', 'pending')
+                .not('waiting_contact', 'is', true);
+            if (error) {
+                console.error('Failed to fetch stale threads:', error);
+                return;
+            }
+
+            const now = new Date();
+            const fresh: { thread: any; activityAt: string; byReply: boolean }[] = [];
+            for (const thread of data || []) {
+                const replies = [...((thread as any).replies || [])]
+                    .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                const lastReply = replies[replies.length - 1];
+                const activityAt: string = lastReply?.created_at || thread.created_at;
+                // FC追記ウォッチの返信などは user_id を持たないので、宛先は人が書いた最後の返信から取る
+                const lastHumanReply = [...replies].reverse().find((r: any) => r.user_id);
+                const recipients = new Set([thread.user_id, lastHumanReply?.user_id].filter(Boolean));
+                if (!recipients.has(user.id)) continue;
+                if (!isTeamNotifEnabled(thread.team_id)) continue;
+                if (businessMsBetween(new Date(activityAt), now) < STALE_AFTER_MS) continue;
+
+                const activityTime = new Date(activityAt).getTime();
+                const notified = ((thread as any).notices || []).some((n: any) =>
+                    n.user_id === user.id && new Date(n.activity_at).getTime() === activityTime);
+                if (notified) continue;
+
+                // 先に記録してから鳴らす。同時に開いている別端末と二重に鳴らさないため、
+                // 主キー重複（23505）なら他端末が先に受け取ったとみなして鳴らさない
+                const { error: insertError } = await supabase
+                    .from('thread_stale_notices')
+                    .insert({ thread_id: thread.id, activity_at: activityAt, user_id: user.id });
+                if (insertError) {
+                    if (insertError.code !== '23505') console.error('Failed to record stale notice:', insertError);
+                    continue;
+                }
+                fresh.push({ thread, activityAt, byReply: !!lastReply });
+            }
+
+            if (fresh.length === 0) return;
+            const base = `${window.location.origin}/Contact-Team-Manager/`;
+            if (fresh.length > STALE_INDIVIDUAL_MAX) {
+                const titles = fresh.slice(0, 3).map(f => f.thread.title).join('、');
+                await showNotification(
+                    `⏳ 1営業日動きのない未完了が${fresh.length}件あります`,
+                    `${titles}${fresh.length > 3 ? ' ほか' : ''}。対応済みなら完了にしてください`,
+                    base,
+                    'stale-summary'
+                );
+                return;
+            }
+            for (const f of fresh) {
+                const when = new Date(f.activityAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                await showNotification(
+                    `⏳ 動きなし: ${f.thread.title}`,
+                    `${f.byReply ? '最後の返信' : '起票'}（${when}）から1営業日動きがありません。対応済みなら完了にしてください`,
+                    `${base}?thread=${f.thread.id}`,
+                    `stale-${f.thread.id}`
+                );
+            }
+        } catch (e) {
+            console.error('Stale thread check error:', e);
+        }
+    }, [user, isTeamNotifEnabled]);
+
+    useEffect(() => {
+        // 起動直後はチャネルごとの通知設定がまだ入っていないので少し待つ
+        const first = setTimeout(checkStaleThreads, 30000);
+        const interval = setInterval(checkStaleThreads, STALE_CHECK_INTERVAL_MS);
+        return () => {
+            clearTimeout(first);
+            clearInterval(interval);
+        };
+    }, [checkStaleThreads]);
 
     // Subscribe with auto-reconnect on disconnect
     useEffect(() => {
