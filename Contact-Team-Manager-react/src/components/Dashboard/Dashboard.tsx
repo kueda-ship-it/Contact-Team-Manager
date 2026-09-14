@@ -59,35 +59,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
         );
     }
 
-    const getFilteredThreads = () => {
-        if (period === 'all') return threads;
+    const isInPeriod = (iso: string | null | undefined) => {
+        if (period === 'all') return true;
+        if (!iso) return false;
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const date = new Date(iso).getTime();
+        const d = new Date(date);
 
-        return threads.filter(t => {
-            const date = new Date(t.completed_at || t.created_at).getTime();
-            const d = new Date(date);
+        if (period === 'year') {
+            return d.getFullYear() === selectedYear;
+        }
+        if (period === 'month') {
+            return d.getFullYear() === selectedYear && (d.getMonth() + 1) === selectedMonth;
+        }
+        if (period === 'week') {
+            const oneWeekAgo = startOfDay - (7 * 24 * 60 * 60 * 1000);
+            return date >= oneWeekAgo;
+        }
+        if (period === 'day') {
+            return date >= startOfDay;
+        }
+        if (period === 'custom' && startDate && endDate) {
+            const start = new Date(startDate).getTime();
+            const end = new Date(endDate).getTime() + (24 * 60 * 60 * 1000) - 1; // End of selected day
+            return date >= start && date <= end;
+        }
+        return true;
+    };
 
-            if (period === 'year') {
-                return d.getFullYear() === selectedYear;
-            }
-            if (period === 'month') {
-                return d.getFullYear() === selectedYear && (d.getMonth() + 1) === selectedMonth;
-            }
-            if (period === 'week') {
-                const oneWeekAgo = startOfDay - (7 * 24 * 60 * 60 * 1000);
-                return date >= oneWeekAgo;
-            }
-            if (period === 'day') {
-                return date >= startOfDay;
-            }
-            if (period === 'custom' && startDate && endDate) {
-                const start = new Date(startDate).getTime();
-                const end = new Date(endDate).getTime() + (24 * 60 * 60 * 1000) - 1; // End of selected day
-                return date >= start && date <= end;
-            }
-            return true;
-        });
+    const getFilteredThreads = () => {
+        if (period === 'all') return threads;
+        return threads.filter(t => isInPeriod(t.completed_at || t.created_at));
     };
 
     const displayThreads = getFilteredThreads();
@@ -144,11 +147,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return `${hours}時間 ${mins}分`;
     };
 
-    const overallAvgTime = calculateAvgTime(displayThreads);
-
     // 平均は長期案件に引っぱられるので、実態が伝わる指標を併記する
-    const completionSummary = (() => {
-        const durations = displayThreads
+    const summarizeCompletion = (list: typeof threads) => {
+        const durations = list
             .filter(t => t.status === 'completed' && t.completed_at && t.created_at)
             .map(t => ({
                 ms: completionDurationMs(t.created_at, t.completed_at!),
@@ -157,11 +158,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
             .filter(d => !isNaN(d.ms));
         const FIVE_BUSINESS_DAYS_MS = 5 * 8.5 * 60 * 60 * 1000;
         return {
+            count: durations.length,
+            avgMs: durations.length > 0 ? durations.reduce((sum, d) => sum + d.ms, 0) / durations.length : null,
             medianMs: medianMs(durations.map(d => d.ms)),
             sameDayRate: durations.length > 0 ? Math.round((durations.filter(d => d.sameDay).length / durations.length) * 100) : null,
             overFiveDays: durations.filter(d => d.ms > FIVE_BUSINESS_DAYS_MS).length,
         };
-    })();
+    };
+    type CompletionSummary = ReturnType<typeof summarizeCompletion>;
+    const completedInPeriod = summarizeCompletion(displayThreads);
+    // 期間内に完了した分には何か月も前の投稿の片付けが混ざり、「日」でも平均が100時間を超える。
+    // 今の対応の速さが分かるよう、期間内に起票した分も並べる
+    const createdInPeriod = summarizeCompletion(period === 'all' ? threads : threads.filter(t => isInPeriod(t.created_at)));
 
     const userStats: { [key: string]: { name: string; count: number; replyCount: number; completedCount: number; avgTime: string; completionRate: number; dailySpan: string; totalRepliesInCompleted: number; avgReplies: number } } = {};
     const getUserStat = (name: string) => {
@@ -600,15 +608,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>平均完了時間</div>
-                            <div className="num" style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)', textAlign: 'center' }}>{overallAvgTime}</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', columnGap: '16px', rowGap: '2px', marginTop: '10px', fontSize: '0.8rem', lineHeight: 1.5 }}>
-                                <span style={{ color: 'var(--text-muted)' }}>中央値</span>
-                                <span className="num" style={{ textAlign: 'right', fontWeight: 700 }}>{completionSummary.medianMs != null ? formatDuration(completionSummary.medianMs) : '—'}</span>
-                                <span style={{ color: 'var(--text-muted)' }}>当日完了率</span>
-                                <span className="num" style={{ textAlign: 'right', fontWeight: 700 }}>{completionSummary.sameDayRate != null ? `${completionSummary.sameDayRate}%` : '—'}</span>
-                                <span style={{ color: 'var(--text-muted)' }}>5営業日超</span>
-                                <span className="num" style={{ textAlign: 'right', fontWeight: 700 }}>{completionSummary.overFiveDays}件</span>
-                            </div>
+                            {(() => {
+                                const columns: { key: string; label: string; summary: CompletionSummary }[] = period === 'all'
+                                    ? [{ key: 'all', label: '', summary: completedInPeriod }]
+                                    : [
+                                        { key: 'created', label: '期間内に起票', summary: createdInPeriod },
+                                        { key: 'completed', label: '期間内に完了', summary: completedInPeriod },
+                                    ];
+                                const rows: { label: string; strong?: boolean; render: (s: CompletionSummary) => string }[] = [
+                                    { label: '平均', strong: true, render: s => s.avgMs != null ? formatDuration(s.avgMs) : '—' },
+                                    { label: '中央値', render: s => s.medianMs != null ? formatDuration(s.medianMs) : '—' },
+                                    { label: '当日完了率', render: s => s.sameDayRate != null ? `${s.sameDayRate}%` : '—' },
+                                    { label: '5営業日超', render: s => `${s.overFiveDays}件` },
+                                    { label: '対象', render: s => `${s.count}件` },
+                                ];
+                                return (
+                                    <div style={{ display: 'grid', gridTemplateColumns: `auto repeat(${columns.length}, minmax(0, 1fr))`, columnGap: '14px', rowGap: '3px', width: '100%', fontSize: '0.8rem', lineHeight: 1.5, alignItems: 'baseline' }}>
+                                        {columns.length > 1 && (
+                                            <>
+                                                <span></span>
+                                                {columns.map(c => (
+                                                    <span key={c.key} style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.72rem' }}>{c.label}</span>
+                                                ))}
+                                            </>
+                                        )}
+                                        {rows.map(r => (
+                                            <React.Fragment key={r.label}>
+                                                <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{r.label}</span>
+                                                {columns.map(c => (
+                                                    <span key={c.key} className="num" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-main)', fontSize: r.strong ? '1.05rem' : undefined }}>{r.render(c.summary)}</span>
+                                                ))}
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                            {period !== 'all' && (
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center', lineHeight: 1.5 }}>起票＝期間内に起票して完了したもの（未完了は含まない）／完了＝期間内に完了したもの（古い投稿の片付けを含む）</div>
+                            )}
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'center', lineHeight: 1.5 }}>日をまたぐものは土日祝・年末年始を除く 9:00〜17:30 で計算</div>
                         </div>
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(220, 38, 38, 0.05), rgba(220, 38, 38, 0.02))' }}>
