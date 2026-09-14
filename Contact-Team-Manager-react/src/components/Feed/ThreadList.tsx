@@ -9,7 +9,7 @@ import { highlightMentions, hasMention } from '../../utils/mentions';
 import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
-import { CustomSelect } from '../common/CustomSelect';
+import { StatusFilterBar, StatusFilterLabel, StatusFilterRail } from './StatusFilterBar';
 import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
 import { DotMenu } from '../common/DotMenu';
 
@@ -98,8 +98,8 @@ interface ThreadListProps {
         refetch: (silent?: boolean) => void;
         mutateThread: (threadId: string, patch: Record<string, any> | ((t: any) => any)) => void;
     };
-    statusFilter: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts';
-    onStatusChange: (status: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts') => void;
+    statusFilter: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts' | 'open';
+    onStatusChange: (status: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts' | 'open') => void;
     sortAscending: boolean;
     onToggleSort: () => void;
     onLoadMore: () => void;
@@ -416,6 +416,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         // 未完了に連絡待ちは含めない（連絡待ちは専用タブと右サイドバーで数える）
         if (statusFilter === 'pending') return thread.status === 'pending' && !thread.waiting_contact;
         if (statusFilter === 'waiting') return thread.status === 'pending' && thread.waiting_contact;
+        if (statusFilter === 'open') return thread.status === 'pending';
         if (statusFilter === 'completed') return thread.status === 'completed';
         if (statusFilter === 'mentions') {
             return hasMention(thread.content, currentProfile, user?.email || null) ||
@@ -1091,43 +1092,22 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             {/* Desktop Header (Original UI) */}
             <div className="feed-header-sticky desktop-only">
                 <div className="feed-header-left">
-                    <CustomSelect
-                        options={[
-                            { value: 'all', label: 'すべて表示' },
-                            { value: 'pending', label: '未完了' },
-                            { value: 'waiting', label: '連絡待ち' },
-                            { value: 'completed', label: '完了済み' },
-                            { value: 'mentions', label: '自分宛て' },
-                            { value: 'myposts', label: '自分の投稿' }
-                        ]}
-                        value={statusFilter}
-                        onChange={(val: string | number) => onStatusChange(val as any)}
-                        style={{
-                            width: '140px',
-                            background: 'transparent',
-                            border: 'none',
-                        }}
-                    />
-                </div>
-                <div className="feed-header-center">
-                    <h2 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: 700, lineHeight: 1.3, display: 'flex', flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: '4px 10px', margin: 0, overflowWrap: 'anywhere' }}>
                         {currentTeamName}
-                        <span className="num" style={{ color: 'var(--primary-light)', fontSize: '0.9rem', fontWeight: 'normal' }}>{threads.length} 件</span>
+                        <span className="num" style={{ color: 'var(--primary-light)', fontSize: '0.9rem', fontWeight: 'normal', lineHeight: 1, whiteSpace: 'nowrap' }}>{threads.length} 件</span>
+                        <StatusFilterLabel value={statusFilter} />
                     </h2>
                 </div>
-                <div className="feed-header-right">
-                    <button className="btn-sort-toggle" onClick={onToggleSort} style={{
-                        background: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        color: 'white',
-                        padding: '4px 12px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem'
-                    }}>
-                        {sortAscending ? 'チャット形式 (最新が下)' : 'ニュース形式 (最新が上)'}
-                    </button>
-                </div>
+            </div>
+
+            {/* デスクトップ: 表示切替と並べ替えは一覧の右隣の縦レール（スクロールしても同じ位置に残る） */}
+            <div className="feed-rail-anchor desktop-only">
+                <StatusFilterRail
+                    value={statusFilter}
+                    onChange={onStatusChange}
+                    sortAscending={sortAscending}
+                    onToggleSort={onToggleSort}
+                />
             </div>
 
             {/* Mobile Header (New Integrated Sticky UI) */}
@@ -1136,34 +1116,27 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                     <div className="mobile-team-name">
                         {currentTeamName}
                     </div>
-                    <button className="sort-minimal-btn" onClick={onToggleSort}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
-                            <polyline points="16 7 22 7 22 13"></polyline>
-                        </svg>
-                        {sortAscending ? '昇' : '降'}
+                    <button
+                        className="sort-minimal-btn"
+                        onClick={onToggleSort}
+                        aria-label={sortAscending ? '最新が下（古い順）' : '最新が上（新しい順）'}
+                    >
+                        {sortAscending ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="M11 4h10" /><path d="M11 8h7" /><path d="M11 12h4" />
+                            </svg>
+                        ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="m3 8 4-4 4 4" /><path d="M7 4v16" /><path d="M11 12h4" /><path d="M11 16h7" /><path d="M11 20h10" />
+                            </svg>
+                        )}
                     </button>
                     <div className="mobile-thread-count num">
                         {threads.length}件
                     </div>
                 </div>
-                <div className="filter-chips-container">
-                    {[
-                        { value: 'all', label: 'すべて表示' },
-                        { value: 'pending', label: '未完了' },
-                        { value: 'waiting', label: '連絡待ち' },
-                        { value: 'completed', label: '完了済み' },
-                        { value: 'mentions', label: '自分宛て' },
-                        { value: 'myposts', label: '自分の投稿' }
-                    ].map(opt => (
-                        <div
-                            key={opt.value}
-                            className={`filter-chip ${statusFilter === opt.value ? 'active' : ''}`}
-                            onClick={() => onStatusChange(opt.value as any)}
-                        >
-                            {opt.label}
-                        </div>
-                    ))}
+                <div className="mobile-status-filter">
+                    <StatusFilterBar value={statusFilter} onChange={onStatusChange} />
                 </div>
             </div>
 

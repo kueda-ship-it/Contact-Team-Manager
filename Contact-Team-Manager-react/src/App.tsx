@@ -78,7 +78,7 @@ function App() {
 
   const [currentTeamId, setCurrentTeamId] = useState<number | string | null>(null);
   const [viewMode, setViewMode] = useState<'feed' | 'dashboard'>('feed');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts' | 'open'>('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'team' | 'admin' | 'team-mgmt' | 'history'>('profile');
   // 設定モーダルが対象とするチーム。サイドバーの歯車 / ＋ から開いたときは
@@ -110,7 +110,7 @@ function App() {
 
   const { teams } = useTeams();
   // Ensure we fetch ALL pending items if that filter is active, regardless of default limit
-  const fetchLimit = (statusFilter === 'pending' || statusFilter === 'waiting' || statusFilter === 'mentions' || searchTerm) ? 2000 : threadsLimit;
+  const fetchLimit = (statusFilter === 'pending' || statusFilter === 'waiting' || statusFilter === 'open' || statusFilter === 'mentions' || searchTerm) ? 2000 : threadsLimit;
   // Pass searchTerm (debounced) to useThreads for server-side filtering
   const threadsData = useThreads(currentTeamId, fetchLimit, sortAscending, statusFilter, searchTerm);
   const { threads: rawThreads, loading: threadsLoading, error: threadsError, refetch, mutateThread, addThreadOptimistic, resolveThreadOptimistic } = threadsData;

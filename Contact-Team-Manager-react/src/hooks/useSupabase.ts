@@ -134,7 +134,7 @@ export function useThreads(
     teamId: number | string | null,
     limit: number = 50,
     ascending: boolean = true,
-    filter: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts' = 'all',
+    filter: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts' | 'open' = 'all',
     searchQuery: string = ''
 ) {
     const { user, profile } = useAuth();
@@ -163,7 +163,7 @@ export function useThreads(
             const isSearching = searchQuery.trim().length > 0;
             const effectiveLimit = isSearching
                 ? SEARCH_RESULT_LIMIT
-                : ((filter === 'pending' || filter === 'waiting' || filter === 'mentions') ? 0 : limit);
+                : ((filter === 'pending' || filter === 'waiting' || filter === 'open' || filter === 'mentions') ? 0 : limit);
 
             console.log(`[useThreads] Fetching. Team: ${teamId}, Filter: ${filter}, Search: ${searchQuery}, Silent: ${silent}`);
 
@@ -205,6 +205,9 @@ export function useThreads(
                     q = q.eq('status', 'pending').not('waiting_contact', 'is', true);
                 } else if (filter === 'waiting') {
                     q = q.eq('status', 'pending').eq('waiting_contact', true);
+                } else if (filter === 'open') {
+                    // 「未完了＋連絡待ち」: 完了していないものすべて
+                    q = q.eq('status', 'pending');
                 } else if (filter === 'completed') {
                     q = q.eq('status', 'completed');
                 } else if (filter === 'myposts') {

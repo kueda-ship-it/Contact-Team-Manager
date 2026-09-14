@@ -1453,55 +1453,33 @@ body:not(.light-mode) .rich-editor * {
     z-index: 9999;
     /* Boosted to ensure dropdowns are on top of threads */
     background: var(--bg-dark);
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    /* 常に表示。チャネル名・件数・今の表示を出す（切り替えと並べ替えは右隣の縦レール .feed-rail） */
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    column-gap: 16px;
+    row-gap: 8px;
     align-items: center;
-    padding: 0;
-    height: 6px;
-    opacity: 0.3;
+    padding: 12px 20px;
     overflow: visible;
     /* Changed from hidden to allow dropdowns */
-    border-bottom: 1px solid transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     width: 100%;
     margin-bottom: 10px;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-/* Ensure content is hidden when collapsed since we removed overflow: hidden */
-.feed-header-sticky:not(:hover)>* {
-    visibility: hidden;
-    pointer-events: none;
-}
-
-/* Expand on hover */
-.feed-header-sticky:hover {
-    padding: 12px 20px;
-    height: auto;
-    opacity: 1;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.feed-header-sticky:hover>* {
-    visibility: visible;
-    pointer-events: auto;
 }
 
 .feed-header-left {
     display: flex;
-    justify-content: flex-start;
-}
-
-.feed-header-center {
-    display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: flex-end;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
-.feed-header-right {
-    display: flex;
+.feed-header-left h2 {
     justify-content: flex-end;
 }
+
 
 .gear-btn-unified {
     padding: 6px;
@@ -1606,6 +1584,56 @@ body.light-mode .feed-list.is-scrolling {
     width: 100%;
     max-width: 880px;
     margin: 0 auto;
+}
+
+/* デスクトップは一覧の右隣に縦レール（.feed-rail）を置く。
+   広い画面では中央寄せのまま右の空きに収め、空きが足りないときだけ一覧を左へ寄せて幅を詰める */
+@media (min-width: 769px) {
+    .main-feed-area {
+        --rail-space: 72px;
+    }
+
+    .feed-list > *,
+    .desktop-only-postform {
+        width: min(880px, calc(100% - var(--rail-space)));
+        max-width: none;
+        margin-left: max(0px, min(calc((100% - 880px) / 2), calc(100% - 880px - var(--rail-space))));
+        margin-right: 0;
+    }
+
+    /* 帯はレールの右端（一覧の列 + 12px + レール 50px）まで伸ばし、文字はレールの真上に右寄せ */
+    .feed-list > .feed-header-sticky {
+        width: calc(min(880px, calc(100% - var(--rail-space))) + 62px);
+    }
+}
+
+/* 一覧の右に 270px 以上の空きがある幅（右サイドバー表示時で画面 1820px 以上）では、
+   チャネル名・件数・今の表示を一覧の列の外（レールの左端から右）に出し、スレッドの上に文字を置かない。
+   帯は透明にしてクリックも下のカードへ通す */
+@media (min-width: 1820px) {
+    .feed-list > .feed-header-sticky {
+        width: min(880px, calc(100% - var(--rail-space)));
+        /* 文字を外に出すと帯が 25px に縮み、28px のバッジが一覧の上端で切れるため、元の高さを保つ */
+        min-height: 53px;
+        background: transparent;
+        border-bottom-color: transparent;
+        pointer-events: none;
+    }
+
+    .feed-header-sticky .feed-header-left {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: calc(100% + 12px);
+        width: max-content;
+        max-width: 240px;
+        justify-content: flex-start;
+        pointer-events: auto;
+    }
+
+    .feed-header-sticky .feed-header-left h2 {
+        justify-content: flex-start;
+    }
 }
 
 /* Compact Reply Form - Show only on hover or focus */
@@ -4471,44 +4499,398 @@ body.light-mode .btn-status.btn-revert:hover svg { stroke: #7B1FA2 !important; f
     white-space: nowrap;
 }
 
-.filter-chips-container {
-    display: flex;
-    overflow-x: auto;
-    gap: 6px;
+.mobile-status-filter {
     padding: 0 12px 10px 12px;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    mask-image: linear-gradient(to right, black 95%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 95%, transparent 100%);
 }
 
-.filter-chips-container::-webkit-scrollbar {
-    display: none;
+/* スマホは「その他」を残り幅いっぱいに。96px を切る狭い端末ではスイッチの下の行へ回す */
+.mobile-status-filter .status-more-select {
+    flex: 1 1 96px;
+    width: auto !important;
 }
 
-.filter-chip {
-    white-space: nowrap;
-    padding: 6px 12px;
-    border-radius: 16px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
+/* 表示フィルタ: すべて / 連絡待ち / 未完了 はスイッチ、残りは「その他」プルダウン */
+.status-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 36px;
+    padding: 3px;
+    box-sizing: border-box;
+    border-radius: 18px;
     background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    flex-shrink: 0;
+}
+
+/* 文字は出さず色で示す。色はカードの状態色（左端の帯）と同じ */
+.status-switch-item {
+    --seg-color: var(--accent);
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 28px;
+    padding: 0;
+    box-sizing: border-box;
+    border: none;
+    border-radius: 14px;
+    background: transparent;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.status-switch-item--waiting {
+    --seg-color: #EAB308;
+}
+
+.status-switch-item--pending {
+    --seg-color: var(--primary);
+}
+
+.status-switch-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--seg-color);
+    transition: background-color 0.3s ease;
+}
+
+.status-switch-item:not(.active):hover {
+    background: rgba(255, 255, 255, 0.06);
+    filter: brightness(1.12);
+}
+
+.status-switch-item.active .status-switch-dot {
+    background: #fff;
+}
+
+/* iOS のセグメントのように、選択中の色つまみが横に滑って移動する（36px の項目 + 2px の間隔 = 38px 刻み） */
+.status-switch-thumb {
+    --thumb-color: var(--accent);
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 36px;
+    height: 28px;
+    border-radius: 14px;
+    background: var(--thumb-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 10px color-mix(in srgb, var(--thumb-color) 45%, transparent);
+    transform: translateX(calc(var(--thumb-index, 0) * 38px));
+    transition:
+        transform 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+        background-color 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+        box-shadow 0.35s ease,
+        opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.status-switch-thumb--waiting {
+    --thumb-color: #EAB308;
+}
+
+.status-switch-thumb--pending {
+    --thumb-color: var(--primary);
+}
+
+.status-switch-thumb.is-hidden {
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status-switch-thumb,
+    .status-switch-dot {
+        transition: none;
+    }
+}
+
+.status-more-select {
+    flex-shrink: 0;
+}
+
+.status-more-select .custom-select-trigger {
+    margin: 0 !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: var(--text-muted) !important;
+}
+
+.status-more-select .custom-select-trigger > span {
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+}
+
+.status-more-select.active .custom-select-trigger {
+    background: rgba(0, 183, 195, 0.12) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+body.light-mode .status-switch {
+    background: #ffffff;
+    border-color: #d8dce1;
+}
+
+body.light-mode .status-switch-item:not(.active):hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.light-mode .status-more-select .custom-select-trigger {
+    background: #ffffff !important;
+    border-color: #d8dce1 !important;
+    color: #5f6368 !important;
+}
+
+body.light-mode .status-more-select.active .custom-select-trigger {
+    background: rgba(0, 183, 195, 0.08) !important;
+    border-color: var(--accent) !important;
+    color: #007f88 !important;
+}
+
+/* 縦向きスイッチ（デスクトップのレール用）。28px の項目 + 2px の間隔 = 30px 刻みで縦に滑る */
+.status-switch.is-vertical {
+    flex-direction: column;
+    width: 36px;
+    height: auto;
+}
+
+.status-switch.is-vertical .status-switch-item {
+    width: 28px;
+}
+
+.status-switch.is-vertical .status-switch-thumb {
+    width: 28px;
+    transform: translateY(calc(var(--thumb-index, 0) * 30px));
+}
+
+/* 一覧の列と同じ幅の高さ0の要素を sticky にし、その右外にレールを出す（スクロールしても残る） */
+.feed-rail-anchor {
+    position: sticky;
+    top: 71px;
+    height: 0;
+    z-index: 9000;
+}
+
+.feed-rail {
+    position: absolute;
+    top: 0;
+    left: calc(100% + 12px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+    box-sizing: border-box;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.feed-rail-divider {
+    width: 20px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.feed-rail-more {
+    position: relative;
+}
+
+.feed-rail-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    border-radius: 18px;
+    background: transparent;
     color: var(--text-muted);
-    transition: all 0.2s ease;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.filter-chip:hover {
-    background: rgba(255, 255, 255, 0.1);
+.feed-rail-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
     color: var(--text-main);
+    filter: brightness(1.12);
 }
 
-.filter-chip.active {
-    background: var(--accent);
-    color: white;
+.feed-rail-btn:active {
+    transform: translateY(1px);
+}
+
+.feed-rail-btn.active {
+    color: var(--accent);
     border-color: var(--accent);
-    box-shadow: 0 2px 8px rgba(0, 183, 195, 0.2);
+    background: rgba(0, 183, 195, 0.12);
+}
+
+/* メニューはレールの左（一覧側）に開く */
+.feed-rail-menu {
+    position: absolute;
+    top: 0;
+    right: calc(100% + 8px);
+    min-width: 140px;
+    padding: 4px 0;
+    background: rgba(24, 24, 27, 0.94);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+}
+
+.feed-rail-menu-item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.feed-rail-menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.feed-rail-menu-item.selected {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+/* チャネル名の横に出す今の表示（スイッチに文字が無いので色の意味をここで補う） */
+.status-filter-label {
+    --label-color: var(--accent);
+    --dot-color: var(--accent);
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    box-sizing: border-box;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--dot-color) 40%, transparent);
+    background: color-mix(in srgb, var(--dot-color) 14%, transparent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--label-color);
+    white-space: nowrap;
+}
+
+.status-filter-label--waiting {
+    --label-color: #EAB308;
+    --dot-color: #EAB308;
+}
+
+.status-filter-label--pending {
+    --label-color: var(--primary-light);
+    --dot-color: var(--primary);
+}
+
+.status-filter-label-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dot-color);
+}
+
+body.light-mode .feed-rail {
+    background: #ffffff;
+    border-color: #d8dce1;
+}
+
+body.light-mode .feed-rail-divider {
+    background: #d8dce1;
+}
+
+body.light-mode .feed-rail-btn {
+    color: #5f6368;
+}
+
+body.light-mode .feed-rail-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #3c4043;
+}
+
+body.light-mode .feed-rail-btn.active {
+    color: #007f88;
+    background: rgba(0, 183, 195, 0.08);
+}
+
+body.light-mode .feed-rail-menu {
+    background: #ffffff;
+    border-color: #e1e1e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+body.light-mode .feed-rail-menu-item {
+    color: #333333;
+}
+
+body.light-mode .feed-rail-menu-item:hover {
+    background: #f5f5f5;
+}
+
+body.light-mode .feed-rail-menu-item.selected,
+body.light-mode .status-filter-label {
+    --label-color: #007f88;
+    color: #007f88;
+}
+
+body.light-mode .status-filter-label--waiting {
+    --label-color: #a16207;
+    color: #a16207;
+}
+
+body.light-mode .status-filter-label--pending {
+    --label-color: var(--primary);
+    color: var(--primary);
+}
+
+/* 未完了/連絡待ち: 紫（未完了）から黄（連絡待ち）へなめらかに混ぜた色で「両方」を示す */
+.status-switch-item--open .status-switch-dot,
+.status-filter-label--open .status-filter-label-dot {
+    background: linear-gradient(135deg, var(--primary), #EAB308);
+}
+
+.status-switch-item--open.active .status-switch-dot {
+    background: #fff;
+}
+
+.status-switch-thumb--open {
+    --thumb-color: color-mix(in srgb, #EAB308 50%, var(--primary));
+    background-image: linear-gradient(135deg, var(--primary), #EAB308);
+}
+
+.status-filter-label--open {
+    --label-color: var(--text-main);
+    --dot-color: color-mix(in srgb, #EAB308 50%, var(--primary));
+}
+
+body.light-mode .status-filter-label--open {
+    --label-color: #3c4043;
+    color: #3c4043;
 }
 
 .sort-minimal-btn {
