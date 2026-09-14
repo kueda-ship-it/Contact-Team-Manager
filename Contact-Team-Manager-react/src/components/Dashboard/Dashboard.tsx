@@ -3,6 +3,7 @@ import { CustomSelect } from '../common/CustomSelect';
 import { useProfiles, useUserMemberships, useTeams, useThreads } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 import { CATEGORY_ORDER, CATEGORY_COLORS, classifyCategory, detectDirection, stripHtml, medianMs, type ContactCategory } from '../../utils/contactTrends';
+import { completionDurationMs } from '../../utils/businessHours';
 
 interface DashboardProps {
     currentTeamId: number | string | null;
@@ -17,6 +18,13 @@ const USER_ALIASES: { [alias: string]: string } = {
     'k_oya@fts.co.jp': '大家光世',
 };
 const normalizeUserName = (name: string) => USER_ALIASES[name] || name;
+
+const formatDuration = (ms: number) => {
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours > 0) return `${hours}時間 ${mins}分`;
+    return `${mins}分`;
+};
 
 export const Dashboard: React.FC<DashboardProps> = ({
     currentTeamId,
@@ -93,18 +101,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         if (completed.length === 0) return 'N/A';
 
         const totalMs = completed.reduce((acc, t) => {
-            const start = new Date(t.created_at).getTime();
-            const end = new Date(t.completed_at).getTime();
-            if (isNaN(start) || isNaN(end)) return acc;
-            return acc + (end - start);
+            const dur = completionDurationMs(t.created_at, t.completed_at);
+            if (isNaN(dur)) return acc;
+            return acc + dur;
         }, 0);
 
         const avgMs = totalMs / completed.length;
         if (isNaN(avgMs)) return 'N/A';
 
-        const days = Math.floor(avgMs / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((avgMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        return `${days}日 ${hours}時間`;
+        return formatDuration(avgMs);
     };
 
     // 投稿作成・完了操作・返信投稿のすべてを「活動」として稼働時間に含める
@@ -210,20 +215,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const longestThreads = displayThreads
         .filter(t => t.status === 'completed' && t.completed_at && t.created_at)
         .map(t => {
-            const durationMs = new Date(t.completed_at!).getTime() - new Date(t.created_at).getTime();
+            const durationMs = completionDurationMs(t.created_at, t.completed_at!);
             return { ...t, durationMs };
         })
         .sort((a, b) => b.durationMs - a.durationMs)
         .slice(0, 100);
-
-    const formatDuration = (ms: number) => {
-        const days = Math.floor(ms / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        if (days > 0) return `${days}日 ${hours}時間`;
-        if (hours > 0) return `${hours}時間 ${mins}分`;
-        return `${mins}分`;
-    };
 
     // 連絡内容の傾向（title + content の文言からルールベースで推定。追加フェッチなし）
     const contactTrend = (() => {
@@ -236,8 +232,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             const entry = catStats.get(classifyCategory(text))!;
             entry.count++;
             if (t.status === 'completed' && t.completed_at && t.created_at) {
-                const dur = new Date(t.completed_at).getTime() - new Date(t.created_at).getTime();
-                if (!isNaN(dur) && dur > 0) entry.durations.push(dur);
+                const dur = completionDurationMs(t.created_at, t.completed_at);
+                if (!isNaN(dur) && dur >= 0) entry.durations.push(dur);
             }
             const dir = detectDirection(text);
             if (dir.inbound) inbound++;
@@ -585,6 +581,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>平均完了時間</div>
                             <div className="num" style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)', textAlign: 'center' }}>{overallAvgTime}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'center', lineHeight: 1.5 }}>日をまたぐものは土日祝・年末年始を除く 9:00〜17:30 で計算</div>
                         </div>
                         <div className="task-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '25px', background: 'linear-gradient(145deg, rgba(220, 38, 38, 0.05), rgba(220, 38, 38, 0.02))' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>返信ありの割合</div>
@@ -1373,7 +1370,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     {replyCountThreads[selectedReplyCount]
                                         .filter(t => t.status === 'completed' && t.completed_at)
-                                        .map(t => ({ ...t, durationMs: new Date(t.completed_at!).getTime() - new Date(t.created_at).getTime() }))
+                                        .map(t => ({ ...t, durationMs: completionDurationMs(t.created_at, t.completed_at!) }))
                                         .sort((a, b) => b.durationMs - a.durationMs)
                                         .slice(0, 5)
                                         .map(t => (
