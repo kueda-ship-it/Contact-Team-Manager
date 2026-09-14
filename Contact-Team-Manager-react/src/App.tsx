@@ -307,16 +307,23 @@ function App() {
   const handleSidebarThreadClick = async (threadId: string) => {
     // 1. Find thread to get its team_id
     let targetTeamId = currentTeamId;
+    // 押したスレッドが一覧に必ず含まれる表示に切り替える。「未完了」は連絡待ちを含まない
+    // （2026-08-25 決定）ため、固定で 'pending' にすると連絡待ちのカードへ飛べなかった
+    const filterFor = (t: { status?: string | null; waiting_contact?: boolean | null }): typeof statusFilter =>
+      t.status === 'completed' ? 'completed' : (t.waiting_contact ? 'waiting' : 'pending');
+    let targetFilter: typeof statusFilter = 'pending';
     const thread = (rawThreads || []).find(t => t.id === threadId);
-    
+
     if (thread) {
       targetTeamId = thread.team_id;
+      targetFilter = filterFor(thread);
     } else {
       // フィード未読み込みのスレッド(古い投稿など)。チームと作成日時を取得し、
       // そのスレッドが読み込み範囲に入る件数までフィードの limit を広げる
-      const { data } = await supabase.from('threads').select('team_id, created_at').eq('id', threadId).single();
+      const { data } = await supabase.from('threads').select('team_id, created_at, status, waiting_contact').eq('id', threadId).single();
       if (data) {
         targetTeamId = data.team_id;
+        targetFilter = filterFor(data);
         const { count } = await supabase
           .from('threads')
           .select('id', { count: 'exact', head: true })
@@ -329,10 +336,10 @@ function App() {
     // 2. Ensure we are in feed mode
     setViewMode('feed');
     // 3. Ensure we can see the thread.
-    // サイドバーのカードは全て未完了スレッドなので「未完了」フィルタに切り替える。
+    // スレッドの状態に合わせたフィルタ（未完了 / 連絡待ち / 完了済み）に切り替える。
     // 'all' だと既定50件に古い投稿が含まれずスクロール先が描画されない
     // （2000件に上限を上げる案は描画で10秒以上フリーズするため不採用）。
-    setStatusFilter('pending');
+    setStatusFilter(targetFilter);
 
     // 4. Switch team if necessary
     if (String(targetTeamId) !== String(currentTeamId)) {

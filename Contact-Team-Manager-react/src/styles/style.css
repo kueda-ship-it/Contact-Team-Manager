@@ -626,7 +626,9 @@ header {
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 1000;
+    /* 通知一覧などヘッダー内のパネルを、一覧上部の帯(1200)・縦レール(1300)より上に出す。
+       モーダル(10000〜)・トースト(2100/9999)よりは下 */
+    z-index: 2000;
 }
 
 /* Remove square frame below post form usually caused by empty container artifacts */
@@ -1450,8 +1452,9 @@ body:not(.light-mode) .rich-editor * {
 .feed-header-sticky {
     position: sticky;
     top: 0;
-    z-index: 9999;
-    /* Boosted to ensure dropdowns are on top of threads */
+    /* カードのホバー(1100/1101)より上、画面上部のヘッダー(2000)より下。
+       以前は中にプルダウンがあり 9999 だったが、通知一覧を覆っていた */
+    z-index: 1200;
     background: var(--bg-dark);
     /* 常に表示。チャネル名・件数・今の表示を出す（切り替えと並べ替えは右隣の縦レール .feed-rail） */
     display: flex;
@@ -4467,8 +4470,8 @@ body.light-mode .btn-status.btn-revert:hover svg { stroke: #7B1FA2 !important; f
     position: sticky;
     top: -10px;
     /* Offset the gap between search bar and content */
-    z-index: 9500;
-    /* Higher than thread items */
+    /* Higher than thread items (hover 1100), below the top header (2000) so its panels stay visible */
+    z-index: 1200;
     background: var(--bg-dark);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
@@ -4679,7 +4682,8 @@ body.light-mode .status-more-select.active .custom-select-trigger {
     position: sticky;
     top: 71px;
     height: 0;
-    z-index: 9000;
+    /* カード(1100)より上、画面上部のヘッダー(2000)より下 */
+    z-index: 1300;
 }
 
 .feed-rail {
