@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 環境変数（値は GitHub Secrets から渡す。ローカルは .env.local を使う）
+.env
+.env.*
+!.env.example
+
+# Claude Code の worktree / ローカル設定
+.claude/worktrees/
+.claude/settings.local.json
