@@ -15,40 +15,6 @@ export const Login: React.FC = () => {
         setError(null);
 
         try {
-            // Legacy Admin Backdoor Support
-            if (email === 'admin' && password === 'admin123') {
-                try {
-                    // Find the first user with 'Admin' role
-                    const { data: adminProfile, error: fetchError } = await supabase
-                        .from('profiles')
-                        .select('email')
-                        .eq('role', 'Admin')
-                        .limit(1)
-                        .single();
-
-                    if (fetchError || !adminProfile) {
-                        throw new Error('管理者アカウントが見つかりませんでした (No Admin profile found).');
-                    }
-
-                    // Attempt to login with the found admin email and the provided password
-                    const { error: signInError } = await supabase.auth.signInWithPassword({
-                        email: adminProfile.email,
-                        password: password,
-                    });
-
-                    if (signInError) {
-                        throw new Error(`管理者アカウント (${adminProfile.email}) は見つかりましたが、パスワードが一致しませんでした。`);
-                    }
-
-                    // Login successful, onAuthStateChange in useAuth will handle the rest
-                    return;
-                } catch (proxyError: any) {
-                    setError(proxyError.message);
-                    setLoading(false);
-                    return;
-                }
-            }
-
             // Supabase Auth
             const { error } = await supabase.auth.signInWithPassword({
                 email,
