@@ -757,7 +757,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         const atts = replyAttachments[threadId] || [];
 
         // 楽観更新: 入力欄は即クリアし、返信を仮表示する（失敗時は復元）
-        const tempId = `temp-${Date.now()}`;
+        // id は送信前にここで決める。仮 id（temp-…）のままだと、refetch で差し替わるまでの
+        // 数秒間に編集・削除されて uuid 不正の 400 になる。保存完了までは _sending で操作を塞ぐ。
+        const tempId = crypto.randomUUID();
         const nowIso = new Date().toISOString();
         inputEl.innerHTML = '';
         setReplyAttachments(prev => ({ ...prev, [threadId]: [] }));
@@ -771,7 +773,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 author: authorName,
                 user_id: user.id,
                 created_at: nowIso,
-                attachments: atts.length > 0 ? atts : null
+                attachments: atts.length > 0 ? atts : null,
+                _sending: true
             }],
         }));
 
@@ -781,6 +784,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             );
             const { error } = await Promise.race([
                 supabase.from('replies').insert([{
+                    id: tempId,
                     thread_id: threadId,
                     content: content,
                     author: authorName,
@@ -790,6 +794,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 timeout
             ]) as any;
             if (error) throw error;
+            mutateThread(threadId, (t: any) => ({
+                ...t,
+                replies: (t.replies || []).map((r: any) =>
+                    r.id === tempId ? { ...r, _sending: false } : r),
+            }));
 
             // 親スレッドの updated_at 更新は表示に必須ではないので待たない
             supabase.from('threads').update({ updated_at: nowIso }).eq('id', threadId)
@@ -1535,7 +1544,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                         onClose={() => setOpenMenuId(null)}
                                                                         containerStyle={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}
                                                                     >
-                                                                        {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                                                        {!reply._sending && (user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
                                                                             <>
                                                                                 {user?.id === reply.user_id && (
                                                                                     <div className="menu-item" onClick={() => { setOpenMenuId(null); setEditingReplyId(reply.id); }}>

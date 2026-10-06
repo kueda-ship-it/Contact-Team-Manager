@@ -265,7 +265,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         const authorName = currentProfile?.display_name || user.email || 'Unknown';
 
         // 楽観更新: 入力欄は即クリアし、返信を仮表示する（失敗時は復元）
-        const tempId = `temp-${Date.now()}`;
+        // id は送信前に決める（仮 id のままだと一覧側で編集・削除されて 400 になる。ThreadList と同じ）
+        const tempId = crypto.randomUUID();
         const nowIso = new Date().toISOString();
         inputEl.innerHTML = '';
         const optimisticReply = {
@@ -275,6 +276,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
             author: authorName,
             user_id: user.id,
             created_at: nowIso,
+            _sending: true,
         };
         mutateThread(threadId, (t: any) => ({
             ...t,
@@ -292,6 +294,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
             );
             const { error } = await Promise.race([
                 supabase.from('replies').insert([{
+                    id: tempId,
                     thread_id: threadId,
                     content: content,
                     author: authorName,
@@ -300,6 +303,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                 timeout
             ]) as any;
             if (error) throw error;
+            mutateThread(threadId, (t: any) => ({
+                ...t,
+                replies: (t.replies || []).map((r: any) =>
+                    r.id === tempId ? { ...r, _sending: false } : r),
+            }));
             mainRefetch(true); // Update main feed
         } catch (e: any) {
             mutateThread(threadId, (t: any) => ({
