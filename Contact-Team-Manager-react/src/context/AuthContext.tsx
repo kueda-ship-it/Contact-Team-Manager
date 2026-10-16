@@ -95,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log(`[AuthContext] Starting loadProfile for user: ${userId}`);
         try {
 
-            let { data, error } = await supabase
+            const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
@@ -116,18 +116,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         .single();
 
                     if (existingProfile) {
-                        // Profile exists (admin pre-registered or old auth ID) - update to new auth ID and activate
-                        console.log('[AuthContext] Found existing profile with email, updating ID and activating...');
-                        const { data: updatedProfile, error: updateError } = await supabase
-                            .from('profiles')
-                            .update({ id: userId, is_active: true })
-                            .ilike('email', currentUser.email)
-                            .select()
-                            .single();
-                        if (!updateError) {
-                            data = updatedProfile;
-                            error = null as any;
-                        }
+                        // 事前登録行の引き継ぎは DB のトリガー（handle_azure_user_migration）が行う。
+                        // ここで id を書き換えると、外部キーで止まるか参照データが消えるので書き換えない
+                        console.warn('[AuthContext] Pre-registered profile was not merged into the new auth ID.');
                     } else {
                         // No profile found → admin has not added this user yet
                         await signOut();
