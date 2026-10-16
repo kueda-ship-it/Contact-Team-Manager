@@ -10,6 +10,15 @@ import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { StatusFilterBar, StatusFilterLabel, StatusFilterRail } from './StatusFilterBar';
+
+// 表示（チャネル × フィルタ × 並び順）ごとのスクロール位置。「最新の端からの距離」で持つ
+// （最新が下なら下端から、最新が上なら上端から）。0 = 最新の端 = 既定の位置。
+// ダッシュボードへ切り替えて ThreadList が外れても残るようモジュールで持つ
+const feedScrollMemory = new Map<string, number>();
+// この距離以内なら「最新の端にいる」とみなし、新しい投稿が来ても端に付いていく
+const NEWEST_END_SNAP_PX = 8;
+// デスクトップの表示バーの向き（縦レール / 横＝一覧上の帯）を端末ごとに覚えるキー
+const FILTER_BAR_ORIENTATION_KEY = 'ctm.feedFilterBarOrientation';
 import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
 import { DotMenu } from '../common/DotMenu';
 import { Spinner } from '../common/Spinner';
@@ -351,34 +360,58 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         }
     }, [threads.length, prevScrollHeight, sortAscending]);
 
-    const initialScrollDone = React.useRef(false);
-
-    // Reset initial scroll state when team changes or sort order changes
-    React.useEffect(() => {
-        initialScrollDone.current = false;
-    }, [currentTeamId, sortAscending]);
-
-    // Initial scroll to bottom for Chat Mode
-    React.useEffect(() => {
-        // Wait until loading is finished and we have threads
-        if (!threadsLoading && sortAscending && threads.length > 0) {
-            // Always try to scroll to bottom on initial load of the view or when switching to Chat mode
-            if (!initialScrollDone.current) {
-                // サイドバーからのジャンプ待機中は最下部スクロールで上書きしない
-                if (scrollToThreadId) {
-                    initialScrollDone.current = true;
-                    return;
-                }
-                // Use a small timeout to ensure DOM is updated
-                const timer = setTimeout(() => {
-                    bottomAnchorRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-                    initialScrollDone.current = true;
-                }, 150);
-                return () => clearTimeout(timer);
-            }
+    // デスクトップの表示バーの向き。端末（ブラウザ）ごとに覚える
+    const [filterBarOrientation, setFilterBarOrientation] = React.useState<'vertical' | 'horizontal'>(() => {
+        try {
+            return localStorage.getItem(FILTER_BAR_ORIENTATION_KEY) === 'horizontal' ? 'horizontal' : 'vertical';
+        } catch {
+            return 'vertical';
         }
-    }, [currentTeamId, sortAscending, threads.length, threadsLoading, scrollToThreadId]);
-    // Actually user wants "Default is bottom is newest".
+    });
+    React.useLayoutEffect(() => {
+        try {
+            localStorage.setItem(FILTER_BAR_ORIENTATION_KEY, filterBarOrientation);
+        } catch {
+            // 保存できない環境では次回も縦から始まる
+        }
+        // 一覧の右にレール分の余白を取るかを CSS で切り替えるため、ルートに向きを出す（投稿欄の幅も合わせる）
+        document.documentElement.dataset.filterBar = filterBarOrientation;
+    }, [filterBarOrientation]);
+    const toggleFilterBarOrientation = () =>
+        setFilterBarOrientation(o => (o === 'vertical' ? 'horizontal' : 'vertical'));
+
+    // 表示が切り替わったら（チャネル・フィルタ・並び順）、前回そこで動かした位置に戻す。
+    // 一度も動かしていなければ最新の端（最新が下なら一番下、最新が上なら一番上）から始める。
+    const viewKey = `${currentTeamId ?? ''}|${statusFilter}|${sortAscending ? 'newest-bottom' : 'newest-top'}`;
+    // 位置を合わせ終えた表示のキー。合わせる前のスクロール（前の表示の DOM）で記憶を上書きしないために使う
+    const readyViewKeyRef = React.useRef<string | null>(null);
+
+    React.useEffect(() => {
+        if (readyViewKeyRef.current === viewKey || threadsLoading) return;
+        const el = threadListRef.current;
+        if (!el) return;
+        // サイドバーからのジャンプ待機中は、その位置合わせを優先する
+        if (scrollToThreadId) {
+            readyViewKeyRef.current = viewKey;
+            return;
+        }
+        // 描画が落ち着くのを少し待ってから合わせる（データの差し替えが続くとタイマーはやり直し）
+        const timer = setTimeout(() => {
+            const distance = feedScrollMemory.get(viewKey) ?? 0;
+            el.scrollTop = sortAscending ? el.scrollHeight - el.clientHeight - distance : distance;
+            readyViewKeyRef.current = viewKey;
+        }, 150);
+        return () => clearTimeout(timer);
+    }, [viewKey, sortAscending, threads.length, threadsLoading, scrollToThreadId]);
+
+    // 最新の端にいる間は、新しい投稿が来ても端に付いていく（動かしていれば位置はそのまま）
+    React.useLayoutEffect(() => {
+        const el = threadListRef.current;
+        if (!el || readyViewKeyRef.current !== viewKey || prevScrollHeight !== null) return;
+        if ((feedScrollMemory.get(viewKey) ?? 0) === 0) {
+            el.scrollTop = sortAscending ? el.scrollHeight - el.clientHeight : 0;
+        }
+    }, [threads.length, viewKey, sortAscending, prevScrollHeight]);
 
     const scrollbarHideTimer = React.useRef<number | null>(null);
 
@@ -389,6 +422,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         el.classList.add('is-scrolling');
         if (scrollbarHideTimer.current) window.clearTimeout(scrollbarHideTimer.current);
         scrollbarHideTimer.current = window.setTimeout(() => el.classList.remove('is-scrolling'), 900);
+
+        // この表示で動かした位置を「最新の端からの距離」で覚える（位置合わせ前のスクロールは記録しない）
+        if (readyViewKeyRef.current === viewKey) {
+            const distance = sortAscending ? el.scrollHeight - el.clientHeight - el.scrollTop : el.scrollTop;
+            feedScrollMemory.set(viewKey, distance <= NEWEST_END_SNAP_PX ? 0 : distance);
+        }
 
         // Check for top reach for "Load More" (Chat Mode)
         if (sortAscending && el.scrollTop === 0 && threads.length >= 50) {
@@ -719,7 +758,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         const atts = replyAttachments[threadId] || [];
 
         // 楽観更新: 入力欄は即クリアし、返信を仮表示する（失敗時は復元）
-        const tempId = `temp-${Date.now()}`;
+        // id は送信前にここで決める。仮 id（temp-…）のままだと、refetch で差し替わるまでの
+        // 数秒間に編集・削除されて uuid 不正の 400 になる。保存完了までは _sending で操作を塞ぐ。
+        const tempId = crypto.randomUUID();
         const nowIso = new Date().toISOString();
         inputEl.innerHTML = '';
         setReplyAttachments(prev => ({ ...prev, [threadId]: [] }));
@@ -733,7 +774,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 author: authorName,
                 user_id: user.id,
                 created_at: nowIso,
-                attachments: atts.length > 0 ? atts : null
+                attachments: atts.length > 0 ? atts : null,
+                _sending: true
             }],
         }));
 
@@ -743,6 +785,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             );
             const { error } = await Promise.race([
                 supabase.from('replies').insert([{
+                    id: tempId,
                     thread_id: threadId,
                     content: content,
                     author: authorName,
@@ -752,6 +795,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 timeout
             ]) as any;
             if (error) throw error;
+            mutateThread(threadId, (t: any) => ({
+                ...t,
+                replies: (t.replies || []).map((r: any) =>
+                    r.id === tempId ? { ...r, _sending: false } : r),
+            }));
 
             // 親スレッドの updated_at 更新は表示に必須ではないので待たない
             supabase.from('threads').update({ updated_at: nowIso }).eq('id', threadId)
@@ -1099,17 +1147,33 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         <StatusFilterLabel value={statusFilter} />
                     </h2>
                 </div>
+                {filterBarOrientation === 'horizontal' && (
+                    <div className="feed-header-right">
+                        <StatusFilterRail
+                            value={statusFilter}
+                            onChange={onStatusChange}
+                            sortAscending={sortAscending}
+                            onToggleSort={onToggleSort}
+                            orientation="horizontal"
+                            onToggleOrientation={toggleFilterBarOrientation}
+                        />
+                    </div>
+                )}
             </div>
 
-            {/* デスクトップ: 表示切替と並べ替えは一覧の右隣の縦レール（スクロールしても同じ位置に残る） */}
-            <div className="feed-rail-anchor desktop-only">
-                <StatusFilterRail
-                    value={statusFilter}
-                    onChange={onStatusChange}
-                    sortAscending={sortAscending}
-                    onToggleSort={onToggleSort}
-                />
-            </div>
+            {/* デスクトップ（縦）: 表示切替と並べ替えは一覧の右隣の縦レール（スクロールしても同じ位置に残る） */}
+            {filterBarOrientation === 'vertical' && (
+                <div className="feed-rail-anchor desktop-only">
+                    <StatusFilterRail
+                        value={statusFilter}
+                        onChange={onStatusChange}
+                        sortAscending={sortAscending}
+                        onToggleSort={onToggleSort}
+                        orientation="vertical"
+                        onToggleOrientation={toggleFilterBarOrientation}
+                    />
+                </div>
+            )}
 
             {/* Mobile Header (New Integrated Sticky UI) */}
             <div className="mobile-only mobile-header-fixed">
@@ -1499,7 +1563,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                         onClose={() => setOpenMenuId(null)}
                                                                         containerStyle={{ top: '2px', right: '2px', transform: 'scale(0.8)' }}
                                                                     >
-                                                                        {(user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                                                        {!reply._sending && (user?.id === reply.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
                                                                             <>
                                                                                 {user?.id === reply.user_id && (
                                                                                     <div className="menu-item" onClick={() => { setOpenMenuId(null); setEditingReplyId(reply.id); }}>
