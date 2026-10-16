@@ -5466,3 +5466,7 @@ body.light-mode .btn-status.btn-waiting.active svg {
     animation-duration: 2.4s;
   }
 }
+/* 添付ボタンの中ではボタンの線と同じ色で回す（ティールは半透明のボタン上で薄く見えるため） */
+.btn-clip-yellow .spinner {
+  --accent: currentColor;
+}
