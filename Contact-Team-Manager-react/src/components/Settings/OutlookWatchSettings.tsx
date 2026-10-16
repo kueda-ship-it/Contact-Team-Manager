@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useTeams } from '../../hooks/useSupabase';
+import { Spinner } from '../common/Spinner';
 import {
     getInboxSubfolders,
     MailFolder,
@@ -227,8 +228,9 @@ export const OutlookWatchSettings: React.FC = () => {
                         </p>
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                             <div style={{ flex: '1 1 180px' }}>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                                     監視フォルダ（受信トレイのサブフォルダ）
+                                    {loadingFolders && <Spinner size={12} />}
                                 </label>
                                 <SelectWrapper>
                                     <select
@@ -238,7 +240,7 @@ export const OutlookWatchSettings: React.FC = () => {
                                         style={selectStyle}
                                     >
                                         <option value="">
-                                            {loadingFolders ? '読み込み中...' : 'フォルダを選択'}
+                                            フォルダを選択
                                         </option>
                                         {folders.map(f => (
                                             <option

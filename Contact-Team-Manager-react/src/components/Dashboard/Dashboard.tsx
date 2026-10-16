@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CustomSelect } from '../common/CustomSelect';
+import { Spinner } from '../common/Spinner';
 import { useProfiles, useUserMemberships, useTeams, useThreads } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 import { CATEGORY_ORDER, CATEGORY_COLORS, classifyCategory, detectDirection, stripHtml, medianMs, type ContactCategory } from '../../utils/contactTrends';
@@ -52,9 +53,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     if (threadsLoading && threads.length === 0) {
         return (
-            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                <div style={{ width: '28px', height: '28px', border: '3px solid rgba(128,128,128,0.25)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                <div style={{ fontSize: '0.9rem' }}>全投稿を読み込み中…</div>
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Spinner size={28} />
             </div>
         );
     }

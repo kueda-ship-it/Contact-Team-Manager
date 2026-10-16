@@ -6,6 +6,7 @@ import { useProfiles, useTags, useTeams, useTeamMembers } from '../../hooks/useS
 import { useOneDriveUpload } from '../../hooks/useOneDriveUpload';
 import { MentionList } from '../common/MentionList';
 import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
+import { Spinner } from '../common/Spinner';
 
 import { initializeMsal } from '../../lib/microsoftGraph';
 
@@ -229,7 +230,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel,
                                 onClick={handleAttachClick}
                             >
                                 {uploading ? (
-                                    <div className="spinner-small" style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                    <Spinner size={16} />
                                 ) : (
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
@@ -362,7 +363,7 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel,
                                                 <span style={{ fontSize: '20px', opacity: 0.6 }}>📄</span>
                                             )}
                                             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1 }}>
-                                                <div className="spinner-small" style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                <Spinner size={20} />
                                             </div>
                                             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: '0.6rem', padding: '2px', textAlign: 'center' }}>
                                                 アップロード中...
@@ -451,15 +452,9 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel,
                         zIndex: 9999,
                         backdropFilter: 'blur(5px)'
                     }}>
-                        <div className="spinner-large" style={{
-                            width: '50px',
-                            height: '50px',
-                            border: '4px solid rgba(255,255,255,0.3)',
-                            borderTopColor: '#0078d4',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite',
-                            marginBottom: '20px'
-                        }}></div>
+                        <div style={{ marginBottom: '20px' }}>
+                            <Spinner size={48} />
+                        </div>
                         <h3 style={{ color: 'white', marginBottom: '10px' }}>Microsoftへログイン中...</h3>
                         <p style={{ color: 'rgba(255,255,255,0.8)' }}>ポップアップウィンドウでログインしてください</p>
                     </div>

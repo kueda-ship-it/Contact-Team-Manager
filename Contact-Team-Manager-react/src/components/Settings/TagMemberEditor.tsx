@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTagMembers } from '../../hooks/useSupabase';
 import { CustomSelect } from '../common/CustomSelect';
+import { Spinner } from '../common/Spinner';
 
 interface TagMemberEditorProps {
     tagId: string | number;
@@ -82,7 +83,7 @@ export const TagMemberEditor: React.FC<TagMemberEditorProps> = ({ tagId, tagName
 
                     {/* Member List */}
                     {loading ? (
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>読み込み中...</div>
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}><Spinner size={16} /></div>
                     ) : tagMembers.length === 0 ? (
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>メンバーがまだ追加されていません</div>
                     ) : (

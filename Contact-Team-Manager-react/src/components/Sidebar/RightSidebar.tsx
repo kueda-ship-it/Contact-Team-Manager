@@ -6,6 +6,7 @@ import { highlightMentions, hasMention } from '../../utils/mentions';
 import { formatDate, getPlainTextForSidebar } from '../../utils/text';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
+import { Spinner } from '../common/Spinner';
 
 interface RightSidebarProps {
     currentTeamId: number | string | null;
@@ -519,8 +520,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
     return (
         <aside className="side-panel glass-panel">
             {showLoading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>
-                    Loading...
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                    <Spinner size={24} />
                 </div>
             ) : (
                 <div style={{ paddingBottom: '20px' }}>

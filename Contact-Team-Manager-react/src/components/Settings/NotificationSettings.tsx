@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useTeams, useUserMemberships } from '../../hooks/useSupabase';
 import { MODE_LABEL, MODES, type NotifyMode } from '../../hooks/useNotifications';
+import { SpinnerBlock } from '../common/Spinner';
 
 /** チャネルごとの通知設定（自分の分だけ）。
  *
@@ -103,7 +104,7 @@ export const NotificationSettings: React.FC = () => {
                 <div style={{ fontSize: '0.8rem', color: 'var(--danger, #ff8a80)' }}>{error}</div>
             )}
 
-            {loading && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>読み込み中…</div>}
+            {loading && <SpinnerBlock />}
 
             {!loading && mine.length === 0 && (
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>

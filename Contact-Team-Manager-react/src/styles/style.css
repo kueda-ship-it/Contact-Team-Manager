@@ -5115,9 +5115,6 @@ body.light-mode #root a.post-link {
     to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
 
 /* --- Image Preview Modal --- */
 .image-preview-overlay {
@@ -5438,4 +5435,34 @@ body.light-mode .btn-status.btn-waiting:hover svg,
 body.light-mode .btn-status.btn-waiting.active svg {
     stroke: #B8860B !important;
     filter: drop-shadow(0 0 4px rgba(234, 179, 8, 0.5));
+}
+
+/* ============================================================
+   読み込み中の輪（Spinner）。全アプリ共通（2026-10-16 確定）
+   光の後ろを円錐状のグラデーションで少しずつ薄くし、端で途切れずに尾を引いて回る。文字は出さない
+   ============================================================ */
+.spinner {
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg, color-mix(in oklab, var(--accent) 15%, transparent) 90deg, var(--accent) 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+  animation: spinner-rotate 0.9s linear infinite;
+}
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spinner-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
 }

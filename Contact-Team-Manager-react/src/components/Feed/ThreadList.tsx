@@ -12,6 +12,7 @@ import { MentionList } from '../common/MentionList';
 import { StatusFilterBar, StatusFilterLabel, StatusFilterRail } from './StatusFilterBar';
 import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
 import { DotMenu } from '../common/DotMenu';
+import { Spinner } from '../common/Spinner';
 
 // Helper component for auto-refreshing images
 const ThreadImage: React.FC<{ 
@@ -952,7 +953,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 ))}
                 {editUploading[id] && (
                     <div className="attachment-item uploading" style={{ width: '64px', height: '64px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--primary-light)' }}>
-                        <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                        <Spinner size={16} />
                     </div>
                 )}
             </div>
@@ -1142,14 +1143,14 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
             {/* Load More Trigger / Loading Indicator could go here */}
             {sortAscending && threadsLoading && threads.length > 0 && (
-                <div style={{ padding: '10px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    読み込み中...
+                <div style={{ padding: '10px', display: 'flex', justifyContent: 'center' }}>
+                    <Spinner size={16} />
                 </div>
             )}
 
             {visibleThreads.length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    {threadsLoading ? '読み込み中...' : '表示する投稿がありません。'}
+                    {threadsLoading ? <Spinner size={24} /> : '表示する投稿がありません。'}
                 </div>
             ) : (
                 visibleThreads
@@ -1738,7 +1739,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                                         <span style={{ fontSize: '14px', opacity: 0.6 }}>📄</span>
                                                                     )}
                                                                     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1 }}>
-                                                                        <div className="spinner-small" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                                        <Spinner size={16} />
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -1753,7 +1754,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                         disabled={replyUploading[thread.id]}
                                                     >
                                                         {replyUploading[thread.id] ? (
-                                                            <div className="spinner-small" style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                            <Spinner size={16} />
                                                         ) : (
                                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
@@ -1952,8 +1953,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                             />
                         ) : (
                             <div style={{ color: 'white', textAlign: 'center' }}>
-                                <div className="spinner" style={{ marginBottom: '10px' }}></div>
-                                <p>読み込み中...</p>
+                                <Spinner size={32} />
                                 {!isAuthenticated && (
                                     <button 
                                         className="btn btn-sm btn-primary" 
@@ -2011,7 +2011,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                     >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#2b2b2b', color: '#fff', flexShrink: 0 }}>
                             <span style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
-                                {pdfPreview?.name || '読み込み中...'}
+                                {pdfPreview?.name || ''}
                             </span>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                 {(pdfPreview?.blobUrl || pdfPreview?.shareUrl) && (
@@ -2036,8 +2036,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         <div style={{ flex: 1, position: 'relative', background: '#525659' }}>
                             {pdfLoading && (
                                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', gap: '10px' }}>
-                                    <div className="spinner"></div>
-                                    <p>PDF を読み込み中...</p>
+                                    <Spinner size={32} />
                                 </div>
                             )}
                             {!pdfLoading && pdfPreview?.blobUrl && (

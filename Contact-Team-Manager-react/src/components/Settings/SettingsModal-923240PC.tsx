@@ -7,6 +7,7 @@ import { msalInstance, signIn, signOut, initializeMsal, hasExternalAccessToken }
 import type { AccountInfo } from '@azure/msal-browser';
 import { CHANGELOG } from '../../data/changelog';
 import { TagMemberEditor } from './TagMemberEditor';
+import { SpinnerBlock } from '../common/Spinner';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -827,7 +828,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {membersLoading ? <div>読み込み中...</div> : members.map((m: any) => (
+                                    {membersLoading ? <SpinnerBlock /> : members.map((m: any) => (
                                         <div key={m.user_id} style={{
                                             display: 'flex',
                                             alignItems: 'center',
