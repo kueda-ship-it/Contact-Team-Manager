@@ -19,6 +19,8 @@ const feedScrollMemory = new Map<string, number>();
 const NEWEST_END_SNAP_PX = 8;
 // デスクトップの表示バーの向き（縦レール / 横＝一覧上の帯）を端末ごとに覚えるキー
 const FILTER_BAR_ORIENTATION_KEY = 'ctm.feedFilterBarOrientation';
+// voice-agent は本番に未デプロイ。本番ビルドに URL が無い間は「AI架電に起票」を出さない（localhost が開くだけになるため）
+const AI_CALL_URL = (import.meta.env.VITE_AI_CALL_URL as string | undefined) || (import.meta.env.DEV ? 'http://localhost:5180' : '');
 import { WaterDateTimePicker } from '../common/WaterDateTimePicker';
 import { DotMenu } from '../common/DotMenu';
 import { Spinner } from '../common/Spinner';
@@ -1335,22 +1337,21 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     )}
 
                                     {/* AI架電（voice-agent）への起票。DB は繋がず、起票フォームを前入力で開くだけ */}
-                                    <div className="menu-item" onClick={() => {
+                                    {AI_CALL_URL && <div className="menu-item" onClick={() => {
                                         setOpenMenuId(null);
-                                        const base = (import.meta.env.VITE_AI_CALL_URL as string | undefined) || 'http://localhost:5180';
                                         const q = new URLSearchParams({
                                             scenario: 'taiou-nichiji',
                                             property: thread.title || '',
                                             note: `CTM: ${thread.title || ''} (#${thread.id})`,
                                         });
-                                        window.open(`${base}/#/targets?${q.toString()}`, '_blank', 'noopener');
+                                        window.open(`${AI_CALL_URL}/#/targets?${q.toString()}`, '_blank', 'noopener');
                                     }}>
                                         <span className="menu-icon">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                                             </svg>
                                         </span> AI架電に起票
-                                    </div>
+                                    </div>}
                                 </DotMenu>
 
                                 <div className="task-header-meta">
