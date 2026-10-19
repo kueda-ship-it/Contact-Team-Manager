@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { selectAll } from '../lib/fetchAll';
 import { useAuth } from './useAuth';
 import { useRefetchOnFocus } from './useRefetchOnFocus';
 import { useRefetchInterval } from './useRefetchInterval';
@@ -238,8 +239,10 @@ export function useThreads(
             let rows: any[] = [];
             for (let from = 0; unlimited || from < effectiveLimit; from += PAGE_SIZE) {
                 const to = (unlimited ? from + PAGE_SIZE : Math.min(from + PAGE_SIZE, effectiveLimit)) - 1;
+                // 同じ created_at の行が区切りをまたいでも重複・欠落しないよう、id まで並び順に含める
                 const { data, error } = await buildQuery()
                     .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
                     .range(from, to);
                 if (error) throw error;
                 rows = rows.concat(data || []);
@@ -484,13 +487,14 @@ export function useProfiles() {
     const fetchProfiles = useCallback(async (silent = false) => {
         try {
             if (!silent) setLoading(true);
-            const data = await sharedFetch('profiles', async () => {
-                const { data, error } = await supabase
+            // 全社のプロフィールのマスタ。1000 行を超えても切れないよう 1000 行ずつ全件読む
+            const data = await sharedFetch('profiles', () =>
+                selectAll<Profile>((from, to) => supabase
                     .from('profiles')
-                    .select('*');
-                if (error) throw error;
-                return data || [];
-            });
+                    .select('*')
+                    .order('id', { ascending: true })
+                    .range(from, to))
+            );
 
             setProfiles((data || []).map((p: any) => ({ ...p, role: normalizeRole(p.role) })));
         } catch (error) {
@@ -687,13 +691,14 @@ export function useReactions() {
     const fetchReactions = useCallback(async (silent = false) => {
         try {
             if (!silent) setLoading(true);
-            const { data, error } = await supabase
+            // reactions は絞り込みなしの全件読み。増え続けるので 1000 行ずつ最後まで読む
+            const data = await selectAll<Reaction>((from, to) => supabase
                 .from('reactions')
                 .select('*')
-                .order('created_at', { ascending: true });
-
-            if (error) throw error;
-            setReactions(data || []);
+                .order('created_at', { ascending: true })
+                .order('id', { ascending: true })
+                .range(from, to));
+            setReactions(data);
         } catch (error) {
             console.error('Error fetching reactions:', error);
         } finally {
@@ -864,14 +869,16 @@ export function usePopularTeamId(userId: string | undefined) {
             setLoading(true);
             try {
                 // Fetch distribution of posts by this user per team
-                const { data, error } = await supabase
+                // 1 人で 1000 件を超えて投稿している人がいる（2026-10 時点で最大 1,653 件）。
+                // 1000 行で切れると古い投稿のチームが数えられないので、全件読んで数える
+                const data = await selectAll<{ team_id: string | number }>((from, to) => supabase
                     .from('threads')
                     .select('team_id')
-                    .eq('user_id', userId);
+                    .eq('user_id', userId)
+                    .order('id', { ascending: true })
+                    .range(from, to));
 
-                if (error) throw error;
-
-                if (data && data.length > 0) {
+                if (data.length > 0) {
                     const counts: { [id: string]: number } = {};
                     data.forEach(t => {
                         const tid = String(t.team_id);
