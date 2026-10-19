@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { highlightMentions, hasMention } from '../../utils/mentions';
 import { formatDate, getPlainTextForSidebar } from '../../utils/text';
+import { COLLAPSE_MAX_HEIGHT, shouldCollapse } from '../../utils/collapse';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
 import { Spinner } from '../common/Spinner';
@@ -47,7 +48,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         });
     };
 
-    // Measure heights for task cards (threshold: 200px)
+    // Measure heights for task cards (200px + はみ出しの余裕分を超えたら折り返す)
     React.useLayoutEffect(() => {
         const observer = new ResizeObserver((entries) => {
             setNeedsExpandMap(prev => {
@@ -57,7 +58,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                     const el = entry.target as HTMLElement;
                     const id = el.getAttribute('data-measure-id');
                     if (id) {
-                        const needs = el.scrollHeight > 200;
+                        const needs = shouldCollapse(el.scrollHeight, COLLAPSE_MAX_HEIGHT.thread);
                         if (next[id] !== needs) {
                             next[id] = needs;
                             changed = true;

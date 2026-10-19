@@ -6,6 +6,7 @@ import { Attachment } from '../../hooks/useFileUpload';
 import { supabase } from '../../lib/supabase';
 import { formatDate } from '../../utils/text';
 import { highlightMentions, hasMention } from '../../utils/mentions';
+import { COLLAPSE_MAX_HEIGHT, shouldCollapse } from '../../utils/collapse';
 import { ReactionBar } from '../ReactionBar';
 import { useMentions } from '../../hooks/useMentions';
 import { MentionList } from '../common/MentionList';
@@ -249,7 +250,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         return () => document.body.classList.remove('menu-open');
     }, [openMenuId]);
 
-    // Measure heights to detect if they exceed thresholds (200px for threads, 100px for replies)
+    // Measure heights to detect if they exceed thresholds (threads 200px / replies 100px + slack)
     //
     // ★ObserverはコンポーネントにつきResizeObserver 1個だけ作り、要素の出入りは
     //   ref コールバックで observe/unobserve する。以前は threads が変わるたびに
@@ -265,8 +266,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                     const el = entry.target as HTMLElement;
                     const id = el.getAttribute('data-measure-id');
                     if (id) {
-                        const threshold = id.startsWith('reply-') ? 100 : 200;
-                        const needs = el.scrollHeight > threshold;
+                        const maxHeight = id.startsWith('reply-') ? COLLAPSE_MAX_HEIGHT.reply : COLLAPSE_MAX_HEIGHT.thread;
+                        const needs = shouldCollapse(el.scrollHeight, maxHeight);
                         if (next[id] !== needs) {
                             next[id] = needs;
                             changed = true;
