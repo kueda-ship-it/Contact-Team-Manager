@@ -2,6 +2,7 @@ import React from 'react';
 import { useProfiles, useTags, useTeams } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import { selectAll } from '../../lib/fetchAll';
 import { highlightMentions, hasMention } from '../../utils/mentions';
 import { formatDate, getPlainTextForSidebar } from '../../utils/text';
 import { COLLAPSE_MAX_HEIGHT, shouldCollapse } from '../../utils/collapse';
@@ -91,21 +92,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         if (!silent && pendingCountRef.current === 0) setPendingLoading(true);
 
         try {
-            // Fetch pending threads regardless of limit (up to 2000 safe limit)
-            // Filter by currentTeamId if selected, or all if not.
-            let query = supabase
-                .from('threads')
-                .select(`
-                    *,
-                    replies:replies(*)
-                `)
-                .eq('status', 'pending')
-                .order('created_at', { ascending: false })
-                .limit(2000);
-
-            if (currentTeamId) {
-                query = query.eq('team_id', currentTeamId);
-            } else if (currentProfile?.role !== 'Admin') {
+            // 未完了はフィードの表示件数に関係なく全件読む。
+            // 以前の .limit(2000) は Supabase の上限で黙って 1000 行に切れていたので、1000 行ずつ最後まで読む。
+            // チャネル選択中はそのチャネルだけ、未選択は管理者のみ全チーム。
+            if (!currentTeamId && currentProfile?.role !== 'Admin') {
                 // 所属チームがない（currentTeamIdがnull）かつ管理者でない場合
                 // 全チームの未完了タスクを取得してしまうのを防ぐ
                 setPendingThreads([]);
@@ -113,9 +103,21 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
                 return;
             }
 
-            const { data, error } = await query;
-            if (error) throw error;
-            setPendingThreads(data || []);
+            const data = await selectAll((from, to) => {
+                let query = supabase
+                    .from('threads')
+                    .select(`
+                        *,
+                        replies:replies(*)
+                    `)
+                    .eq('status', 'pending');
+                if (currentTeamId) query = query.eq('team_id', currentTeamId);
+                return query
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
+                    .range(from, to);
+            });
+            setPendingThreads(data);
         } catch (e) {
             console.error("Error fetching pending threads for sidebar:", e);
         } finally {
