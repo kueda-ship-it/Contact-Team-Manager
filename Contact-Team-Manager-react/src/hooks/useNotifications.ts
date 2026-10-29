@@ -1,6 +1,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { selectAll } from '../lib/fetchAll';
 import { useAuth } from './useAuth';
 import { useNotificationContext } from '../context/NotificationContext';
 import { businessMsBetween } from '../utils/businessHours';
@@ -27,6 +28,17 @@ const STALE_AFTER_MS = 8.5 * 60 * 60 * 1000;
 const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 // 一度にこれより多く該当したら1通にまとめる（初回や休み明けに通知が連打されないように）
 const STALE_INDIVIDUAL_MAX = 2;
+
+/** 動きのない未完了の判定に使う列だけ（checkStaleThreads の取得結果） */
+interface StaleThreadRow {
+    id: string;
+    title: string;
+    team_id: string;
+    user_id: string;
+    created_at: string;
+    replies?: { user_id: string | null; created_at: string }[];
+    notices?: { user_id: string; activity_at: string }[];
+}
 
 const NOTIFICATION_ICON = `${import.meta.env.BASE_URL}favicon-v3.png`;
 
@@ -306,12 +318,18 @@ export function useNotifications() {
     const checkStaleThreads = useCallback(async () => {
         if (!user) return;
         try {
-            const { data, error } = await supabase
-                .from('threads')
-                .select('id, title, team_id, user_id, created_at, replies:replies(user_id, created_at), notices:thread_stale_notices(user_id, activity_at)')
-                .eq('status', 'pending')
-                .not('waiting_contact', 'is', true);
-            if (error) {
+            // 全チームの未完了が対象で件数に上限が無いので、1000 行で切れないよう最後まで読む
+            let data: StaleThreadRow[];
+            try {
+                data = await selectAll<StaleThreadRow>((from, to) => supabase
+                    .from('threads')
+                    .select('id, title, team_id, user_id, created_at, replies:replies(user_id, created_at), notices:thread_stale_notices(user_id, activity_at)')
+                    .eq('status', 'pending')
+                    .not('waiting_contact', 'is', true)
+                    .order('created_at', { ascending: true })
+                    .order('id', { ascending: true })
+                    .range(from, to));
+            } catch (error) {
                 console.error('Failed to fetch stale threads:', error);
                 return;
             }
