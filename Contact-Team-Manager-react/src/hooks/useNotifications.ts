@@ -285,12 +285,22 @@ export function useNotifications() {
         fetchTagData();
         fetchTeamNotifSettings();
         checkReminders();
-        const interval = setInterval(() => {
+        // リマインドは時刻が来たら鳴らすものなので 60 秒のまま。裏タブでも止めない
+        // （通知はタブを見ていないときのためのもの）。
+        const reminderTimer = setInterval(checkReminders, 60_000);
+        // タグとチャネルごとの通知設定は毎分引き直す必要がない。60 秒 polling だと
+        // 1 人あたり毎分 2 本が増えるだけで、内容はほぼ変わらない。
+        const settingsTimer = setInterval(() => {
             fetchTagData();
             fetchTeamNotifSettings();
-            checkReminders();
-        }, 60000);
-        return () => clearInterval(interval);
+        }, 10 * 60_000);
+        const onSettingsChanged = () => { fetchTeamNotifSettings(); };
+        window.addEventListener('ctm:notify-settings-changed', onSettingsChanged);
+        return () => {
+            clearInterval(reminderTimer);
+            clearInterval(settingsTimer);
+            window.removeEventListener('ctm:notify-settings-changed', onSettingsChanged);
+        };
     }, [fetchTagData, fetchTeamNotifSettings, checkReminders]);
 
     const checkStaleThreads = useCallback(async () => {

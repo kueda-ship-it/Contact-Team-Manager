@@ -93,12 +93,27 @@ const VIEW_CACHE_MAX = 12;
 // ダッシュボード(limit<=0 の全件取得)はビューを離れるとアンマウントされ、インスタンス内の
 // キャッシュごと消えて開くたびに全件を待たされていた。全件取得だけはモジュールで持つ。
 const fullFetchCache = new Map<string, Thread[]>();
-const makeViewKey = (teamId: number | string | null, filter: string, ascending: boolean, searchQuery: string) =>
-    `${teamId ?? ''}|${filter}|${ascending}|${searchQuery.trim()}`;
+const makeViewKey = (teamId: number | string | null, filter: string, ascending: boolean, searchQuery: string, slim: boolean = false) =>
+    `${teamId ?? ''}|${filter}|${ascending}|${searchQuery.trim()}|${slim ? 'slim' : 'full'}`;
+
+// 全件取得ビューを最後に取った時刻。マウントのたびに裏で全件を引き直すと、
+// ダッシュボードを開き直すだけで数 MB が飛ぶ。表示はキャッシュで即出しつつ、
+// この窓の間は取り直さない。
+const fullFetchAt = new Map<string, number>();
+const FULL_FETCH_FRESH_MS = 60_000;
+
+// 同じ条件の取得が同時に走るのを 1 本に束ねる。
+// useThreads の fetch は memberships の到着などで作り直され、最初の 1 本が返る前に
+// 2本目・3本目が出ていた(ダッシュボードを1回開くだけで全件取得が3周=13.7MB)。
+// キャッシュではない。走っている最中だけ相乗りし、終わったら捨てる。
+const threadsInflight = new Map<string, Promise<any[]>>();
 
 // 検索ヒットの取得上限。号機のような数字は 1〜2 文字で数千件に当たるため、
 // 新しい順にこの件数だけ引く(描画コストの上限を切る)。
 const SEARCH_RESULT_LIMIT = 200;
+
+// メンション候補を DB 側で拾うときの上限(新しい順)。実測で1人あたり十数件。
+const MENTION_SCAN_LIMIT = 1000;
 
 
 // ---------------------------------------------------------------------------
@@ -115,12 +130,21 @@ const SEARCH_RESULT_LIMIT = 200;
 // invalidateShared() で明示的に捨てる。
 // ---------------------------------------------------------------------------
 const SHARED_STALE_MS = 3_000;
+
+// 参照系(teams / profiles / tags / tag_members)は実運用ではほとんど変わらない。
+// それを 60 秒 polling で引き直すと、profiles(205行)だけで 1 人あたり約 7MB/時。
+// 起動時に 1 回取り、以降はこの窓の間キャッシュを返す。管理画面での追加・変更は
+// 書き込み側の invalidateShared() と、各 hook が返す refetch()(必ずキャッシュを
+// 捨ててから引く)で即時反映する。
+const REF_STALE_MS = 10 * 60_000;
+const REF_POLL_MS = 10 * 60_000;
+
 const sharedCache = new Map<string, { at: number; data: any }>();
 const sharedInflight = new Map<string, Promise<any>>();
 
-async function sharedFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+async function sharedFetch<T>(key: string, fetcher: () => Promise<T>, staleMs: number = SHARED_STALE_MS): Promise<T> {
     const hit = sharedCache.get(key);
-    if (hit && Date.now() - hit.at < SHARED_STALE_MS) return hit.data as T;
+    if (hit && Date.now() - hit.at < staleMs) return hit.data as T;
 
     const running = sharedInflight.get(key);
     if (running) return running as Promise<T>;
@@ -136,19 +160,41 @@ function invalidateShared(key: string) {
     sharedCache.delete(key);
 }
 
+// 参照系キャッシュの明示破棄。管理画面のようにキャッシュ窓(10分)を待てない
+// 書き込みの直後から呼ぶ。次の取得でサーバーから引き直す。
+export function invalidateReferenceCache() {
+    ['teams', 'profiles', 'tags', 'tag_members'].forEach(invalidateShared);
+}
+
+// ---------------------------------------------------------------------------
+// 取得する列は明示する。select('*') は画面が読んでいない列(threads.remind_at /
+// reminder_sent など)まで毎回運ぶ。
+// SLIM はダッシュボード用。集計に要らない返信本文・添付を落とす
+// (返信 8,113 行の本文が全取得 1 回あたりの最大の塊だった)。
+// ---------------------------------------------------------------------------
+export const THREAD_COLS = 'id,title,content,author,user_id,team_id,status,is_pinned,created_at,updated_at,completed_by,completed_at,completed_auto,attachments,waiting_contact,waiting_by,waiting_at';
+const THREAD_COLS_SLIM = 'id,title,content,author,user_id,team_id,status,is_pinned,created_at,updated_at,completed_by,completed_at,completed_auto,waiting_contact,waiting_by,waiting_at';
+const REPLY_COLS = 'id,thread_id,content,author,user_id,created_at,attachments';
+const REPLY_COLS_SLIM = 'id,thread_id,author,created_at';
+
 export function useThreads(
     teamId: number | string | null,
     limit: number = 50,
     ascending: boolean = true,
     filter: 'all' | 'pending' | 'completed' | 'waiting' | 'mentions' | 'myposts' | 'open' = 'all',
-    searchQuery: string = ''
+    searchQuery: string = '',
+    options: { slim?: boolean; live?: boolean } = {}
 ) {
+    // slim: 集計用。返信本文と添付を取らない
+    // live: realtime 購読と polling を張るか。false なら表示時の取得だけ
+    const slim = options.slim === true;
+    const live = options.live !== false;
     const { user, profile } = useAuth();
     const { memberships } = useUserMemberships(user?.id);
     const [threads, setThreads] = useState<Thread[]>(() =>
-        (limit <= 0 && fullFetchCache.get(makeViewKey(teamId, filter, ascending, searchQuery))) || []);
+        (limit <= 0 && fullFetchCache.get(makeViewKey(teamId, filter, ascending, searchQuery, slim))) || []);
     const [loading, setLoading] = useState(() =>
-        !(limit <= 0 && fullFetchCache.has(makeViewKey(teamId, filter, ascending, searchQuery))));
+        !(limit <= 0 && fullFetchCache.has(makeViewKey(teamId, filter, ascending, searchQuery, slim))));
     const [error, setError] = useState<Error | null>(null);
     // 発行順を持つカウンタ。後から投げた fetch が先に返った古い fetch に
     // 上書きされる(= 検索が解ける)のを防ぐ。
@@ -174,8 +220,6 @@ export function useThreads(
                 ? SEARCH_RESULT_LIMIT
                 : ((filter === 'pending' || filter === 'waiting' || filter === 'open' || filter === 'mentions') ? 0 : limit);
 
-            console.log(`[useThreads] Fetching. Team: ${teamId}, Filter: ${filter}, Search: ${searchQuery}, Silent: ${silent}`);
-
             // Only show loading if we really have no data for the current team
             // ★team_id は uuid。Number(teamId) は必ず NaN になり、この判定は
             //   「常に別チーム」として成立していた（＝毎回ローディング表示）。文字列で比べる。
@@ -192,15 +236,65 @@ export function useThreads(
                 return;
             }
 
+            // メンションは「本文に自分の名前が入っているか」を画面側で判定していたため、
+            // フィルタを選ぶたびにスレッド全件 + 返信全件(約 4,500 + 8,100 行)を
+            // 引いていた。先に DB 側で該当スレッドの id だけを拾い、それだけを引く。
+            // ここでの ilike は @ を付けない緩い superset。最終判定は従来どおり
+            // 画面側の hasMention() が行うので、取りこぼしも誤検出も増えない。
+            let mentionIds: string[] | null = null;
+            if (filter === 'mentions') {
+                const needles = [profile?.display_name, user?.email]
+                    .filter((s): s is string => !!s && s.trim().length > 0 && !s.includes('"'));
+                if (needles.length === 0) {
+                    setThreads([]);
+                    setLoading(false);
+                    return;
+                }
+                const scope = (q: any) => {
+                    if (teamId !== null && teamId !== '') return q.eq('team_id', teamId);
+                    if (!isAdmin) return q.in('team_id', memberTeamIds);
+                    return q;
+                };
+                const [hitThreads, hitReplies] = await Promise.all([
+                    scope(supabase.from('threads').select('id'))
+                        .or(needles.map(n => `title.ilike."%${n}%",content.ilike."%${n}%"`).join(','))
+                        .order('created_at', { ascending: false })
+                        .limit(MENTION_SCAN_LIMIT),
+                    // replies は team_id で絞らない。#34 より前の返信は team_id が
+                    // NULL のまま(16件)で、絞ると取りこぼす。チームの絞り込みは
+                    // 下の本取得（buildQuery）側でかかるので、ここは候補集めに徹する。
+                    supabase.from('replies').select('thread_id')
+                        .or(needles.map(n => `content.ilike."%${n}%"`).join(','))
+                        .order('created_at', { ascending: false })
+                        .limit(MENTION_SCAN_LIMIT),
+                ]);
+                if (hitThreads.error) throw hitThreads.error;
+                if (hitReplies.error) throw hitReplies.error;
+                mentionIds = Array.from(new Set([
+                    ...(hitThreads.data || []).map((r: any) => String(r.id)),
+                    ...(hitReplies.data || []).map((r: any) => String(r.thread_id)),
+                ]));
+                if (seq !== fetchSeqRef.current) return;
+                if (mentionIds.length === 0) {
+                    setThreads([]);
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            const selectExpr = slim
+                ? `${THREAD_COLS_SLIM},replies:replies(${REPLY_COLS_SLIM})`
+                : `${THREAD_COLS},replies:replies(${REPLY_COLS}),reminders:thread_reminders(id,remind_at,reminder_sent)`;
+
             // ページごとに query builder を作り直す(builder は破壊的に更新されるため使い回せない)
             const buildQuery = () => {
                 let q = supabase
                     .from('threads')
-                    .select(`
-                      *,
-                      replies:replies(*),
-                      reminders:thread_reminders(id, remind_at, reminder_sent)
-                    `);
+                    .select(selectExpr);
+
+                if (mentionIds) {
+                    q = q.in('id', mentionIds);
+                }
 
                 if (isSearching) {
                     const term = `%${searchQuery.trim()}%`;
@@ -233,18 +327,30 @@ export function useThreads(
 
             // Supabase(PostgREST) は 1 リクエスト最大 1000 行に切り詰めるため、
             // limit がそれを超える場合(0 以下 = 全件)は range() でページングして結合する。
-            const PAGE_SIZE = 1000;
-            const unlimited = effectiveLimit <= 0;
-            let rows: any[] = [];
-            for (let from = 0; unlimited || from < effectiveLimit; from += PAGE_SIZE) {
-                const to = (unlimited ? from + PAGE_SIZE : Math.min(from + PAGE_SIZE, effectiveLimit)) - 1;
-                const { data, error } = await buildQuery()
-                    .order('created_at', { ascending: false })
-                    .range(from, to);
-                if (error) throw error;
-                rows = rows.concat(data || []);
-                if (!data || data.length < to - from + 1) break;
+            const runPages = async () => {
+                const PAGE_SIZE = 1000;
+                const unlimited = effectiveLimit <= 0;
+                let acc: any[] = [];
+                for (let from = 0; unlimited || from < effectiveLimit; from += PAGE_SIZE) {
+                    const to = (unlimited ? from + PAGE_SIZE : Math.min(from + PAGE_SIZE, effectiveLimit)) - 1;
+                    const { data, error } = await buildQuery()
+                        .order('created_at', { ascending: false })
+                        .range(from, to);
+                    if (error) throw error;
+                    acc = acc.concat(data || []);
+                    if (!data || data.length < to - from + 1) break;
+                }
+                return acc;
+            };
+
+            // 同じ条件の取得が既に走っていれば相乗りする。走り終わるまでの間だけ。
+            const inflightKey = `${viewKeyRef.current}|${effectiveLimit}|${mentionIds ? mentionIds.length : ''}`;
+            let pending = threadsInflight.get(inflightKey);
+            if (!pending) {
+                pending = runPages().finally(() => { threadsInflight.delete(inflightKey); });
+                threadsInflight.set(inflightKey, pending);
             }
+            const rows = await pending;
 
             if (seq !== fetchSeqRef.current) return;   // 追い越された古いレスポンスは捨てる
 
@@ -265,6 +371,7 @@ export function useThreads(
             const cache = viewCacheRef.current;
             if (cache.size > VIEW_CACHE_MAX) cache.clear();
             cache.set(viewKeyRef.current, result as Thread[]);
+            if (limit <= 0) fullFetchAt.set(viewKeyRef.current, Date.now());
             setThreads(result as Thread[]);
         } catch (error: any) {
             console.error('Error fetching threads:', error);
@@ -272,14 +379,14 @@ export function useThreads(
         } finally {
             if (seq === fetchSeqRef.current) setLoading(false);
         }
-    }, [teamId, profile?.id, memberships.length, limit, ascending, filter, searchQuery]);
+    }, [teamId, profile?.id, profile?.display_name, user?.email, memberships.length, limit, ascending, filter, searchQuery, slim]);
 
     // チャネル切替を「待たせない」ための表示キャッシュ。
     // 一度見たチャネルは、往復(実測 約200ms。DB は 3ms で残りは日本〜シンガポール間の
     // 往復)を待たずに前回の内容を即座に出し、裏で silent に取り直して差し替える。
     // これが無いと、クリックしてから前のチャネルの内容が出たままになり
     // 「ワンテンポ遅れて切り替わる」ように見える。
-    const viewKey = makeViewKey(teamId, filter, ascending, searchQuery);
+    const viewKey = makeViewKey(teamId, filter, ascending, searchQuery, slim);
     viewKeyRef.current = viewKey;
 
     useEffect(() => {
@@ -287,7 +394,12 @@ export function useThreads(
         if (cached) {
             setThreads(cached);
             setLoading(false);
-            fetchThreads(true);        // 表示は即座。更新は裏で
+            // 全件取得ビュー(ダッシュボード)は、直近に取ったばかりなら引き直さない。
+            // 開くたびに数 MB を引き直すのが Egress の主因だった。
+            const freshAt = limit <= 0 ? (fullFetchAt.get(viewKey) || 0) : 0;
+            if (limit > 0 || Date.now() - freshAt >= FULL_FETCH_FRESH_MS) {
+                fetchThreads(true);    // 表示は即座。更新は裏で
+            }
         } else {
             setThreads([]);            // 初見のチャネルは古い内容を残さない
             fetchThreads();
@@ -303,16 +415,33 @@ export function useThreads(
 
     // 書き込み1回で threads UPDATE + replies INSERT のイベントが立て続けに届き、
     // そのたびに全件 fetch していた。800ms 窓で束ねて 1 本にする。
+    // 裏に回っているタブでは引かない。見ていない画面のために一覧を引き直すのは
+    // そのまま Egress になる。戻ってきたときに 1 回だけまとめて取り直す。
     const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const missedWhileHiddenRef = useRef(false);
     const scheduleRealtimeRefetch = useCallback(() => {
+        if (document.visibilityState !== 'visible') {
+            missedWhileHiddenRef.current = true;
+            return;
+        }
         if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current);
         realtimeTimerRef.current = setTimeout(() => {
             realtimeTimerRef.current = null;
             fetchRef.current(true);
         }, 800);
     }, []);
-    useEffect(() => () => {
-        if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current);
+    useEffect(() => {
+        const onVisible = () => {
+            if (document.visibilityState !== 'visible') return;
+            if (!missedWhileHiddenRef.current) return;
+            missedWhileHiddenRef.current = false;
+            fetchRef.current(true);
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            document.removeEventListener('visibilitychange', onVisible);
+            if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current);
+        };
     }, []);
 
     // 楽観更新: サーバー往復や全件 refetch を待たずに、手元の表示だけ先に書き換える。
@@ -364,6 +493,7 @@ export function useThreads(
     const membershipKey = memberships.map((m: any) => String(m.team_id)).join(',');
 
     useEffect(() => {
+        if (!live) return;   // 集計ビューは1件の変更で全件を引き直す価値がない
         // filter 用の team_id 集合を組み立てる。
         // - 単一チーム表示 (teamId 指定): その team のみ
         // - 全件表示 (teamId=null): Admin は購読しない (filter 不可で Egress 暴走 #33)、
@@ -412,11 +542,11 @@ export function useThreads(
             supabase.removeChannel(threadsChannel);
             supabase.removeChannel(repliesChannel);
         };
-    }, [teamId, profile?.role, membershipKey, scheduleRealtimeRefetch]);
+    }, [live, teamId, profile?.role, membershipKey, scheduleRealtimeRefetch]);
 
     // Admin の全件表示時は filter 不可 (memberships に無い team も見る)
     // で realtime 諦め → 60秒 polling で代替する。
-    const isAdminAllTeamsView = profile?.role === 'Admin' && (teamId === null || teamId === '');
+    const isAdminAllTeamsView = live && profile?.role === 'Admin' && (teamId === null || teamId === '');
     const pollFetch = useCallback(() => { fetchThreads(true); }, [fetchThreads]);
     useRefetchInterval(pollFetch, 60_000, isAdminAllTeamsView);
 
@@ -439,7 +569,7 @@ export function useTeams() {
                     .order('name', { ascending: true });
                 if (error) throw error;
                 return data || [];
-            });
+            }, REF_STALE_MS);
 
             const isAdmin = profile?.role === 'Admin';
             if (isAdmin) {
@@ -472,9 +602,14 @@ export function useTeams() {
         fetchTeams();
     }, [fetchTeams]);
     useRefetchOnFocus(fetchTeams);
-    useRefetchInterval(fetchTeams, 60_000);
+    useRefetchInterval(fetchTeams, REF_POLL_MS);
 
-    return { teams, loading };
+    const refetch = useCallback(() => {
+        invalidateShared('teams');
+        return fetchTeams(true);
+    }, [fetchTeams]);
+
+    return { teams, loading, refetch };
 }
 
 export function useProfiles() {
@@ -490,7 +625,7 @@ export function useProfiles() {
                     .select('*');
                 if (error) throw error;
                 return data || [];
-            });
+            }, REF_STALE_MS);
 
             setProfiles((data || []).map((p: any) => ({ ...p, role: normalizeRole(p.role) })));
         } catch (error) {
@@ -506,9 +641,14 @@ export function useProfiles() {
         fetchProfiles();
     }, [fetchProfiles]);
     useRefetchOnFocus(fetchProfiles);
-    useRefetchInterval(fetchProfiles, 60_000);
+    useRefetchInterval(fetchProfiles, REF_POLL_MS);
 
-    return { profiles, loading, refetch: fetchProfiles };
+    const refetch = useCallback(() => {
+        invalidateShared('profiles');
+        return fetchProfiles(true);
+    }, [fetchProfiles]);
+
+    return { profiles, loading, refetch };
 }
 
 export function useTags() {
@@ -525,7 +665,7 @@ export function useTags() {
                     .order('name', { ascending: true });
                 if (error) throw error;
                 return data || [];
-            });
+            }, REF_STALE_MS);
 
             setTags(data || []);
         } catch (error) {
@@ -541,7 +681,7 @@ export function useTags() {
         fetchTags();
     }, [fetchTags]);
     useRefetchOnFocus(fetchTags);
-    useRefetchInterval(fetchTags, 60_000);
+    useRefetchInterval(fetchTags, REF_POLL_MS);
 
     const addTag = useCallback(async (name: string, teamId?: string | number | null, color?: string) => {
         const insertData: any = { name };
@@ -560,7 +700,12 @@ export function useTags() {
         await fetchTags(true);
     }, [fetchTags]);
 
-    return { tags, loading, addTag, deleteTag, refetch: fetchTags };
+    const refetch = useCallback(() => {
+        invalidateShared('tags');
+        return fetchTags(true);
+    }, [fetchTags]);
+
+    return { tags, loading, addTag, deleteTag, refetch };
 }
 
 export function useTagMembers(tagId: string | number | null) {
@@ -617,6 +762,7 @@ export function useTagMembers(tagId: string | number | null) {
             .from('tag_members')
             .insert({ tag_id: tagId, profile_id: profileId });
         if (error) throw error;
+        invalidateShared('tag_members');
         await fetchTagMembers(true);
     }, [tagId, fetchTagMembers]);
 
@@ -628,6 +774,7 @@ export function useTagMembers(tagId: string | number | null) {
             .eq('tag_id', tagId)
             .eq('profile_id', profileId);
         if (error) throw error;
+        invalidateShared('tag_members');
         await fetchTagMembers(true);
     }, [tagId, fetchTagMembers]);
 
@@ -640,11 +787,14 @@ export function useAllTagMembers() {
 
     const fetchAllTagMembers = useCallback(async () => {
         try {
-            const { data, error } = await supabase
-                .from('tag_members')
-                .select('tag_id, profile_id');
+            const data = await sharedFetch('tag_members', async () => {
+                const { data, error } = await supabase
+                    .from('tag_members')
+                    .select('tag_id, profile_id');
+                if (error) throw error;
+                return data || [];
+            }, REF_STALE_MS);
 
-            if (error) throw error;
             setAllTagMembers(data || []);
         } catch (error) {
             console.error('Error fetching all tag members:', error);
@@ -658,7 +808,7 @@ export function useAllTagMembers() {
         fetchAllTagMembers();
     }, [fetchAllTagMembers]);
     useRefetchOnFocus(fetchAllTagMembers);
-    useRefetchInterval(fetchAllTagMembers, 60_000);
+    useRefetchInterval(fetchAllTagMembers, REF_POLL_MS);
 
     // Helper: get user IDs for a given tag name
     const getUserIdsForTag = useCallback((tagId: string | number): string[] => {
@@ -808,12 +958,15 @@ export function useUserMemberships(userId: string | undefined) {
         }
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('team_members')
-                .select('*')
-                .eq('user_id', userId);
-
-            if (error) throw error;
+            // この hook は 6 箇所から呼ばれていて、同じ select が同時に 6 本飛んでいた
+            const data = await sharedFetch(`memberships:${userId}`, async () => {
+                const { data, error } = await supabase
+                    .from('team_members')
+                    .select('*')
+                    .eq('user_id', userId);
+                if (error) throw error;
+                return data || [];
+            }, REF_STALE_MS);
             // Normalize role casing — team_members.role has mixed casing
             // ('Manager', 'Member', 'member') and downstream === 'Manager' checks
             // would otherwise miss the lowercase rows. See src/utils/role.ts.
@@ -838,6 +991,7 @@ export function useUserMemberships(userId: string | undefined) {
                 .eq('user_id', userId)
                 .eq('team_id', teamId);
             if (error) throw error;
+            invalidateShared(`memberships:${userId}`);   // last_read_at が変わったので共有キャッシュを捨てる
             // Optimistic update
             setMemberships(prev => prev.map(m =>
                 m.team_id === teamId ? { ...m, last_read_at: new Date().toISOString() } : m

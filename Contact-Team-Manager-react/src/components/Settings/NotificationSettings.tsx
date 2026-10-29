@@ -68,6 +68,9 @@ export const NotificationSettings: React.FC = () => {
             const { error: e } = await Promise.race([req, timer]) as any;
             if (e) throw e;
             setError(null);
+            // 通知フックは設定を手元にキャッシュしている。定期取り直し(10分)を待たせず、
+            // 変えた直後に反映させる
+            window.dispatchEvent(new Event('ctm:notify-settings-changed'));
         } catch (err: any) {
             setModes(m => ({ ...m, [teamId]: before }));   // 戻す
             setError(`保存に失敗した: ${err?.message || err}`);

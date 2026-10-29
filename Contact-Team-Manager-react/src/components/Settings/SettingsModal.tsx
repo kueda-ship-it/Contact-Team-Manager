@@ -40,8 +40,15 @@ const TAB_TO_SECTION: Record<string, SettingsSection> = {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTeamId: currentTeamIdProp, currentTeamName: currentTeamNameProp, initialTab = 'profile', createChannelParentId = null }) => {
     const { user, profile } = useAuth();
-    const { profiles } = useProfiles();
-    const { teams } = useTeams();
+    const { profiles, refetch: refetchProfiles } = useProfiles();
+    const { teams, refetch: refetchTeams } = useTeams();
+    // teams / profiles は通常 10 分キャッシュ（Egress 対策）だが、ここは書き換える画面。
+    // 開いている間だけ短い間隔で取り直して、保存した内容がすぐ一覧に出るようにする。
+    useEffect(() => {
+        if (!isOpen) return;
+        const timer = setInterval(() => { refetchTeams(); refetchProfiles(); }, 20_000);
+        return () => clearInterval(timer);
+    }, [isOpen, refetchTeams, refetchProfiles]);
     // 設定内で対象チームを切り替えられるようにする（親から渡された値を初期値にする）
     const [teamScopeId, setTeamScopeId] = useState<string | null>(currentTeamIdProp);
     useEffect(() => { setTeamScopeId(currentTeamIdProp); }, [currentTeamIdProp]);
@@ -103,6 +110,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
             const { error } = await supabase.from('profiles').upsert(updates);
             if (error) throw error;
 
+            refetchProfiles();
             alert('一括更新が完了しました');
             setSelectedUserIds(new Set());
         } catch (error: any) {
@@ -337,6 +345,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         if (error) {
             alert('プロフィールの更新に失敗しました: ' + error.message);
         } else {
+            refetchProfiles();
             alert('プロフィールを更新しました');
             onClose();
         }
@@ -449,7 +458,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                 alert('チームの作成に失敗しました: ' + error.message);
             } else {
                 console.log('[handleSaveMgmtTeam] Create Success:', data);
-                
+                refetchTeams();
+
                 // Automatically add the creator as Admin
                 if (user && data) {
                     const { error: memberError } = await supabase
@@ -490,6 +500,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                 alert('チームの更新に失敗しました: ' + error.message);
             } else {
                 console.log('[handleSaveMgmtTeam] Update Success');
+                refetchTeams();
                 alert('チーム情報を更新しました');
                 if (mgmtParentId) {
                     await handleFirstChannelCreation(mgmtParentId, selectedTeamId);
@@ -506,6 +517,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         if (error) {
             alert('削除に失敗しました: ' + error.message);
         } else {
+            refetchTeams();
             alert('チームを削除しました');
             setSelectedTeamId('');
         }
@@ -540,6 +552,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
             if (error) throw error;
 
+            refetchProfiles();
             alert('ユーザーを追加しました。\nMicrosoft SSOでログインすると自動的にアカウントが有効化されます。');
             setNewUserEmail('');
             setNewDisplayName('');
@@ -567,6 +580,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         if (error) {
             alert('ユーザーの更新に失敗しました: ' + error.message);
         } else {
+            refetchProfiles();
             alert('ユーザー情報を更新しました');
         }
     };

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CustomSelect } from '../common/CustomSelect';
 import { Spinner } from '../common/Spinner';
+import { supabase } from '../../lib/supabase';
 import { useProfiles, useUserMemberships, useTeams, useThreads } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 import { CATEGORY_ORDER, CATEGORY_COLORS, classifyCategory, detectDirection, stripHtml, medianMs, type ContactCategory } from '../../utils/contactTrends';
@@ -35,8 +36,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const { teams } = useTeams();
     const { user, profile } = useAuth();
     const { memberships } = useUserMemberships(user?.id);
-    // ダッシュボード統計は全件対象。limit 0 = useThreads 側で 1000 行ずつページングして全件取得
-    const { threads, loading: threadsLoading } = useThreads(currentTeamId, 0, false);
+    // ダッシュボード統計は全件対象。limit 0 = useThreads 側で 1000 行ずつページングして全件取得。
+    // ただし集計に要らない返信本文・添付は取らない(slim)。また 1 件の投稿のたびに
+    // 全件を引き直す価値がないので realtime / polling も張らない(live:false)。
+    // 返信本文はモーダルを開いたときにそのスレッドの分だけ引く。
+    const { threads, loading: threadsLoading } = useThreads(currentTeamId, 0, false, 'all', '', { slim: true, live: false });
     const { profiles } = useProfiles();
     const [period, setPeriod] = useState<'all' | 'year' | 'month' | 'week' | 'day' | 'custom'>('all');
     // User Activity Stats State - Moved up to avoid hook order errors
@@ -48,6 +52,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const [selectedReplyCount, setSelectedReplyCount] = useState<string | null>(null);
     const [replyChartType, setReplyChartType] = useState<'bar' | 'pie'>('bar');
     const [selectedThread, setSelectedThread] = useState<any | null>(null);
+    // 返信本文は一覧では取らない(slim)。詳細を開いたスレッドの分だけ後から引く
+    const [replyBodies, setReplyBodies] = useState<{ [replyId: string]: string }>({});
+    const selectedThreadId = selectedThread?.id ? String(selectedThread.id) : null;
+    useEffect(() => {
+        if (!selectedThreadId) return;
+        let cancelled = false;
+        setReplyBodies({});
+        (async () => {
+            const { data, error } = await supabase
+                .from('replies')
+                .select('id,content')
+                .eq('thread_id', selectedThreadId);
+            if (error) {
+                console.error('Failed to fetch reply bodies:', error);
+                return;
+            }
+            if (cancelled) return;
+            const map: { [replyId: string]: string } = {};
+            (data || []).forEach((r: any) => { map[String(r.id)] = r.content || ''; });
+            setReplyBodies(map);
+        })();
+        return () => { cancelled = true; };
+    }, [selectedThreadId]);
     const [graphUser, setGraphUser] = useState<string | null>(null);
     const [graphMetric, setGraphMetric] = useState<'posts' | 'completions' | 'replies'>('completions');
 
@@ -1572,7 +1599,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 </div>
                                                 <div
                                                     style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                                                    dangerouslySetInnerHTML={{ __html: r.content || '' }}
+                                                    dangerouslySetInnerHTML={{ __html: r.content ?? replyBodies[String(r.id)] ?? '' }}
                                                 />
                                             </div>
                                         ))}

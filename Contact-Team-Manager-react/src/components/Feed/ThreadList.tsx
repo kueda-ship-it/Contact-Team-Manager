@@ -1146,7 +1146,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 <div className="feed-header-left">
                     <h2 style={{ fontSize: '1.1rem', fontWeight: 700, lineHeight: 1.3, display: 'flex', flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: '4px 10px', margin: 0, overflowWrap: 'anywhere' }}>
                         {currentTeamName}
-                        <span className="num" style={{ color: 'var(--primary-light)', fontSize: '0.9rem', fontWeight: 'normal', lineHeight: 1, whiteSpace: 'nowrap' }}>{threads.length} 件</span>
+                        {/* 件数は「取得した数」ではなく「出している数」。自分宛ては本文を見て
+                            絞り込むので、取得数のままだと一覧のカード数と合わない */}
+                        <span className="num" style={{ color: 'var(--primary-light)', fontSize: '0.9rem', fontWeight: 'normal', lineHeight: 1, whiteSpace: 'nowrap' }}>{visibleThreads.length} 件</span>
                         <StatusFilterLabel value={statusFilter} />
                     </h2>
                 </div>
@@ -1200,7 +1202,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                         )}
                     </button>
                     <div className="mobile-thread-count num">
-                        {threads.length}件
+                        {visibleThreads.length}件
                     </div>
                 </div>
                 <div className="mobile-status-filter">

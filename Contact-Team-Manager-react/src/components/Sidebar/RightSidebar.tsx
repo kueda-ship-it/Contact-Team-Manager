@@ -1,5 +1,5 @@
 import React from 'react';
-import { useProfiles, useTags, useTeams } from '../../hooks/useSupabase';
+import { useProfiles, useTags, useTeams, THREAD_COLS } from '../../hooks/useSupabase';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { highlightMentions, hasMention } from '../../utils/mentions';
@@ -93,12 +93,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ currentTeamId, threa
         try {
             // Fetch pending threads regardless of limit (up to 2000 safe limit)
             // Filter by currentTeamId if selected, or all if not.
+            // 返信は本数とメンション判定にしか使わない。本文以外（添付・投稿者など）は取らない
             let query = supabase
                 .from('threads')
-                .select(`
-                    *,
-                    replies:replies(*)
-                `)
+                .select(`${THREAD_COLS},replies:replies(id,thread_id,content,created_at)`)
                 .eq('status', 'pending')
                 .order('created_at', { ascending: false })
                 .limit(2000);
