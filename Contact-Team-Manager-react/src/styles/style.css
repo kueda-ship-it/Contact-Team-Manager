@@ -2061,11 +2061,13 @@ body.light-mode .settings-nav-item:hover {
     min-width: 0;
 }
 
-/* 状態バッジ・リアクション・操作はすべて右列に寄せ、本文の縦中央に置く */
+/* 状態バッジ・リアクション・操作はすべて右列に寄せ、本文の下端にそろえる。
+   center にすると、返信が付いたカードでは本文側が縦に伸びるぶん
+   完了者バッジ・操作がカードの中ほどに浮いてしまう（従来は常に下端だった・2026-11-04） */
 .feed-list .task-card > .tc-side {
     grid-column: 2;
     grid-row: 1;
-    align-self: center;
+    align-self: end;
     display: flex;
     align-items: center;
     justify-content: flex-end;
