@@ -1478,10 +1478,11 @@ body:not(.light-mode) .rich-editor * {
     min-width: 0;
 }
 
-/* 縦レールのときは文字をレール側（右）に寄せる。横のときは左にチャネル名、右に操作 */
+/* 一覧が全幅になったので、Teams と同じくチャネル名・件数は帯の左端に置く
+   （以前はレール側＝右に寄せていたが、全幅だと左に大きな空きが出る・2026-10-26） */
 :root:not([data-filter-bar="horizontal"]) .feed-header-left,
 :root:not([data-filter-bar="horizontal"]) .feed-header-left h2 {
-    justify-content: flex-end;
+    justify-content: flex-start;
 }
 
 .feed-header-right {
@@ -1581,9 +1582,9 @@ body.light-mode .feed-list.is-scrolling {
     scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
 }
 
-/* スクロールコンテナは全幅のまま、カード列・ヘッダーだけ中央寄せ。
-   カード外の余白でもホイールが効き、スクロールバーはエリア右端に出る。
-   880px は従来 .feed-list に掛かっていた幅と同じ(見た目のカード幅は不変) */
+/* スクロールコンテナは全幅のまま。スクロールバーはエリア右端に出る。
+   この 880px はモバイル(〜768px)用の保険で、769px 以上では下の
+   @media が全幅(calc(100% - レール))に上書きする */
 .feed-list > * {
     max-width: 880px;
     margin-left: auto;
@@ -1597,57 +1598,29 @@ body.light-mode .feed-list.is-scrolling {
 }
 
 /* デスクトップは一覧の右隣に縦レール（.feed-rail）を置く。
-   広い画面では中央寄せのまま右の空きに収め、空きが足りないときだけ一覧を左へ寄せて幅を詰める */
+   Teams と同じく一覧はメイン領域の全幅を使う（中央寄せの 880px 固定をやめ、
+   左右に数百 px の空きが出ないようにした・2026-10-26）。レール分だけ右を空ける */
 @media (min-width: 769px) {
     .main-feed-area {
         --rail-space: 72px;
     }
 
-    /* 横向き（バーは一覧上の帯の中）のときは右の余白を取らず、一覧は中央寄せのまま */
+    /* 横向き（バーは一覧上の帯の中）のときは右の余白を取らない */
     :root[data-filter-bar="horizontal"] .main-feed-area {
         --rail-space: 0px;
     }
 
     .feed-list > *,
     .desktop-only-postform {
-        width: min(880px, calc(100% - var(--rail-space)));
+        width: calc(100% - var(--rail-space));
         max-width: none;
-        margin-left: max(0px, min(calc((100% - 880px) / 2), calc(100% - 880px - var(--rail-space))));
+        margin-left: 0;
         margin-right: 0;
     }
 
-    /* 縦レールのとき: 帯はレールの右端（一覧の列 + 12px + レール 50px）まで伸ばし、文字はレールの真上に右寄せ */
+    /* 縦レールのとき: 帯はレールの右端（一覧の列 + 12px + レール 50px）まで伸ばす */
     :root:not([data-filter-bar="horizontal"]) .feed-list > .feed-header-sticky {
-        width: calc(min(880px, calc(100% - var(--rail-space))) + 62px);
-    }
-}
-
-/* 一覧の右に 270px 以上の空きがある幅（右サイドバー表示時で画面 1820px 以上）では、
-   チャネル名・件数・今の表示を一覧の列の外（レールの左端から右）に出し、スレッドの上に文字を置かない。
-   帯は透明にしてクリックも下のカードへ通す */
-@media (min-width: 1820px) {
-    :root:not([data-filter-bar="horizontal"]) .feed-list > .feed-header-sticky {
-        width: min(880px, calc(100% - var(--rail-space)));
-        /* 文字を外に出すと帯が 25px に縮み、28px のバッジが一覧の上端で切れるため、元の高さを保つ */
-        min-height: 53px;
-        background: transparent;
-        border-bottom-color: transparent;
-        pointer-events: none;
-    }
-
-    :root:not([data-filter-bar="horizontal"]) .feed-header-sticky .feed-header-left {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: calc(100% + 12px);
-        width: max-content;
-        max-width: 240px;
-        justify-content: flex-start;
-        pointer-events: auto;
-    }
-
-    :root:not([data-filter-bar="horizontal"]) .feed-header-sticky .feed-header-left h2 {
-        justify-content: flex-start;
+        width: calc(100% - var(--rail-space) + 62px);
     }
 }
 
@@ -2072,13 +2045,57 @@ body.light-mode .settings-nav-item:hover {
 }
 
 /* --- Actions & Footer --- */
-.task-footer-teams {
+
+/* 一覧のカードだけ 左=本文(.tc-main) / 右=状態バッジ・操作(.tc-side) の 2 カラムにする。
+   返信フォームは 2 行目に全幅で開く。右列は 1 行目に固定してあるので、
+   ホバーで返信フォームが開いても操作ボタンは動かない（下部に操作だけの帯を作らない・2026-11-04）。
+   ダッシュボードと右サイドバーの .task-card は従来どおり縦積みのまま */
+.feed-list .task-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 20px;
+    align-items: start;
+}
+
+.feed-list .task-card > .tc-main {
+    min-width: 0;
+}
+
+/* 状態バッジ・リアクション・操作はすべて右列に寄せ、本文の縦中央に置く */
+.feed-list .task-card > .tc-side {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-top: 8px;
-    /* Changed from auto to fixed to keep it compact */
-    padding-top: 8px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 360px;
+}
+
+/* 返信フォームは本文の下に全幅で開く */
+.feed-list .task-card > .reply-form {
+    grid-column: 1 / -1;
+}
+
+/* リアクション追加の「＋」（返信・サイドパネルでも同じ見た目） */
+.reaction-bubble.reaction-add {
+    opacity: 0.8;
+}
+
+/* 一覧カードの右列では、ホバー時だけ「＋」を見せる。
+   display:none にすると右列の幅が変わってボタンの位置が動くので opacity で消す */
+.task-card .tc-side .reaction-add {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+}
+
+.task-card:hover .tc-side .reaction-add,
+.task-card:focus-within .tc-side .reaction-add {
+    opacity: 0.8;
+    pointer-events: auto;
 }
 
 .reaction-bar {

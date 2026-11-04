@@ -1357,6 +1357,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                     </div>}
                                 </DotMenu>
 
+                                {/* 左列: 本文側。操作と状態は右列 .tc-side にまとめる */}
+                                <div className="tc-main">
                                 <div className="task-header-meta">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
                                         <div className="avatar-container">
@@ -1535,17 +1537,6 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
                                             {renderAttachments(thread.attachments)}
 
-                                            <div className="task-footer-teams">
-                                                <ReactionBar
-                                                    reactions={reactions.filter(r => r.thread_id === thread.id && !r.reply_id)}
-                                                    profiles={profiles}
-                                                    currentUserId={user?.id}
-                                                    currentProfile={currentProfile}
-                                                    onAdd={(emoji) => handleAddReaction(emoji, thread.id, undefined)}
-                                                    onRemove={handleRemoveReaction}
-                                                />
-                                            </div>
-
                                             <div className={`reply-section ${(!thread.replies || thread.replies.length === 0) ? 'is-empty' : ''}`}>
                                                 {thread.replies && thread.replies.length > 0 && (
                                                     <div className="reply-scroll-area">
@@ -1700,7 +1691,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 {expandedThreads.has(thread.id) ? 'スレッドを閉じる' : 'スレッド全文/返信を表示'}
                                             </button>
                                         )}
+                                    </>
+                                )}
+                                </div>
 
+                                {editingThreadId !== thread.id && (
+                                    <>
                                         {thread.status !== 'completed' && (
                                             <div className="reply-form" style={{ display: 'flex', gap: '15px', alignItems: 'flex-start', marginTop: '10px' }}>
                                                 <div style={{ flex: 1, position: 'relative' }}>
@@ -1862,8 +1858,16 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 </div>
                                             </div>
                                         )}
-                                        {/* right/gap は返信フォームの添付・送信ボタン列（padding 18px + gap 5px）と縦に揃える */}
-                                        <div style={{ position: 'absolute', bottom: '10px', right: '18px', display: 'flex', alignItems: 'center', gap: '5px', zIndex: 100 }}>
+                                        {/* 右列: 状態バッジ・リアクション・操作。カードの縦中央に置く */}
+                                        <div className="tc-side">
+                                            <ReactionBar
+                                                reactions={reactions.filter(r => r.thread_id === thread.id && !r.reply_id)}
+                                                profiles={profiles}
+                                                currentUserId={user?.id}
+                                                currentProfile={currentProfile}
+                                                onAdd={(emoji) => handleAddReaction(emoji, thread.id, undefined)}
+                                                onRemove={handleRemoveReaction}
+                                            />
                                             {thread.status === 'completed' && (
                                                 <div style={{
                                                     fontSize: '0.75rem',

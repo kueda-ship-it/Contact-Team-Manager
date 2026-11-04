@@ -206,7 +206,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
 
             <button
                 ref={plusBtnRef}
-                className="reaction-bubble"
+                className="reaction-bubble reaction-add"
                 style={{
                     borderRadius: '20px',
                     width: '32px',
@@ -214,8 +214,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
                     cursor: 'pointer',
                     display: 'grid',
                     placeItems: 'center',
-                    padding: '0',
-                    opacity: 0.8
+                    padding: '0'
                 }}
                 onClick={() => setShowPicker(!showPicker)}
             >
