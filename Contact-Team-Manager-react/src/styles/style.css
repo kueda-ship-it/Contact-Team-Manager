@@ -2142,6 +2142,20 @@ body.light-mode .feed-list .task-card > .tc-float {
     height: 17px;
 }
 
+/* ホバー時の光彩（filter: drop-shadow）を消す。
+   .btn-status.btn-waiting:not(.btn-revert):hover svg と詳細度が同点で、
+   ファイルの後ろにある向こうが勝ち、連絡待ちのときだけ丸く光って見えていた（2026-11-18） */
+.feed-list .task-card > .tc-float .reaction-add:hover svg,
+.feed-list .task-card > .tc-float .btn-status:hover svg,
+.feed-list .task-card > .tc-float .btn-status.active svg,
+.feed-list .task-card > .tc-float .btn-status.active:hover svg,
+.feed-list .task-card > .tc-bar .btn-clip-yellow:hover svg,
+.feed-list .task-card > .tc-bar .btn-send-blue:hover svg,
+.static-form-container .btn-clip-yellow:hover svg,
+.static-form-container .btn-send-blue:hover svg {
+    filter: none !important;
+}
+
 /* リアクションは顔の絵が viewBox の一部しか使っておらず、
    同じ 34px のボタンでも小さく見えるのでアイコンだけ大きくする */
 .feed-list .task-card > .tc-float .reaction-add svg {
