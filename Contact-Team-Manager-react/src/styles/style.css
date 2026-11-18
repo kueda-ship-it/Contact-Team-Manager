@@ -1624,32 +1624,19 @@ body.light-mode .feed-list.is-scrolling {
     }
 }
 
-/* Compact Reply Form - Show only on hover or focus */
-/* Compact Reply Form - Show only on hover or focus */
+/* 返信の入力欄・クリップ・送信は、カードにマウスを乗せたときだけ見せる。
+   max-height で畳むと行の高さが変わり、同じ行に並ぶ操作ボタンが動いてしまうので、
+   場所は確保したまま visibility だけ切り替える（2026-11-04） */
 .feed-list .task-card .reply-form {
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    margin-top: 0 !important;
-    padding: 0 !important;
-    transform: scaleY(0);
-    transform-origin: top;
-    /* transition removed for instant response */
+    visibility: hidden;
 }
 
 /* has-open-menu: DotMenu は Portal 描画でカードの子孫でないため、メニューに
-   カーソルが乗ると :hover が外れてフォームが畳まれ、カード高さが変わって
-   メニュー位置が再計算され振動する。メニュー開放中は展開状態を維持する。 */
+   カーソルが乗ると :hover が外れる。メニュー開放中は表示を維持する。 */
 .feed-list .task-card:hover .reply-form,
 .feed-list .task-card:focus-within .reply-form,
 .feed-list .task-card.has-open-menu .reply-form {
-    max-height: initial;
-    /* Use specific height if causing layout shift issues, but initial/auto is best for varying content */
-    opacity: 1;
-    overflow: visible;
-    margin-top: 10px !important;
-    padding: initial !important;
-    transform: scaleY(1);
+    visibility: visible;
 }
 
 /* Modal Base - glass morphism */
@@ -2046,58 +2033,396 @@ body.light-mode .settings-nav-item:hover {
 
 /* --- Actions & Footer --- */
 
-/* 一覧のカードだけ 左=本文(.tc-main) / 右=状態バッジ・操作(.tc-side) の 2 カラムにする。
-   返信フォームは 2 行目に全幅で開く。右列は 1 行目に固定してあるので、
-   ホバーで返信フォームが開いても操作ボタンは動かない（下部に操作だけの帯を作らない・2026-11-04）。
-   ダッシュボードと右サイドバーの .task-card は従来どおり縦積みのまま */
+/* ===== 一覧カードの中身は Teams の並べ方にする（枠は残す・2026-11-18） =====
+   左にアバターの列、右に 名前/日時/状態・件名・本文・返信。
+   操作はホバーでカード右上にポップ、返信欄はいちばん下の 1 行。 */
 .feed-list .task-card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 20px;
-    align-items: start;
+    /* 右上に浮く操作バーがカードの外へ出るので切り取らない */
+    overflow: visible;
+}
+
+/* 左端の色帯はカードの角に合わせて丸める（overflow を外したため） */
+.feed-list .task-card::after {
+    border-radius: 12px 0 0 12px;
 }
 
 .feed-list .task-card > .tc-main {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    column-gap: 12px;
+}
+
+.feed-list .task-card > .tc-main > * {
+    grid-column: 2;
     min-width: 0;
 }
 
-/* 状態バッジ・リアクション・操作はすべて右列に寄せ、本文の下端にそろえる。
-   center にすると、返信が付いたカードでは本文側が縦に伸びるぶん
-   完了者バッジ・操作がカードの中ほどに浮いてしまう（従来は常に下端だった・2026-11-04） */
-.feed-list .task-card > .tc-side {
-    grid-column: 2;
+.feed-list .task-card > .tc-main > .avatar-container {
+    grid-column: 1;
     grid-row: 1;
-    align-self: end;
+    align-self: start;
+}
+
+.feed-list .task-card > .tc-main > .avatar-container .avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 0.8rem;
+}
+
+/* ===== ホバーでカード右上にポップする操作 =====
+   カードの外（上辺より上）に出すと、ひとつ上のカードの中に浮いて見えて
+   どのカードの操作か分からなくなるので、カードの内側に収める（2026-11-18） */
+.feed-list .task-card > .tc-float {
+    position: absolute;
+    top: 8px;
+    right: 12px;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    gap: 6px;
-    max-width: 360px;
-}
-
-/* 返信フォームは本文の下に全幅で開く */
-.feed-list .task-card > .reply-form {
-    grid-column: 1 / -1;
-}
-
-/* リアクション追加の「＋」（返信・サイドパネルでも同じ見た目） */
-.reaction-bubble.reaction-add {
-    opacity: 0.8;
-}
-
-/* 一覧カードの右列では、ホバー時だけ「＋」を見せる。
-   display:none にすると右列の幅が変わってボタンの位置が動くので opacity で消す */
-.task-card .tc-side .reaction-add {
+    gap: 2px;
+    padding: 3px;
+    border-radius: 22px;
+    background: #26262b;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.15s;
+    transition: opacity 0.12s;
+    /* 一覧上部の sticky な帯（1200）より上に出す */
+    z-index: 1250;
 }
 
-.task-card:hover .tc-side .reaction-add,
-.task-card:focus-within .tc-side .reaction-add {
-    opacity: 0.8;
+body.light-mode .feed-list .task-card > .tc-float {
+    background: #fff;
+    border-color: rgba(0, 0, 0, 0.12);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+
+.feed-list .task-card:hover > .tc-float,
+.feed-list .task-card:focus-within > .tc-float,
+.feed-list .task-card.has-open-menu > .tc-float {
+    opacity: 1;
     pointer-events: auto;
+}
+
+/* 浮かせたバーの中では DotMenu の絶対配置を解く */
+.feed-list .task-card > .tc-float .dot-menu-container {
+    position: static;
+    opacity: 1;
+}
+
+/* ボタンは丸い枠も下地も持たない裸のアイコン。ホバーで色が付くことだけで示す */
+.feed-list .task-card > .tc-float .reaction-add,
+.feed-list .task-card > .tc-float .btn-status,
+.feed-list .task-card > .tc-float .dot-menu-trigger,
+.feed-list .task-card > .tc-bar .btn-clip-yellow,
+.feed-list .task-card > .tc-bar .btn-send-blue {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px;
+    border: 0 !important;
+    border-radius: 50% !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    /* liquid-glass.css の backdrop-filter: brightness(1.15) が残ると、
+       下地も枠も無いのに丸く明るく光って見える（2026-11-18） */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    color: var(--text-muted) !important;
+    opacity: 1;
+    transition: color 0.12s;
+}
+
+.feed-list .task-card > .tc-float .reaction-add svg,
+.feed-list .task-card > .tc-float .btn-status svg,
+.feed-list .task-card > .tc-bar .btn-clip-yellow svg,
+.feed-list .task-card > .tc-bar .btn-send-blue svg {
+    stroke: currentColor !important;
+    filter: none !important;
+    width: 17px;
+    height: 17px;
+}
+
+/* リアクションは顔の絵が viewBox の一部しか使っておらず、
+   同じ 34px のボタンでも小さく見えるのでアイコンだけ大きくする */
+.feed-list .task-card > .tc-float .reaction-add svg {
+    width: 21px;
+    height: 21px;
+}
+
+/* ホバーでも liquid-glass 側の光彩・浮き上がりを出さない */
+.feed-list .task-card > .tc-float button:hover,
+.feed-list .task-card > .tc-bar .btn-clip-yellow:hover,
+.feed-list .task-card > .tc-bar .btn-send-blue:hover,
+.static-form-container .btn-clip-yellow:hover,
+.static-form-container .btn-send-blue:hover {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transform: none !important;
+    border-color: transparent !important;
+}
+
+/* 線の太さは 1.8 でそろえる。2.5 / 2 は太すぎた（2026-11-18） */
+.feed-list .task-card > .tc-float .btn-status svg,
+.feed-list .task-card > .tc-bar .btn-clip-yellow svg,
+.feed-list .task-card > .tc-bar .btn-send-blue svg,
+.static-form-container .btn-clip-yellow svg,
+.static-form-container .btn-send-blue svg {
+    stroke-width: 1.8;
+}
+
+/* ホバー: 丸い下地は出さず、アイコンの絵そのものを「線」から「塗りつぶし」に変える
+   （Teams の線アイコン → 塗りつぶしアイコンと同じ見え方・2026-11-18）。
+   色はアクセント色のまま、絵の中身だけカードの地の色で抜く */
+.feed-list .task-card > .tc-float .reaction-add:hover { color: #e851ff !important; }
+.feed-list .task-card > .tc-float .btn-status.btn-waiting:hover { color: #EAB308 !important; }
+.feed-list .task-card > .tc-float .btn-status.btn-complete:hover { color: #4bf2ad !important; }
+.feed-list .task-card > .tc-float .btn-status.btn-revert:hover { color: #a78bfa !important; }
+.feed-list .task-card > .tc-bar .btn-clip-yellow:hover { color: #FFD700 !important; }
+.feed-list .task-card > .tc-bar .btn-send-blue:hover { color: #4cc2ff !important; }
+
+/* 「⋮」は文字なので塗りつぶしに変えられない。明るくするだけ（丸は出さない） */
+.feed-list .task-card > .tc-float .dot-menu-trigger:hover {
+    background: transparent !important;
+    /* 白にすると既定の薄い白と区別が付かないので、ほかと同じく色で示す */
+    color: var(--accent) !important;
+}
+
+/* リアクション: 顔を塗り、目と口をカードの地の色で抜く */
+.feed-list .task-card > .tc-float .reaction-add:hover svg circle:first-of-type { fill: currentColor; }
+.feed-list .task-card > .tc-float .reaction-add:hover svg path { stroke: var(--bg-dark); }
+.feed-list .task-card > .tc-float .reaction-add:hover svg circle:nth-of-type(2),
+.feed-list .task-card > .tc-float .reaction-add:hover svg circle:nth-of-type(3) { fill: var(--bg-dark); }
+
+/* 受話器: 形が閉じているので塗るだけで塗りつぶしになる */
+.feed-list .task-card > .tc-float .btn-status.btn-waiting:hover svg path { fill: currentColor; }
+
+/* 完了 / クリップ / 送信 は、線用の絵と塗り用の絵を別々に持たせて差し替える。
+   Teams（Fluent UI）も線用・塗り用が別に描き起こされていて、
+   線の絵をそのまま塗ると塊になる（2026-11-18）。
+   塗り用は mask または羽根の分割で、中を本当にくり抜いてある */
+.ic-fill { display: none; }
+
+.feed-list .task-card > .tc-float .btn-status:hover .ic-line,
+.feed-list .task-card > .tc-bar .btn-clip-yellow:hover .ic-line,
+.feed-list .task-card > .tc-bar .btn-send-blue:hover .ic-line,
+.static-form-container .btn-clip-yellow:hover .ic-line,
+.static-form-container .btn-send-blue:hover .ic-line { display: none; }
+
+.feed-list .task-card > .tc-float .btn-status:hover .ic-fill,
+.feed-list .task-card > .tc-bar .btn-clip-yellow:hover .ic-fill,
+.feed-list .task-card > .tc-bar .btn-send-blue:hover .ic-fill,
+.static-form-container .btn-clip-yellow:hover .ic-fill,
+.static-form-container .btn-send-blue:hover .ic-fill { display: inline; }
+
+/* 戻す（円弧の矢印）は塗り用の絵を持たないので、線のまま色だけ変える */
+.feed-list .task-card > .tc-float .btn-status.btn-revert:hover .ic-line { display: inline; }
+
+/* 連絡待ち中は「線画のまま黄色」。塗りつぶしはホバーのときだけにして、
+   押せることが分かるようにする（常時塗りだとホバーしても変化が無い・2026-11-18） */
+.feed-list .task-card > .tc-float .btn-status.btn-waiting.active {
+    background: transparent !important;
+    color: #EAB308 !important;
+}
+
+.feed-list .task-card > .tc-float .btn-status.btn-waiting.active svg path {
+    fill: none;
+}
+
+.feed-list .task-card > .tc-float .btn-status.btn-waiting.active:hover svg path {
+    fill: currentColor;
+}
+
+/* ===== 名前・日時の横に置く状態バッジ（アイコンだけ。氏名と時刻はツールチップ） ===== */
+.tc-state {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    box-sizing: border-box;
+    padding: 0 7px;
+    border-radius: 20px;
+    line-height: 1;
+    flex-shrink: 0;
+    cursor: default;
+}
+
+.tc-state img,
+.tc-state .tc-state-ini {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.tc-state-done {
+    color: var(--success);
+    border: 1px solid rgba(67, 181, 129, 0.45);
+    background: rgba(67, 181, 129, 0.1);
+}
+
+.tc-state-done .tc-state-ini { background: rgba(67, 181, 129, 0.45); }
+
+.tc-state-wait {
+    color: #EAB308;
+    border: 1px solid rgba(234, 179, 8, 0.5);
+    background: rgba(234, 179, 8, 0.12);
+}
+
+.tc-state-wait .tc-state-ini { background: rgba(234, 179, 8, 0.45); }
+
+/* ===== 返信は枠を持たず、縦線で 1 段下げるだけ ===== */
+.feed-list .task-card .reply-scroll-area {
+    padding: 0 0 0 12px !important;
+    border-left: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+body.light-mode .feed-list .task-card .reply-scroll-area {
+    border-left-color: rgba(0, 0, 0, 0.12);
+}
+
+.feed-list .task-card .reply-item {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    border-radius: 6px;
+    padding: 4px 6px;
+    margin-bottom: 2px;
+}
+
+.feed-list .task-card .reply-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* ===== いちばん下の返信欄 =====
+   アバターの列（36px + 余白 12px）ぶん右に寄せて、本文・件名と左端をそろえる */
+.feed-list .task-card > .tc-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    margin-left: 48px;
+    min-height: 44px;
+}
+
+/* 完了済みのスレッドには返信欄が無いので、空の帯を作らない */
+.feed-list .task-card > .tc-bar:empty {
+    display: none;
+}
+
+/* 返信欄の枠は、この .reply-form ひとつだけが持つ。
+   以前は中の入力欄も枠と下地を持っていて二重に見えていた。
+   枠の左端は件名・本文とそろえ、文字は枠の中で 12px 内側・縦中央に置く（2026-11-18） */
+.feed-list .task-card > .tc-bar > .reply-form {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 0 6px 0 12px;
+    min-height: 44px;
+    gap: 4px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05) !important;
+    transition: background 0.15s;
+}
+
+.feed-list .task-card > .tc-bar > .reply-form:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.feed-list .task-card > .tc-bar > .reply-form:focus-within {
+    background: rgba(255, 255, 255, 0.12) !important;
+}
+
+body.light-mode .feed-list .task-card > .tc-bar > .reply-form {
+    background: rgba(0, 0, 0, 0.04) !important;
+}
+
+body.light-mode .feed-list .task-card > .tc-bar > .reply-form:focus-within {
+    background: rgba(0, 0, 0, 0.07) !important;
+}
+
+/* 中の入力欄は枠も下地も持たない。文字カーソル（点滅する縦棒）の高さは
+   行の高さで決まるので、欄に対して小さく見えないよう 1.7 を明示する（2026-11-18） */
+.feed-list .task-card > .tc-bar .reply-form .input-field,
+.feed-list .task-card > .tc-bar .reply-form .input-field:hover,
+.feed-list .task-card > .tc-bar .reply-form .input-field:focus {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 26px !important;
+    line-height: 1.7 !important;
+}
+
+/* リアクション追加（返信・サイドパネルでも同じ見た目） */
+.reaction-bubble.reaction-add {
+    opacity: 0.8;
+    width: 32px;
+    height: 24px;
+    border-radius: 20px;
+}
+
+.reaction-bubble.reaction-add svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* --- 常設の投稿欄（画面下）も一覧と同じ考え方にそろえる。
+   箱で囲まず、プレースホルダーで書く場所を示し、書いているときだけ下地を出す。
+   クリップ・送信は丸枠も下地も持たない裸のアイコン（2026-11-18） --- */
+.static-form-container .compact-form .input-field {
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    transition: background 0.15s;
+}
+
+.static-form-container .compact-form .input-field:focus {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.light-mode .static-form-container .compact-form .input-field {
+    border: 0 !important;
+    background: transparent !important;
+}
+
+body.light-mode .static-form-container .compact-form .input-field:focus {
+    background: rgba(0, 0, 0, 0.05) !important;
+}
+
+.static-form-container .btn-clip-yellow,
+.static-form-container .btn-send-blue {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-radius: 50% !important;
+    color: var(--text-muted) !important;
+    transition: color 0.12s;
+}
+
+/* ホバーは下地を足さず、アイコンの色だけで示す */
+.static-form-container .btn-clip-yellow:hover { background: transparent !important; color: #FFD700 !important; }
+.static-form-container .btn-send-blue:hover { background: transparent !important; color: #4cc2ff !important; }
+
+
+.static-form-container .btn-clip-yellow svg,
+.static-form-container .btn-send-blue svg {
+    stroke: currentColor !important;
+    filter: none !important;
 }
 
 .reaction-bar {
@@ -2581,6 +2906,14 @@ textarea.input-field {
 .rich-editor[placeholder]:empty:before {
     content: attr(placeholder);
     color: var(--text-muted);
+}
+
+/* data-placeholder でも出す。PC では [placeholder] しか見ていなかったため、
+   常設の投稿欄も返信欄も「どこに書くか」が見えていなかった（2026-11-04） */
+.rich-editor[data-placeholder]:empty:before {
+    content: attr(data-placeholder);
+    color: var(--text-muted);
+    pointer-events: none;
 }
 
 

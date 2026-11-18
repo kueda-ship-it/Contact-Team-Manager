@@ -207,10 +207,8 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
             <button
                 ref={plusBtnRef}
                 className="reaction-bubble reaction-add"
+                title="リアクションを付ける"
                 style={{
-                    borderRadius: '20px',
-                    width: '32px',
-                    height: '24px',
                     cursor: 'pointer',
                     display: 'grid',
                     placeItems: 'center',
@@ -218,9 +216,14 @@ export const ReactionBar: React.FC<ReactionBarProps> = (props) => {
                 }}
                 onClick={() => setShowPicker(!showPicker)}
             >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                {/* 裸の「＋」だと反応を付けるボタンに見えないので、顔＋＋にする（2026-11-04） */}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="10.5" cy="13.5" r="7.5"></circle>
+                    <path d="M7.4 15.4s1.1 1.6 3.1 1.6 3.1-1.6 3.1-1.6"></path>
+                    <circle cx="8" cy="11.2" r="0.9" fill="currentColor" stroke="none"></circle>
+                    <circle cx="13" cy="11.2" r="0.9" fill="currentColor" stroke="none"></circle>
+                    <line x1="19" y1="2.5" x2="19" y2="8.5"></line>
+                    <line x1="16" y1="5.5" x2="22" y2="5.5"></line>
                 </svg>
             </button>
             {showPicker && (

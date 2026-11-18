@@ -1242,135 +1242,183 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                 key={thread.id}
                                 id={`thread-${thread.id}`}
                                 className={`task-card ${thread.is_pinned ? 'is-pinned' : ''} ${thread.status === 'completed' ? 'is-completed' : ''} ${thread.status !== 'completed' && thread.waiting_contact ? 'is-waiting' : ''} ${openMenuId === thread.id ? 'has-open-menu' : ''}`}
-                                style={{ position: 'relative', paddingBottom: '50px' }}
+                                style={{ position: 'relative' }}
                             >
                                 {thread.is_pinned && <div className="pinned-badge">重要</div>}
 
-                                <DotMenu
-                                    open={openMenuId === thread.id}
-                                    onTriggerClick={(e) => {
-                                        e.stopPropagation();
-                                        setOpenSubmenuId(null);
-                                        setOpenMenuId(prev => prev === thread.id ? null : thread.id);
-                                    }}
-                                    onClose={() => { setOpenMenuId(null); setOpenSubmenuId(null); }}
-                                >
-                                    {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
-                                        <>
-                                            {user?.id === thread.user_id && (
-                                                <div className="menu-item" onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setEditTitles(prev => ({ ...prev, [thread.id]: thread.title || '' }));
-                                                    setEditingThreadId(thread.id);
-                                                }}>
-                                                    <span className="menu-icon">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                        </svg>
-                                                    </span> 編集
-                                                </div>
+                                {/* ホバーでカードの右上に浮く操作（Teams と同じ位置）・2026-11-18 */}
+                                {editingThreadId !== thread.id && (
+                                    <div className="tc-float">
+                                        <ReactionBar
+                                            reactions={reactions.filter(r => r.thread_id === thread.id && !r.reply_id)}
+                                            profiles={profiles}
+                                            currentUserId={user?.id}
+                                            currentProfile={currentProfile}
+                                            onAdd={(emoji) => handleAddReaction(emoji, thread.id, undefined)}
+                                            onRemove={handleRemoveReaction}
+                                        />
+                                        {thread.status !== 'completed' && (
+                                            <button
+                                                className={`btn btn-sm btn-status btn-waiting ${thread.waiting_contact ? 'active' : ''}`}
+                                                title={thread.waiting_contact ? '連絡待ちを解除' : '連絡待ちにする'}
+                                                style={{ width: '40px', height: '40px' }}
+                                                onClick={() => handleToggleWaiting(thread.id, !!thread.waiting_contact)}
+                                            >
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                                </svg>
+                                            </button>
+                                        )}
+                                        <button
+                                            className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : 'btn-complete'}`}
+                                            title={thread.status === 'completed' ? '未完了に戻す' : '完了にする'}
+                                            style={{ width: '40px', height: '40px' }}
+                                            onClick={() => handleToggleStatus(thread.id, thread.status)}
+                                        >
+                                            {thread.status === 'completed' ? (
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                                            ) : (
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                                    <mask id="ctm-m-check">
+                                                        <rect x="0" y="0" width="24" height="24" fill="#fff" />
+                                                        <polyline points="16.5 9.5 10.5 15.5 7.5 12.5" stroke="#000" strokeWidth="2" fill="none" />
+                                                    </mask>
+                                                    <g className="ic-line">
+                                                        <circle cx="12" cy="12" r="9.5"></circle>
+                                                        <polyline points="16.5 9.5 10.5 15.5 7.5 12.5"></polyline>
+                                                    </g>
+                                                    <circle className="ic-fill" cx="12" cy="12" r="10.2" fill="currentColor" stroke="none" mask="url(#ctm-m-check)"></circle>
+                                                </svg>
                                             )}
-                                            <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteThread(thread.id); }}>
-                                                <span className="menu-icon">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                        <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                        <line x1="14" y1="11" x2="14" y2="17"></line>
-                                                    </svg>
-                                                </span> 削除
-                                            </div>
-                                            <div className="menu-item" onClick={() => {
+                                        </button>
+                                        <DotMenu
+                                            open={openMenuId === thread.id}
+                                            onTriggerClick={(e) => {
+                                                e.stopPropagation();
+                                                setOpenSubmenuId(null);
+                                                setOpenMenuId(prev => prev === thread.id ? null : thread.id);
+                                            }}
+                                            onClose={() => { setOpenMenuId(null); setOpenSubmenuId(null); }}
+                                        >
+                                            {(user?.id === thread.user_id || ['Admin', 'Manager'].includes(currentProfile?.role || '')) && (
+                                                <>
+                                                    {user?.id === thread.user_id && (
+                                                        <div className="menu-item" onClick={() => {
+                                                            setOpenMenuId(null);
+                                                            setEditTitles(prev => ({ ...prev, [thread.id]: thread.title || '' }));
+                                                            setEditingThreadId(thread.id);
+                                                        }}>
+                                                            <span className="menu-icon">
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                                </svg>
+                                                            </span> 編集
+                                                        </div>
+                                                    )}
+                                                    <div className="menu-item menu-item-delete" onClick={() => { setOpenMenuId(null); handleDeleteThread(thread.id); }}>
+                                                        <span className="menu-icon">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                            </svg>
+                                                        </span> 削除
+                                                    </div>
+                                                    <div className="menu-item" onClick={() => {
+                                                        setOpenMenuId(null);
+                                                        openRemindPanel(thread.id);
+                                                    }}>
+                                                        <span className="menu-icon">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <circle cx="12" cy="12" r="10"></circle>
+                                                                <polyline points="12 6 12 12 16 14"></polyline>
+                                                            </svg>
+                                                        </span> リマインド編集
+                                                    </div>
+                                                    {['Admin', 'Manager'].includes(currentProfile?.role || '') && (
+                                                        <div
+                                                            className="menu-item move-team-item"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSubmenuUp(e.currentTarget.getBoundingClientRect().top > window.innerHeight / 2);
+                                                                setOpenSubmenuId(prev => prev === thread.id ? null : thread.id);
+                                                            }}
+                                                        >
+                                                            <span className="menu-icon">
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                                                </svg>
+                                                            </span> チーム移動
+                                                            <div className={`submenu${openSubmenuId === thread.id ? ' submenu-open' : ''}${submenuUp ? ' submenu-up' : ''}`} onClick={(e) => e.stopPropagation()}>
+                                                                {teams
+                                                                    .filter(t => t.id !== thread.team_id)
+                                                                    .map(t => {
+                                                                        const parentName = t.parent_id ? teams.find(p => p.id === t.parent_id)?.name : null;
+                                                                        return { team: t, parentName, label: parentName ? `${parentName} / ${t.name}` : t.name };
+                                                                    })
+                                                                    .sort((a, b) => a.label.localeCompare(b.label, 'ja'))
+                                                                    .map(({ team: t, parentName, label }) => (
+                                                                    <div key={t.id} className="menu-item" onClick={async (e) => {
+                                                                        e.stopPropagation();
+                                                                        setOpenSubmenuId(null);
+                                                                        setOpenMenuId(null);
+                                                                        if (window.confirm(`この投稿を「${label}」へ移動しますか？`)) {
+                                                                            const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
+                                                                            if (error) alert('移動に失敗しました: ' + error.message);
+                                                                            else refetch(true);
+                                                                        }
+                                                                    }}>
+                                                                        {parentName && (
+                                                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.78em', whiteSpace: 'nowrap' }}>
+                                                                                {parentName} /&nbsp;
+                                                                            </span>
+                                                                        )}
+                                                                        {t.name}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+
+                                            {/* AI架電（voice-agent）への起票。DB は繋がず、起票フォームを前入力で開くだけ */}
+                                            {AI_CALL_URL && <div className="menu-item" onClick={() => {
                                                 setOpenMenuId(null);
-                                                openRemindPanel(thread.id);
+                                                const q = new URLSearchParams({
+                                                    scenario: 'taiou-nichiji',
+                                                    property: thread.title || '',
+                                                    note: `CTM: ${thread.title || ''} (#${thread.id})`,
+                                                });
+                                                window.open(`${AI_CALL_URL}/#/targets?${q.toString()}`, '_blank', 'noopener');
                                             }}>
                                                 <span className="menu-icon">
                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <circle cx="12" cy="12" r="10"></circle>
-                                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                                                     </svg>
-                                                </span> リマインド編集
-                                            </div>
-                                            {['Admin', 'Manager'].includes(currentProfile?.role || '') && (
-                                                <div
-                                                    className="menu-item move-team-item"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSubmenuUp(e.currentTarget.getBoundingClientRect().top > window.innerHeight / 2);
-                                                        setOpenSubmenuId(prev => prev === thread.id ? null : thread.id);
-                                                    }}
-                                                >
-                                                    <span className="menu-icon">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                                        </svg>
-                                                    </span> チーム移動
-                                                    <div className={`submenu${openSubmenuId === thread.id ? ' submenu-open' : ''}${submenuUp ? ' submenu-up' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                                        {teams
-                                                            .filter(t => t.id !== thread.team_id)
-                                                            .map(t => {
-                                                                const parentName = t.parent_id ? teams.find(p => p.id === t.parent_id)?.name : null;
-                                                                return { team: t, parentName, label: parentName ? `${parentName} / ${t.name}` : t.name };
-                                                            })
-                                                            .sort((a, b) => a.label.localeCompare(b.label, 'ja'))
-                                                            .map(({ team: t, parentName, label }) => (
-                                                            <div key={t.id} className="menu-item" onClick={async (e) => {
-                                                                e.stopPropagation();
-                                                                setOpenSubmenuId(null);
-                                                                setOpenMenuId(null);
-                                                                if (window.confirm(`この投稿を「${label}」へ移動しますか？`)) {
-                                                                    const { error } = await supabase.from('threads').update({ team_id: t.id }).eq('id', thread.id);
-                                                                    if (error) alert('移動に失敗しました: ' + error.message);
-                                                                    else refetch(true);
-                                                                }
-                                                            }}>
-                                                                {parentName && (
-                                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.78em', whiteSpace: 'nowrap' }}>
-                                                                        {parentName} /&nbsp;
-                                                                    </span>
-                                                                )}
-                                                                {t.name}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
+                                                </span> AI架電に起票
+                                            </div>}
+                                        </DotMenu>
+                                    </div>
+                                )}
 
-                                    {/* AI架電（voice-agent）への起票。DB は繋がず、起票フォームを前入力で開くだけ */}
-                                    {AI_CALL_URL && <div className="menu-item" onClick={() => {
-                                        setOpenMenuId(null);
-                                        const q = new URLSearchParams({
-                                            scenario: 'taiou-nichiji',
-                                            property: thread.title || '',
-                                            note: `CTM: ${thread.title || ''} (#${thread.id})`,
-                                        });
-                                        window.open(`${AI_CALL_URL}/#/targets?${q.toString()}`, '_blank', 'noopener');
-                                    }}>
-                                        <span className="menu-icon">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                            </svg>
-                                        </span> AI架電に起票
-                                    </div>}
-                                </DotMenu>
 
                                 {/* 左列: 本文側。操作と状態は右列 .tc-side にまとめる */}
                                 <div className="tc-main">
+                                    <div className="avatar-container">
+                                        <div className="avatar">
+                                            {authorAvatar ? (
+                                                <img src={authorAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                            ) : (
+                                                (thread.author && thread.author[0].toUpperCase())
+                                            )}
+                                        </div>
+                                        <div className="status-dot active"></div>
+                                    </div>
                                 <div className="task-header-meta">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-                                        <div className="avatar-container">
-                                            <div className="avatar">
-                                                {authorAvatar ? (
-                                                    <img src={authorAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                                                ) : (
-                                                    (thread.author && thread.author[0].toUpperCase())
-                                                )}
-                                            </div>
-                                            <div className="status-dot active"></div>
-                                        </div>
                                         <div className="task-author-info" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: '0 8px', minWidth: 0 }}>
                                             <span className="author-name">{thread.author}</span>
                                             <span className="num" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -1389,6 +1437,37 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                         {new Date(r.remind_at).toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 ));
+                                            })()}
+                                            {/* 状態はアイコンだけの小さなバッジ。氏名と時刻はツールチップに回す
+                                                （バッジに名前を入れない・2026-11-18） */}
+                                            {thread.status === 'completed' && (
+                                                <span
+                                                    className="tc-state tc-state-done"
+                                                    title={isAutoCompleted
+                                                        ? `自動完了（FC連動）  ${formatDate(thread.completed_at)}`
+                                                        : `完了者: ${completerName}  ${formatDate(thread.completed_at)}`}
+                                                >
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                                    </svg>
+                                                    {!isAutoCompleted && (completerProfile?.avatar_url
+                                                        ? <img src={completerProfile.avatar_url} alt="" />
+                                                        : <span className="tc-state-ini">{(completerName || '?').slice(0, 1)}</span>)}
+                                                </span>
+                                            )}
+                                            {thread.status !== 'completed' && thread.waiting_contact && thread.waiting_at && (() => {
+                                                const waitingProfile = thread.waiting_by ? profiles.find(p => p.id === thread.waiting_by) : null;
+                                                const waitingName = waitingProfile?.display_name || waitingProfile?.email || '不明';
+                                                return (
+                                                    <span className="tc-state tc-state-wait" title={`連絡待ち: ${waitingName}  ${formatDate(thread.waiting_at)}`}>
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                                        </svg>
+                                                        {waitingProfile?.avatar_url
+                                                            ? <img src={waitingProfile.avatar_url} alt="" />
+                                                            : <span className="tc-state-ini">{waitingName.slice(0, 1)}</span>}
+                                                    </span>
+                                                );
                                             })()}
                                         </div>
                                     </div>
@@ -1697,257 +1776,184 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
                                 {editingThreadId !== thread.id && (
                                     <>
-                                        {thread.status !== 'completed' && (
-                                            <div className="reply-form" style={{ display: 'flex', gap: '15px', alignItems: 'flex-start', marginTop: '10px' }}>
-                                                <div style={{ flex: 1, position: 'relative' }}>
-                                                    <div
-                                                        ref={(el) => { if (el) replyRefs.current[thread.id] = el; }}
-                                                        contentEditable
-                                                        className="input-field btn-sm rich-editor"
-                                                        style={{ minHeight: '38px', marginTop: 0, padding: '8px' }}
-                                                        onInput={(e: React.FormEvent<HTMLDivElement>) => {
-                                                            handleInput(e, thread.id);
-                                                        }}
-                                                        onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
-                                                            handleKeyDown(e, thread.id, e.currentTarget);
-                                                            if (isOpen && targetThreadId === thread.id) {
-                                                                if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
-                                                                    return;
+                                        {/* 下の 1 行にまとめる: 左＝リアクション（この投稿への反応）、中＝返信入力、
+                                            右＝クリップ・送信 ｜ 電話・完了 ・ 状態バッジ（2026-11-04） */}
+                                        <div className="tc-bar">
+                                            {thread.status !== 'completed' && (
+                                                <div className="reply-form" style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                                                    <div style={{ flex: 1, position: 'relative' }}>
+                                                        <div
+                                                            ref={(el) => { if (el) replyRefs.current[thread.id] = el; }}
+                                                            contentEditable
+                                                            className="input-field btn-sm rich-editor"
+                                                            data-placeholder="返信を入力"
+                                                            style={{ minHeight: '38px', marginTop: 0, padding: '8px' }}
+                                                            onInput={(e: React.FormEvent<HTMLDivElement>) => {
+                                                                handleInput(e, thread.id);
+                                                            }}
+                                                            onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+                                                                handleKeyDown(e, thread.id, e.currentTarget);
+                                                                if (isOpen && targetThreadId === thread.id) {
+                                                                    if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
+                                                                        return;
+                                                                    }
                                                                 }
-                                                            }
-                                                            // IME 変換確定の Enter で送信しない(サイドバーの簡易返信と同じ扱い)
-                                                            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                                                                e.preventDefault();
-                                                                handleAddReply(thread.id);
-                                                            }
-                                                        }}
-                                                        onPaste={async (e: React.ClipboardEvent) => {
-                                                            const items = e.clipboardData.items;
-                                                            let hasImage = false;
+                                                                // IME 変換確定の Enter で送信しない(サイドバーの簡易返信と同じ扱い)
+                                                                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                                                                    e.preventDefault();
+                                                                    handleAddReply(thread.id);
+                                                                }
+                                                            }}
+                                                            onPaste={async (e: React.ClipboardEvent) => {
+                                                                const items = e.clipboardData.items;
+                                                                let hasImage = false;
 
-                                                            for (let i = 0; i < items.length; i++) {
-                                                                if (items[i].type.indexOf('image') !== -1) {
-                                                                    const blob = items[i].getAsFile();
-                                                                    if (blob && user) {
-                                                                        hasImage = true;
-                                                                        setReplyUploading(prev => ({ ...prev, [thread.id]: true }));
-                                                                        try {
-                                                                            const uploaded = await uploadFile(blob);
-                                                                            if (uploaded) {
-                                                                                setReplyAttachments(prev => ({
-                                                                                    ...prev,
-                                                                                    [thread.id]: [...(prev[thread.id] || []), uploaded]
-                                                                                }));
+                                                                for (let i = 0; i < items.length; i++) {
+                                                                    if (items[i].type.indexOf('image') !== -1) {
+                                                                        const blob = items[i].getAsFile();
+                                                                        if (blob && user) {
+                                                                            hasImage = true;
+                                                                            setReplyUploading(prev => ({ ...prev, [thread.id]: true }));
+                                                                            try {
+                                                                                const uploaded = await uploadFile(blob);
+                                                                                if (uploaded) {
+                                                                                    setReplyAttachments(prev => ({
+                                                                                        ...prev,
+                                                                                        [thread.id]: [...(prev[thread.id] || []), uploaded]
+                                                                                    }));
+                                                                                }
+                                                                            } finally {
+                                                                                setReplyUploading(prev => ({ ...prev, [thread.id]: false }));
                                                                             }
-                                                                        } finally {
-                                                                            setReplyUploading(prev => ({ ...prev, [thread.id]: false }));
                                                                         }
                                                                     }
                                                                 }
-                                                            }
 
-                                                            if (hasImage) {
-                                                                e.preventDefault();
-                                                            } else {
-                                                                e.preventDefault();
-                                                                const text = e.clipboardData.getData('text/plain');
-                                                                document.execCommand('insertText', false, text);
-                                                            }
-                                                        }}
-                                                    />
-                                                    {isOpen && targetThreadId === thread.id && (
-                                                        <MentionList
-                                                            candidates={candidates}
-                                                            activeIndex={activeIndex}
-                                                            onSelect={(c) => {
-                                                                const el = replyRefs.current[thread.id];
-                                                                if (el) insertMention(c, el);
-                                                            }}
-                                                            style={{
-                                                                top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
-                                                                left: mentionCoords.left,
-                                                                position: 'fixed',
-                                                                transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none',
-                                                                zIndex: 10000
+                                                                if (hasImage) {
+                                                                    e.preventDefault();
+                                                                } else {
+                                                                    e.preventDefault();
+                                                                    const text = e.clipboardData.getData('text/plain');
+                                                                    document.execCommand('insertText', false, text);
+                                                                }
                                                             }}
                                                         />
-                                                    )}
-                                                    {((replyAttachments[thread.id]?.length || 0) > 0 || (replyPendingFiles[thread.id]?.length || 0) > 0) && (
-                                                        <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                                                            {/* すでにアップロード済みのファイル */}
-                                                            {(replyAttachments[thread.id] || []).map((att, idx) => (
-                                                                <div key={`att-${idx}`} className="attachment-item" style={{ position: 'relative', width: '80px', height: '80px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(att.downloadUrl || att.thumbnailUrl || null)}>
-                                                                    {att.type.startsWith('image/') ? (
-                                                                        <img src={att.downloadUrl || att.thumbnailUrl || ''} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} title="クリックで拡大表示" />
-                                                                    ) : (
-                                                                        <span style={{ fontSize: '14px' }}>📄</span>
-                                                                    )}
-                                                                    <div
-                                                                        className="attachment-remove"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            removeReplyAttachment(thread.id, idx);
-                                                                        }}
-                                                                        style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', zIndex: 2 }}
-                                                                    >
-                                                                        ×
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                            {/* アップロード中のファイル (即時プレビュー) */}
-                                                            {(replyPendingFiles[thread.id] || []).map((pf) => (
-                                                                <div key={`pending-${pf.id}`} className="attachment-item uploading" style={{ position: 'relative', width: '80px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--primary-light)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(pf.previewUrl)}>
-                                                                    {pf.file.type.startsWith('image/') ? (
-                                                                        <img src={pf.previewUrl} alt={pf.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} title="クリックで拡大表示" />
-                                                                    ) : (
-                                                                        <span style={{ fontSize: '14px', opacity: 0.6 }}>📄</span>
-                                                                    )}
-                                                                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1 }}>
-                                                                        <Spinner size={16} />
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '5px', marginTop: '0px' }}>
-                                                    <button
-                                                        className="btn-sm btn-clip-yellow"
-                                                        style={{ padding: 0, width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                                                        onClick={() => handleReplyAttachClick(thread.id)}
-                                                        disabled={replyUploading[thread.id]}
-                                                    >
-                                                        {replyUploading[thread.id] ? (
-                                                            <Spinner size={16} />
-                                                        ) : (
-                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                                                            </svg>
+                                                        {isOpen && targetThreadId === thread.id && (
+                                                            <MentionList
+                                                                candidates={candidates}
+                                                                activeIndex={activeIndex}
+                                                                onSelect={(c) => {
+                                                                    const el = replyRefs.current[thread.id];
+                                                                    if (el) insertMention(c, el);
+                                                                }}
+                                                                style={{
+                                                                    top: mentionCoords.top + (mentionPosition === 'top' ? -5 : 5),
+                                                                    left: mentionCoords.left,
+                                                                    position: 'fixed',
+                                                                    transform: mentionPosition === 'top' ? 'translateY(-100%)' : 'none',
+                                                                    zIndex: 10000
+                                                                }}
+                                                            />
                                                         )}
-                                                    </button>
-                                                    <input
-                                                        type="file"
-                                                        ref={el => { fileInputRefs.current[thread.id] = el; }}
-                                                        data-reply-thread={thread.id}
-                                                        style={{ display: 'none' }}
-                                                        multiple
-                                                        onChange={(e) => handleReplyFileChange(thread.id, e)}
-                                                        disabled={replyUploading[thread.id]}
-                                                    />
-                                                    <button
-                                                        className="btn-send-blue"
-                                                        title="送信"
-                                                        style={{
-                                                            width: '40px',
-                                                            height: '40px',
-                                                            padding: 0,
-                                                            flexShrink: 0,
-                                                            cursor: 'pointer',
-                                                            borderRadius: '50%',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center'
-                                                        }}
-                                                        onClick={() => handleAddReply(thread.id)}
-                                                    >
-                                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                                            <line x1="22" y1="2" x2="11" y2="13"></line>
-                                                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                        {/* 右列: 状態バッジ・リアクション・操作。カードの縦中央に置く */}
-                                        <div className="tc-side">
-                                            <ReactionBar
-                                                reactions={reactions.filter(r => r.thread_id === thread.id && !r.reply_id)}
-                                                profiles={profiles}
-                                                currentUserId={user?.id}
-                                                currentProfile={currentProfile}
-                                                onAdd={(emoji) => handleAddReaction(emoji, thread.id, undefined)}
-                                                onRemove={handleRemoveReaction}
-                                            />
-                                            {thread.status === 'completed' && (
-                                                <div style={{
-                                                    fontSize: '0.75rem',
-                                                    color: 'var(--success)',
-                                                    display: 'flex',
-                                                    flexWrap: 'wrap',
-                                                    alignItems: 'center',
-                                                    gap: '0 5px',
-                                                    background: 'rgba(67, 181, 129, 0.1)',
-                                                    padding: '4px 12px',
-                                                    borderRadius: '20px',
-                                                    border: '1px solid rgba(67, 181, 129, 0.2)',
-                                                    animation: 'fadeIn 0.3s ease-out',
-                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                                                }}>
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                                    </svg>
-                                                    {!isAutoCompleted && completerProfile?.avatar_url && (
-                                                        <img src={completerProfile.avatar_url} alt="" style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} />
-                                                    )}
-                                                    <span style={{ fontWeight: 600, minWidth: 0, maxWidth: 'calc(100% - 40px)', overflowWrap: 'anywhere' }}>
-                                                        {isAutoCompleted ? '自動完了（FC連動）' : `完了者: ${completerName}`}
-                                                    </span>
-                                                    <span className="num" style={{ opacity: 0.7, marginLeft: '4px', whiteSpace: 'nowrap' }}>{formatDate(thread.completed_at)}</span>
-                                                </div>
-                                            )}
-                                            {thread.status !== 'completed' && thread.waiting_contact && thread.waiting_at && (() => {
-                                                const waitingProfile = thread.waiting_by ? profiles.find(p => p.id === thread.waiting_by) : null;
-                                                const waitingName = waitingProfile?.display_name || waitingProfile?.email || '不明';
-                                                return (
-                                                    <div style={{
-                                                        fontSize: '0.75rem',
-                                                        color: '#EAB308',
-                                                        display: 'flex',
-                                                        flexWrap: 'wrap',
-                                                        alignItems: 'center',
-                                                        gap: '0 5px',
-                                                        background: 'rgba(234, 179, 8, 0.1)',
-                                                        padding: '4px 12px',
-                                                        borderRadius: '20px',
-                                                        border: '1px solid rgba(234, 179, 8, 0.25)',
-                                                        animation: 'fadeIn 0.3s ease-out',
-                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                                                    }}>
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                                        </svg>
-                                                        {waitingProfile?.avatar_url && (
-                                                            <img src={waitingProfile.avatar_url} alt="" style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} />
+                                                        {((replyAttachments[thread.id]?.length || 0) > 0 || (replyPendingFiles[thread.id]?.length || 0) > 0) && (
+                                                            <div className="attachment-preview-area" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                                                                {/* すでにアップロード済みのファイル */}
+                                                                {(replyAttachments[thread.id] || []).map((att, idx) => (
+                                                                    <div key={`att-${idx}`} className="attachment-item" style={{ position: 'relative', width: '80px', height: '80px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(att.downloadUrl || att.thumbnailUrl || null)}>
+                                                                        {att.type.startsWith('image/') ? (
+                                                                            <img src={att.downloadUrl || att.thumbnailUrl || ''} alt={att.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} title="クリックで拡大表示" />
+                                                                        ) : (
+                                                                            <span style={{ fontSize: '14px' }}>📄</span>
+                                                                        )}
+                                                                        <div
+                                                                            className="attachment-remove"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                removeReplyAttachment(thread.id, idx);
+                                                                            }}
+                                                                            style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', zIndex: 2 }}
+                                                                        >
+                                                                            ×
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                                {/* アップロード中のファイル (即時プレビュー) */}
+                                                                {(replyPendingFiles[thread.id] || []).map((pf) => (
+                                                                    <div key={`pending-${pf.id}`} className="attachment-item uploading" style={{ position: 'relative', width: '80px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--primary-light)', cursor: 'pointer' }} onClick={() => setSelectedPreviewUrl(pf.previewUrl)}>
+                                                                        {pf.file.type.startsWith('image/') ? (
+                                                                            <img src={pf.previewUrl} alt={pf.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} title="クリックで拡大表示" />
+                                                                        ) : (
+                                                                            <span style={{ fontSize: '14px', opacity: 0.6 }}>📄</span>
+                                                                        )}
+                                                                        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1 }}>
+                                                                            <Spinner size={16} />
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         )}
-                                                        <span style={{ fontWeight: 600, minWidth: 0, maxWidth: 'calc(100% - 40px)', overflowWrap: 'anywhere' }}>連絡待ち: {waitingName}</span>
-                                                        <span className="num" style={{ opacity: 0.7, marginLeft: '4px', whiteSpace: 'nowrap' }}>{formatDate(thread.waiting_at)}</span>
                                                     </div>
-                                                );
-                                            })()}
-                                            {thread.status !== 'completed' && (
-                                                <button
-                                                    className={`btn btn-sm btn-status btn-waiting ${thread.waiting_contact ? 'active' : ''}`}
-                                                    title={thread.waiting_contact ? '連絡待ちを解除' : '連絡待ちにする'}
-                                                    style={{ width: '40px', height: '40px' }}
-                                                    onClick={() => handleToggleWaiting(thread.id, !!thread.waiting_contact)}
-                                                >
-                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                                    </svg>
-                                                </button>
+                                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                        <button
+                                                            className="btn-sm btn-clip-yellow"
+                                                            style={{ padding: 0, width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                                            onClick={() => handleReplyAttachClick(thread.id)}
+                                                            disabled={replyUploading[thread.id]}
+                                                        >
+                                                            {replyUploading[thread.id] ? (
+                                                                <Spinner size={16} />
+                                                            ) : (
+                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                                                    {/* 塗りつぶしは線を塗るのではなく、マスクで中を本当にくり抜く（2026-11-18） */}
+                                                                    <mask id="ctm-m-clip">
+                                                                        <rect x="0" y="0" width="24" height="24" fill="#fff" />
+                                                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke="#000" strokeWidth="1.6" fill="none" />
+                                                                    </mask>
+                                                                    <path className="ic-line" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                                                    <path className="ic-fill" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" fill="currentColor" stroke="none" mask="url(#ctm-m-clip)"></path>
+                                                                </svg>
+                                                            )}
+                                                        </button>
+                                                        <input
+                                                            type="file"
+                                                            ref={el => { fileInputRefs.current[thread.id] = el; }}
+                                                            data-reply-thread={thread.id}
+                                                            style={{ display: 'none' }}
+                                                            multiple
+                                                            onChange={(e) => handleReplyFileChange(thread.id, e)}
+                                                            disabled={replyUploading[thread.id]}
+                                                        />
+                                                        <button
+                                                            className="btn-send-blue"
+                                                            title="送信"
+                                                            style={{
+                                                                width: '40px',
+                                                                height: '40px',
+                                                                padding: 0,
+                                                                flexShrink: 0,
+                                                                cursor: 'pointer',
+                                                                borderRadius: '50%',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center'
+                                                            }}
+                                                            onClick={() => handleAddReply(thread.id)}
+                                                        >
+                                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                                                <g className="ic-line">
+                                                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                                                </g>
+                                                                {/* 塗りつぶしは羽根を 2 枚に分けて、折り目を隙間として残す */}
+                                                                <g className="ic-fill" fill="currentColor" stroke="none">
+                                                                    <path d="M21.3 2.6 2.6 9.1 10.6 12.6Z"></path>
+                                                                    <path d="M22.4 3.1 15 21.5 11.6 13.4Z"></path>
+                                                                </g>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             )}
-                                            <button
-                                                className={`btn btn-sm btn-status ${thread.status === 'completed' ? 'btn-revert' : 'btn-complete'}`}
-                                                title={thread.status === 'completed' ? '未完了に戻す' : '完了にする'}
-                                                style={{ width: '40px', height: '40px' }}
-                                                onClick={() => handleToggleStatus(thread.id, thread.status)}
-                                            >
-                                                {thread.status === 'completed' ? (
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-                                                ) : (
-                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                                                )}
-                                            </button>
                                         </div>
                                     </>
                                 )}
