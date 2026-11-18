@@ -2260,6 +2260,46 @@ body.light-mode .feed-list .task-card > .tc-float {
     fill: currentColor;
 }
 
+/* 浮くバーの中のボタンは、どの指定で描かれていても丸く光らせない。
+   背景・枠・影・光彩・擬似要素まで含めて全部打ち消す（2026-11-18）。
+   .btn .btn-sm まで並べて詳細度を上げ、後ろにある指定にも勝たせる */
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status,
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status:hover,
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status:focus,
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status.active,
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status.active:hover,
+.feed-list .task-card > .tc-float .reaction-bar .reaction-bubble,
+.feed-list .task-card > .tc-float .reaction-bar .reaction-bubble:hover {
+    background: none !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transform: none !important;
+}
+
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status svg,
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status:hover svg,
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status.active svg,
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status.active:hover svg,
+.feed-list .task-card > .tc-float .reaction-bar .reaction-bubble svg,
+.feed-list .task-card > .tc-float .reaction-bar .reaction-bubble:hover svg {
+    filter: none !important;
+    box-shadow: none !important;
+}
+
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status::before,
+.feed-list .task-card > .tc-float .btn.btn-sm.btn-status::after,
+.feed-list .task-card > .tc-float .reaction-bar .reaction-bubble::before,
+.feed-list .task-card > .tc-float .reaction-bar .reaction-bubble::after {
+    content: none !important;
+    display: none !important;
+}
+
 /* ===== 名前・日時の横に置く状態バッジ（アイコンだけ。氏名と時刻はツールチップ） ===== */
 .tc-state {
     display: inline-flex;
