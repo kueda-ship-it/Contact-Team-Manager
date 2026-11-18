@@ -5920,3 +5920,119 @@ body.light-mode .btn-status.btn-waiting.active svg {
 .btn-clip-yellow .spinner {
   --accent: currentColor;
 }
+
+/* ===== 返信のリアクションもカードと同じ挙動にそろえる（2026-11-18） =====
+   ・「リアクションを付ける」は丸枠も下地も持たない裸のアイコン。
+     ホバーで色が付き、顔が線から塗りつぶしに変わる（カードの＋と同じ）
+   ・ふだんは出さず、返信にカーソルを置いたときだけ ⋮ の左に出す。
+     絶対配置なので、出ても返信の高さは変わらない（下の返信が動かない）
+   ・付いたリアクションは常に見せる。反応が無い返信では行そのものを作らない */
+
+.feed-list .task-card .reply-item .reaction-bar {
+    position: static !important;
+    margin-top: 2px !important;
+    gap: 4px;
+}
+
+/* 反応がひとつも無い返信では、バーの行を作らない（空きを残さない） */
+.feed-list .task-card .reply-item .reaction-bar:not(:has(.reaction-bubble:not(.reaction-add))) {
+    margin-top: 0 !important;
+    height: 0;
+}
+
+.feed-list .task-card .reply-item .reaction-add,
+.feed-list .task-card .reply-item .reaction-add:hover,
+.feed-list .task-card .reply-item .reaction-add:focus,
+.feed-list .task-card .reply-item .reaction-add:active {
+    position: absolute;
+    top: 2px;
+    right: 28px;
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px;
+    padding: 0 !important;
+    border: 0 !important;
+    outline: 0 !important;
+    border-radius: 50% !important;
+    background: none !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transform: none !important;
+    transition: color 0.12s, opacity 0.12s;
+}
+
+.feed-list .task-card .reply-item .reaction-add::before,
+.feed-list .task-card .reply-item .reaction-add::after {
+    content: none !important;
+    display: none !important;
+}
+
+.feed-list .task-card .reply-item .reaction-add {
+    color: var(--text-muted) !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.feed-list .task-card .reply-item:hover .reaction-add,
+.feed-list .task-card .reply-item:focus-within .reaction-add {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.feed-list .task-card .reply-item .reaction-add svg,
+.feed-list .task-card .reply-item .reaction-add:hover svg {
+    width: 17px;
+    height: 17px;
+    stroke: currentColor !important;
+    filter: none !important;
+    box-shadow: none !important;
+}
+
+/* ホバー: 丸い下地は出さず、顔を塗りつぶして目と口を地の色で抜く */
+.feed-list .task-card .reply-item .reaction-add:hover {
+    color: #e851ff !important;
+}
+
+.feed-list .task-card .reply-item .reaction-add:hover svg circle:first-of-type { fill: currentColor; }
+.feed-list .task-card .reply-item .reaction-add:hover svg path { stroke: var(--bg-dark); }
+.feed-list .task-card .reply-item .reaction-add:hover svg circle:nth-of-type(2),
+.feed-list .task-card .reply-item .reaction-add:hover svg circle:nth-of-type(3) { fill: var(--bg-dark); }
+
+/* 付いたリアクションは常に見せる。光らせず、数が読める静かな下地だけ */
+.feed-list .task-card .reply-item .reaction-bar .reaction-bubble:not(.reaction-add),
+.feed-list .task-card .reply-item .reaction-bar .reaction-bubble:not(.reaction-add):hover {
+    height: 22px;
+    padding: 0 8px !important;
+    border: 0 !important;
+    border-radius: 20px !important;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transform: none !important;
+    background: rgba(255, 255, 255, 0.07) !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.feed-list .task-card .reply-item .reaction-bar .reaction-bubble:not(.reaction-add):hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+}
+
+.feed-list .task-card .reply-item .reaction-bar .reaction-bubble.user-reacted,
+.feed-list .task-card .reply-item .reaction-bar .reaction-bubble.user-reacted:hover {
+    background: rgba(232, 81, 255, 0.16) !important;
+    color: #e851ff !important;
+}
+
+body.light-mode .feed-list .task-card .reply-item .reaction-bar .reaction-bubble:not(.reaction-add) {
+    background: rgba(0, 0, 0, 0.06) !important;
+    color: rgba(0, 0, 0, 0.75) !important;
+}
+
+body.light-mode .feed-list .task-card .reply-item .reaction-bar .reaction-bubble:not(.reaction-add):hover {
+    background: rgba(0, 0, 0, 0.1) !important;
+}
