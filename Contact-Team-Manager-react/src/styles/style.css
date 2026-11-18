@@ -2171,6 +2171,11 @@ body.light-mode .feed-list .task-card > .tc-float {
     stroke-width: 1.8;
 }
 
+/* 「戻す」は細い円弧の矢印で、1.8 だと埋もれて見えないので太くする（2026-11-18） */
+.feed-list .task-card > .tc-float .btn-status.btn-revert svg {
+    stroke-width: 2.4;
+}
+
 /* ホバー: 丸い下地は出さず、アイコンの絵そのものを「線」から「塗りつぶし」に変える
    （Teams の線アイコン → 塗りつぶしアイコンと同じ見え方・2026-11-18）。
    色はアクセント色のまま、絵の中身だけカードの地の色で抜く */
@@ -2219,9 +2224,17 @@ body.light-mode .feed-list .task-card > .tc-float {
 .feed-list .task-card > .tc-float .btn-status.btn-revert:hover .ic-line { display: inline; }
 
 /* 連絡待ち中は「線画のまま黄色」。塗りつぶしはホバーのときだけにして、
-   押せることが分かるようにする（常時塗りだとホバーしても変化が無い・2026-11-18） */
-.feed-list .task-card > .tc-float .btn-status.btn-waiting.active {
+   押せることが分かるようにする（常時塗りだとホバーしても変化が無い・2026-11-18）。
+   既存の .btn-status.btn-waiting.active が下地・枠・光彩を付けてくるので、
+   ホバー時も含めてすべて打ち消す（連絡待ちのときだけ丸く囲まれて見えた） */
+.feed-list .task-card > .tc-float .btn-status.btn-waiting.active,
+.feed-list .task-card > .tc-float .btn-status.btn-waiting.active:hover {
     background: transparent !important;
+    background-color: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     color: #EAB308 !important;
 }
 
