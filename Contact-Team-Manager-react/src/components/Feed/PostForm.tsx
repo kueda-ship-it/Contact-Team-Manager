@@ -234,12 +234,12 @@ export const PostForm: React.FC<PostFormProps> = ({ teamId, onSuccess, onCancel,
                                 ) : (
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                                         {/* 塗りつぶしは線を塗るのではなく、マスクで中を本当にくり抜く（2026-11-18） */}
-                                        <mask id="ctm-m-clip">
+                                        <mask id="ctm-m-clip-post">
                                             <rect x="0" y="0" width="24" height="24" fill="#fff" />
                                             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke="#000" strokeWidth="1.6" fill="none" />
                                         </mask>
                                         <path className="ic-line" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                                        <path className="ic-fill" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" fill="currentColor" stroke="none" mask="url(#ctm-m-clip)"></path>
+                                        <path className="ic-fill" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" fill="currentColor" stroke="none" mask="url(#ctm-m-clip-post)"></path>
                                     </svg>
                                 )}
                             </button>

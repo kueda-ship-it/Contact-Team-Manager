@@ -1279,7 +1279,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
                                             ) : (
                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                                    <mask id="ctm-m-check">
+                                                    <mask id={`ctm-m-check-${thread.id}`}>
                                                         <rect x="0" y="0" width="24" height="24" fill="#fff" />
                                                         <polyline points="16.5 9.5 10.5 15.5 7.5 12.5" stroke="#000" strokeWidth="2" fill="none" />
                                                     </mask>
@@ -1287,7 +1287,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                         <circle cx="12" cy="12" r="9.5"></circle>
                                                         <polyline points="16.5 9.5 10.5 15.5 7.5 12.5"></polyline>
                                                     </g>
-                                                    <circle className="ic-fill" cx="12" cy="12" r="10.2" fill="currentColor" stroke="none" mask="url(#ctm-m-check)"></circle>
+                                                    <circle className="ic-fill" cx="12" cy="12" r="10.2" fill="currentColor" stroke="none" mask={`url(#ctm-m-check-${thread.id})`}></circle>
                                                 </svg>
                                             )}
                                         </button>
@@ -1905,12 +1905,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                                                             ) : (
                                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                                                                     {/* 塗りつぶしは線を塗るのではなく、マスクで中を本当にくり抜く（2026-11-18） */}
-                                                                    <mask id="ctm-m-clip">
+                                                                    <mask id={`ctm-m-clip-${thread.id}`}>
                                                                         <rect x="0" y="0" width="24" height="24" fill="#fff" />
                                                                         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke="#000" strokeWidth="1.6" fill="none" />
                                                                     </mask>
                                                                     <path className="ic-line" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                                                                    <path className="ic-fill" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" fill="currentColor" stroke="none" mask="url(#ctm-m-clip)"></path>
+                                                                    <path className="ic-fill" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" fill="currentColor" stroke="none" mask={`url(#ctm-m-clip-${thread.id})`}></path>
                                                                 </svg>
                                                             )}
                                                         </button>
