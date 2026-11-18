@@ -5921,35 +5921,22 @@ body.light-mode .btn-status.btn-waiting.active svg {
   --accent: currentColor;
 }
 
-/* ===== 返信のリアクションもカードと同じ挙動にそろえる（2026-11-18） =====
-   ・「リアクションを付ける」は丸枠も下地も持たない裸のアイコン。
-     ホバーで色が付き、顔が線から塗りつぶしに変わる（カードの＋と同じ）
-   ・ふだんは出さず、返信にカーソルを置いたときだけ ⋮ の左に出す。
-     絶対配置なので、出ても返信の高さは変わらない（下の返信が動かない）
-   ・付いたリアクションは常に見せる。反応が無い返信では行そのものを作らない */
+/* ===== 返信のリアクションもカードのボタンと同じ見た目にそろえる（2026-11-18） =====
+   置き場所は変えない。返信テキストの下に、常に出したまま（隠さない）。
+   丸枠と下地だけをなくし、ホバーで線の顔 → 塗りつぶしの顔に変える */
 
 .feed-list .task-card .reply-item .reaction-bar {
-    position: static !important;
     margin-top: 2px !important;
     gap: 4px;
-}
-
-/* 反応がひとつも無い返信では、バーの行を作らない（空きを残さない） */
-.feed-list .task-card .reply-item .reaction-bar:not(:has(.reaction-bubble:not(.reaction-add))) {
-    margin-top: 0 !important;
-    height: 0;
 }
 
 .feed-list .task-card .reply-item .reaction-add,
 .feed-list .task-card .reply-item .reaction-add:hover,
 .feed-list .task-card .reply-item .reaction-add:focus,
 .feed-list .task-card .reply-item .reaction-add:active {
-    position: absolute;
-    top: 2px;
-    right: 28px;
-    width: 26px !important;
-    height: 26px !important;
-    min-width: 26px;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px;
     padding: 0 !important;
     border: 0 !important;
     outline: 0 !important;
@@ -5962,7 +5949,7 @@ body.light-mode .btn-status.btn-waiting.active svg {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     transform: none !important;
-    transition: color 0.12s, opacity 0.12s;
+    transition: color 0.12s;
 }
 
 .feed-list .task-card .reply-item .reaction-add::before,
@@ -5971,16 +5958,10 @@ body.light-mode .btn-status.btn-waiting.active svg {
     display: none !important;
 }
 
+/* ふだんから見えていること。薄すぎると「隠れている」ので地の文と同じ濃さにする */
 .feed-list .task-card .reply-item .reaction-add {
+    opacity: 1 !important;
     color: var(--text-muted) !important;
-    opacity: 0;
-    pointer-events: none;
-}
-
-.feed-list .task-card .reply-item:hover .reaction-add,
-.feed-list .task-card .reply-item:focus-within .reaction-add {
-    opacity: 1;
-    pointer-events: auto;
 }
 
 .feed-list .task-card .reply-item .reaction-add svg,
@@ -6002,7 +5983,7 @@ body.light-mode .btn-status.btn-waiting.active svg {
 .feed-list .task-card .reply-item .reaction-add:hover svg circle:nth-of-type(2),
 .feed-list .task-card .reply-item .reaction-add:hover svg circle:nth-of-type(3) { fill: var(--bg-dark); }
 
-/* 付いたリアクションは常に見せる。光らせず、数が読める静かな下地だけ */
+/* 付いたリアクションは光らせず、数が読める静かな下地だけ */
 .feed-list .task-card .reply-item .reaction-bar .reaction-bubble:not(.reaction-add),
 .feed-list .task-card .reply-item .reaction-bar .reaction-bubble:not(.reaction-add):hover {
     height: 22px;
